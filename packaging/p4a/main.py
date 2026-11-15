@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
-"""p4a 启动器：注入环境变量 → 日志 → 权限 → 原生桥 → 启动 backend.cli.main。
+"""p4a 启动器副本（仅供本地阅读/参考）。
 
-白屏排查：p4a 的 WebViewLoader 只轮询端口、失败不提示；
-本文件把启动异常写到 DATA_DIR/ac2.log，同时打到 stderr（logcat）。
+**构建入口是仓库根 main.py**：buildozer 的 `source.dir=../..` 会把仓库根复制到
+`--private` 目录，p4a 只认根目录下的 main.py。修改启动逻辑请改根 main.py，
+再把本文件同步成同一份内容（或直接删掉本文件）。
 """
+
 import os
 import sys
 import time

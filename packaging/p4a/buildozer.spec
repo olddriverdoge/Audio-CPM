@@ -11,19 +11,15 @@ requirements = python3,starlette==1.10.0,uvicorn==0.54.0,httpx==0.28.1,mutagen==
 orientation = portrait
 fullscreen = 1
 
-# p4a 分支/版本：develop 当前是 Python 3.14.2 + ffmpeg 8.0.1 recipe。
-# 首次成功后建议把 branch 换成固定 commit，保证可复现。
+# p4a 参数（buildozer 只认 [app] 段下的点号键；[android] 段不会生效）
+p4a.bootstrap = webview
+p4a.port = 8000
 p4a.branch = develop
 
-# 原生桥：把 packaging/android/java 作为额外 Java 源编译
-android.add_src = ../android/java
-
-# 只打 arm64（本机设备），减少构建时间与体积
+# Android 目标（targetSdk 28：/sdcard 旧权限 + app 目录 exec 豁免）
+android.api = 28
+android.minapi = 24
+android.permissions = READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,INTERNET
 android.archs = arm64-v8a
 android.accept_sdk_license = True
-
-[android]
-api = 28
-minapi = 24
-port = 8000
-permissions = READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,INTERNET
+android.add_src = ../android/java
