@@ -38,7 +38,7 @@ def main():
     os.environ.setdefault("AC2_DATA_DIR", str(data))
     os.environ.setdefault("AC2_ROOT", "/sdcard")
     os.environ.setdefault("AC2_HOST", "127.0.0.1")
-    os.environ.setdefault("AC2_PORT", "8000")
+    os.environ.setdefault("AC2_PORT", "8765")
     os.environ.setdefault("AC2_ANDROID", "1")
 
     _log(data, "boot: base=%s data=%s" % (base, data))

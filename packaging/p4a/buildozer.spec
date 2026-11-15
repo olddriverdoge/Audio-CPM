@@ -16,7 +16,7 @@ fullscreen = 1
 
 # p4a 参数（buildozer 只认 [app] 段下的点号键；[android] 段不会生效）
 p4a.bootstrap = webview
-p4a.port = 8000
+p4a.port = 8765
 p4a.branch = develop
 
 # Android 目标（targetSdk 28：/sdcard 旧权限 + app 目录 exec 豁免）
