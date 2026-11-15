@@ -1,0 +1,21 @@
+# runtime / user data
+__pycache__/
+*.py[cod]
+cache/
+ac_web.log
+ac_web.pid
+ac2_ui_config.json
+ac2_storage.json
+ac2_presets.json
+ac2_tasks.json
+local:/
+
+# build outputs
+.buildozer/
+bin/
+build.log
+.gradle/
+*.apk
+*.aab
+packaging/tests/node_modules
+packaging/tests/package-lock.json
