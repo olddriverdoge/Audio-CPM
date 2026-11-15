@@ -634,6 +634,19 @@ const App = (() => {
     updateSelInfo2();
     Player.paintRows();
     Player.syncBar();
+
+    /* 权限弹窗返回 / 切回前台后自动刷新，避免“授权后要重启 app” */
+    let _resumeAt = 0;
+    function refreshOnResume() {
+      if (document.visibilityState !== 'visible') return;
+      const now = Date.now();
+      if (now - _resumeAt < 1200) return;
+      _resumeAt = now;
+      try { if (currentPath) browse(currentPath); } catch (_) {}
+      try { if (srcPath) srcBrowse(srcPath, {clearUndo: false}); } catch (_) {}
+    }
+    document.addEventListener('visibilitychange', refreshOnResume);
+    window.addEventListener('focus', refreshOnResume);
   }
 
   async function defaultRoot() {

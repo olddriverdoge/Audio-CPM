@@ -124,7 +124,12 @@ const Player = (() => {
     waveBase.removeAttribute('src');
     waveHi.removeAttribute('src');
     setPct(0);
+    const waveBox = document.getElementById('pb-wave');
+    const isDav = String(path || '').indexOf('dav:') === 0;
+    if (waveBox) waveBox.classList.toggle('time-only', isDav);
     if (!path) return;
+    // WebDAV 不请求波形（也不画占位），进度条用时间/range
+    if (isDav) { paintRows(); return; }
     const url = await Wave.get(path);
     if (!url || cur !== path) return;
     curWave = url;

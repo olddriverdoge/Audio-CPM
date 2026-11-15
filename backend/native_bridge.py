@@ -23,7 +23,7 @@ def register() -> bool:
         return False
     try:
         from jnius import autoclass  # type: ignore
-        Bridge = autoclass('com.example.ac2.Ac2Bridge')
+        Bridge = autoclass('com.github.olddriverdoge.audiocpm.Ac2Bridge')
     except Exception:
         return False
 
