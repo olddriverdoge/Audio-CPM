@@ -1,12 +1,5 @@
 # -*- coding: utf-8 -*-
-"""p4a 启动器（构建入口：仓库根 main.py）。
-
-注入环境变量 → 日志 → 权限 → 原生桥 → 启动 backend.cli.main。
-（packaging/p4a/main.py 是同一份副本，构建只读本文件。）
-
-白屏排查：p4a 的 WebViewLoader 只轮询端口、失败不提示；
-本文件把启动异常写到 DATA_DIR/ac2.log，同时打到 stderr（logcat）。
-"""
+"""p4a 启动器：注入环境变量 → 日志 → 权限 → 原生桥 → 启动 backend.cli.main。"""
 import os
 import sys
 import time
@@ -15,7 +8,6 @@ from pathlib import Path
 
 
 def _pick_data_dir(base: Path) -> Path:
-    """优先用 private 目录下的 data/；不可写时退回 ANDROID_PRIVATE。"""
     candidates = [base / "data"]
     alt = os.environ.get("ANDROID_PRIVATE")
     if alt:
@@ -43,7 +35,6 @@ def _log(data: Path, msg: str) -> None:
 def main():
     base = Path(__file__).resolve().parent
     data = _pick_data_dir(base)
-
     os.environ.setdefault("AC2_DATA_DIR", str(data))
     os.environ.setdefault("AC2_ROOT", "/sdcard")
     os.environ.setdefault("AC2_HOST", "127.0.0.1")
@@ -52,32 +43,33 @@ def main():
 
     _log(data, "boot: base=%s data=%s" % (base, data))
 
-    # nativeLibraryDir：ffbin.prepare() 会从这里复制 libffmpegbin.so/libav*
     try:
         from jnius import autoclass
         Activity = autoclass("org.kivy.android.PythonActivity")
         native = Activity.mActivity.getApplicationInfo().nativeLibraryDir
         os.environ.setdefault("AC2_NATIVE_LIB_DIR", native)
         _log(data, "nativeLibraryDir=%s" % native)
-    except Exception:
+    except BaseException:
         _log(data, "nativeLibraryDir failed:\n" + traceback.format_exc())
 
-    # 存储权限（targetSdk 28 旧模型；34+ 需要 MANAGE_EXTERNAL_STORAGE 引导）
-    try:
-        from android.permissions import request_permissions, Permission
-        request_permissions([Permission.READ_EXTERNAL_STORAGE,
-                             Permission.WRITE_EXTERNAL_STORAGE])
-        _log(data, "storage permissions requested")
-    except Exception:
-        _log(data, "permissions failed:\n" + traceback.format_exc())
+    # 先跳过权限弹窗，排除 Activity/权限回调对启动的干扰；
+    # 需要时设 AC2_REQUEST_PERMISSIONS=1 再启用。
+    if os.environ.get("AC2_REQUEST_PERMISSIONS", "0") == "1":
+        try:
+            from android.permissions import request_permissions, Permission
+            request_permissions([Permission.READ_EXTERNAL_STORAGE,
+                                 Permission.WRITE_EXTERNAL_STORAGE])
+            _log(data, "storage permissions requested")
+        except BaseException:
+            _log(data, "permissions failed:\n" + traceback.format_exc())
 
     try:
-        _log(data, "import backend.cli")
+        _log(data, "before import backend.cli")
         from backend.cli import main as run
-        _log(data, "starting uvicorn on %s:%s" % (
-            os.environ.get("AC2_HOST"), os.environ.get("AC2_PORT")))
+        _log(data, "imported backend.cli; calling run()")
         run()
-    except Exception:
+        _log(data, "run() returned")
+    except BaseException:
         tb = traceback.format_exc()
         _log(data, "FATAL:\n" + tb)
         print(tb, file=sys.stderr)
