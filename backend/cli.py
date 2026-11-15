@@ -27,4 +27,10 @@ def main():
     print(f"封面缓存: {COVER_CACHE_DIR}")
     host_display = '127.0.0.1' if args.host == '0.0.0.0' else args.host
     print(f"打开浏览器访问: http://{host_display}:{args.port}")
-    uvicorn.run(app, host=args.host, port=args.port, log_level="info")
+    config = uvicorn.Config(app, host=args.host, port=args.port, log_level="info")
+    server = uvicorn.Server(config)
+    if os.environ.get("AC2_ANDROID"):
+        # p4a 在非主线程执行 main.py；uvicorn 默认安装 signal handlers 会抛
+        # "signal only works in main thread"，导致进程在启动阶段静默退出。
+        server.install_signal_handlers = lambda: None
+    server.run()
