@@ -11,7 +11,10 @@ version = 0.1
 # 注意：p4a 的依赖图不接受 `==` 版本 pin（会报 no valid dependency graphs），
 # 纯 Python 包只写名字，由 pip 解析最新版本。
 requirements = python3,starlette,uvicorn,httpx,mutagen,ffmpeg
-orientation = sensor
+orientation = portrait
+# buildozer 的 orientation 只支持 landscape/portrait/*-reverse/all；
+# 用 manifest 覆盖为 fullSensor，才能跟系统旋转。
+android.manifest.orientation = fullSensor
 fullscreen = 1
 
 # p4a 参数（buildozer 只认 [app] 段下的点号键；[android] 段不会生效）
