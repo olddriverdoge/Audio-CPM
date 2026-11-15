@@ -1,0 +1,21 @@
+  :root{
+    --bg:#0f1419; --panel:#1a2028; --panel2:#222a34; --border:#2d3748;
+    --text:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8; --ok:#22c55e;
+    --err:#ef4444; --warn:#f59e0b; --hl:#1e3a52;
+    --meta-w:340px;   /* 元数据固定内容宽度：拖动只遮挡，不重排 */
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);overflow:hidden;
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+       font-size:14px;line-height:1.45}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .hidden{display:none!important}
+  h3{color:var(--accent);font-size:11px;margin:9px 0 4px;font-weight:600;
+     text-transform:uppercase;letter-spacing:.5px}
+  h3:first-child{margin-top:0}
+
+  /* 顶栏开关：顺序自动播放 */
+  #btn-autoplay.on{color:var(--accent);border-color:var(--accent);
+    box-shadow:0 0 0 1px rgba(56,189,248,.35) inset}

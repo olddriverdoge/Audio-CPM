@@ -1,0 +1,115 @@
+  /* ---------- 浮层 ---------- */
+  /* 底部播放条 */
+  #audio-el{display:none}
+  .player-bar{position:fixed;left:0;right:0;bottom:0;z-index:220;display:flex;align-items:center;
+    gap:8px;padding:6px 10px calc(6px + env(safe-area-inset-bottom));
+    background:rgba(20,26,34,.97);border-top:1px solid var(--border);
+    -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+  .player-bar.hidden{display:none}
+  .pb-btn{flex:none;width:32px;height:32px;padding:0;border-radius:50%;font-size:13px;
+    display:flex;align-items:center;justify-content:center;background:var(--panel2)}
+  .pb-cover{flex:none;position:relative;width:40px;height:40px;border-radius:6px;
+    background:#080c11;border:1px solid var(--border);overflow:hidden;
+    display:flex;align-items:center;justify-content:center}
+  .pb-cover img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none}
+  .pb-cover.on img{display:block}
+  .pb-cover .ph{font-size:17px;color:#33404f;user-select:none}
+  .pb-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
+  .pb-title{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    color:var(--text)}
+  .pb-track{display:flex;align-items:center;gap:6px}
+  /* 波形进度：底层虚化波形 + 上层同一波形按进度裁剪高亮 */
+  .pb-wave{position:relative;flex:1 1 auto;min-width:70px;height:30px;border-radius:6px;
+    overflow:hidden;background:#120c07;border:1px solid rgba(251,146,60,.26);cursor:pointer}
+  .pb-wave img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:fill;
+    pointer-events:none;transform:scaleY(.9)}
+  .pb-wave .wave-base{opacity:.34}
+  .pb-wave .wave-hi{opacity:1;clip-path:inset(0 100% 0 0);transition:clip-path .12s linear}
+  .pb-wave input[type=range]{position:absolute;inset:0;width:100%;height:100%;margin:0;
+    opacity:0;cursor:pointer}
+  .pb-time{flex:none;font-size:10.5px;color:var(--muted);min-width:36px;text-align:center;
+    font-family:ui-monospace,Menlo,monospace}
+  .pb-vol{flex:0 0 66px;accent-color:var(--accent)}
+  body.has-player .app{height:calc(100vh - 58px);height:calc(100dvh - 58px)}
+  #toast-wrap{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:300;
+    display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
+  body.has-player #toast-wrap{bottom:74px}
+  .toast{background:#243040;border:1px solid var(--border);color:var(--text);
+    padding:6px 14px;border-radius:20px;font-size:12.5px;max-width:90vw;
+    box-shadow:0 4px 16px rgba(0,0,0,.55);opacity:1;transform:none;
+    transition:opacity .3s,transform .3s}
+  .toast.out{opacity:0;transform:translateY(6px)}
+  .toast.err{border-color:var(--err);color:#fecaca}
+  .toast.warn{border-color:var(--warn);color:#fde68a}
+  #menu-overlay{position:fixed;inset:0;z-index:250;background:transparent}
+  .ctx-menu{position:fixed;background:var(--panel);border:1px solid var(--border);
+    border-radius:8px;padding:4px;min-width:150px;box-shadow:0 8px 24px rgba(0,0,0,.6);z-index:251}
+  .ctx-item{padding:7px 12px;border-radius:5px;font-size:13px;cursor:pointer}
+  .ctx-item:hover{background:#2f3a48}
+  .ctx-item.danger{color:var(--err)}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.88);display:flex;align-items:center;
+    justify-content:center;z-index:400;cursor:zoom-out}
+  .modal img{max-width:92vw;max-height:92vh}
+  .sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;
+    align-items:center;justify-content:center;z-index:350}
+  .sheet{background:var(--panel);border:1px solid var(--border);border-radius:10px;
+    padding:14px;width:min(92vw,430px);box-shadow:0 12px 40px rgba(0,0,0,.6);
+    max-height:88vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .sheet .hint{font-size:11.5px;color:var(--muted);line-height:1.5}
+  .sheet input{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+
+  @media(max-width:600px){
+    .hdr .hdr-label{display:none}
+    /* 窄屏仍保持左右分屏，允许拖动分隔条调整 */
+    .page{padding:6px}
+    .panel{padding:7px}
+    .sortbar{gap:4px}
+    .sortbar input[type=search]{width:112px}
+    .m2-left{min-width:110px;padding-right:4px}
+    .m2-right{padding-left:4px}
+    .detail-panel .k{min-width:64px}
+    .cover-box img{max-width:100%;max-height:110px}
+    #view1{height:34vh}
+    .pb-vol{display:none}
+    .pb-time{min-width:32px}
+  }
+
+  /* 播放条副标题：专辑 / 艺术家 / 作曲家 */
+  .pb-meta{font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;line-height:1.2}
+
+  /* 全局悬浮频谱：默认右下角贴边按钮，点开浮窗；右下角拖动调整大小 */
+  .sf-fab{position:fixed;right:10px;bottom:96px;z-index:330;display:flex;align-items:center;gap:4px;
+    padding:5px 10px;font-size:11px;border-radius:999px;border:1px solid var(--border);
+    background:rgba(20,26,34,.95);color:var(--muted);cursor:pointer;
+    box-shadow:0 4px 14px rgba(0,0,0,.45);font-family:inherit}
+  .sf-fab:hover,.sf-fab.on{color:var(--accent);border-color:var(--accent)}
+  body.has-player .sf-fab{bottom:140px}
+  .spectrum-float{position:fixed;right:10px;bottom:96px;z-index:331;width:320px;height:170px;
+    min-width:180px;min-height:110px;max-width:92vw;max-height:70vh;
+    display:flex;flex-direction:column;background:rgba(13,18,24,.97);
+    border:1px solid var(--border);border-radius:8px;
+    box-shadow:0 8px 28px rgba(0,0,0,.6);overflow:hidden}
+  body.has-player .spectrum-float{bottom:140px}
+  .spectrum-float.hidden{display:none}
+  .sf-head{display:flex;align-items:center;gap:6px;padding:3px 6px;font-size:11px;
+    color:var(--muted);border-bottom:1px solid var(--border);flex:0 0 auto;
+    cursor:move;touch-action:none;user-select:none;-webkit-user-select:none}
+  .sf-title{font-weight:600;letter-spacing:.4px;flex:none}
+  .sf-track{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-size:10.5px;color:var(--text)}
+  .sf-state{flex:none;font-size:10px;opacity:.8;margin-left:auto}
+  .sf-btn{border:none;background:none;color:var(--muted);cursor:pointer;font-size:13px;
+    line-height:1;padding:0 4px}
+  .sf-btn:hover{color:var(--text)}
+  .spectrum-float canvas{display:block;width:100%;flex:1 1 auto;min-height:0;background:#080c11}
+  .sf-resize{position:absolute;right:0;bottom:0;width:24px;height:24px;z-index:2;
+    cursor:nwse-resize;touch-action:none;
+    background:linear-gradient(135deg,transparent 50%,rgba(148,163,184,.55) 50%)}
+
+  /* 频谱浮窗：模式切换 tab */
+  .sf-tabs{display:flex;gap:2px;flex:none}
+  .sf-tab{border:1px solid transparent;background:none;color:var(--muted);font-size:11px;
+    padding:1px 7px;border-radius:4px;cursor:pointer;font-family:inherit}
+  .sf-tab:hover{color:var(--text)}
+  .sf-tab.active{color:var(--accent);border-color:var(--border);background:var(--panel2)}

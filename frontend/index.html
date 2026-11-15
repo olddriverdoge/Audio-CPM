@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>AC2 Web</title>
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/controls.css">
+<link rel="stylesheet" href="/css/layout.css">
+<link rel="stylesheet" href="/css/process.css">
+<link rel="stylesheet" href="/css/organize.css">
+<link rel="stylesheet" href="/css/overlays.css">
+
+</head>
+<body>
+<div class="app" id="app">
+
+  <header class="hdr">
+    <span class="logo">🎵 AC2 Web</span>
+    <div class="seg" id="page-seg">
+      <button type="button" data-page="process" class="active">文件处理</button>
+      <button type="button" data-page="organize">文件整理</button>
+    </div>
+    <select id="source-select" class="small" title="数据源（本地 / WebDAV）"
+            style="max-width:150px"></select>
+    <span class="spacer"></span>
+    <div class="seg" id="view-seg">
+      <button type="button" data-view="list" class="active">列表</button>
+      <button type="button" data-view="grid">网格</button>
+    </div>
+    <div class="seg hidden" id="gridsize-seg" title="封面尺寸">
+      <button type="button" data-size="96">S</button>
+      <button type="button" data-size="128" class="active">M</button>
+      <button type="button" data-size="192">L</button>
+    </div>
+    <button type="button" class="small" id="btn-fullscreen" title="全屏">⛶</button>
+    <button type="button" class="small" id="btn-autoplay" title="顺序播放：播完自动播放列表下一首">⏭ 顺序</button>
+    <button type="button" class="small" id="btn-player-cfg" title="设置（播放 + 界面配置）">⚙ 设置</button>
+  </header>
+
+  <!-- ==================== 页面 A · 文件处理 ==================== -->
+  <section class="page page-process" id="mod1">
+    <div class="p1-main" id="p1-main">
+    <div class="panel">
+      <div class="pathbar pathrow" id="pb1">
+        <div class="pb-crumbs" id="pb1-crumbs" title="点路径段跳转，长按编辑路径"></div>
+        <img id="dir-cover" class="dir-cover-thumb hidden" alt="目录封面">
+      </div>
+      <div class="sortbar">
+        <input type="search" id="search-input" placeholder="搜索当前目录">
+        <span class="spacer"></span>
+        <span class="sel-tools hidden" id="sel-tools">
+          <span class="status" id="sel-info">未选择</span>
+          <button id="btn-selall" class="small">全选</button>
+          <button id="btn-selclear" class="small">清空</button>
+        </span>
+      </div>
+      <div class="view-wrap" id="view1"><div class="empty">加载中...</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="row">
+        <label class="chk"><input type="radio" name="task" value="convert" checked> 转换格式</label>
+        <label class="chk"><input type="radio" name="task" value="tags"> 整理标签</label>
+        <label class="chk"><input type="radio" name="task" value="cover"> 替换封面</label>
+        <label class="chk"><input type="radio" name="task" value="check"> 检查标签</label>
+      </div>
+
+      <div id="ui-convert">
+        <div class="row">
+          <label>格式</label>
+          <select id="fmt-select" style="flex:1;max-width:320px">
+            <optgroup label="无损（bit / kHz）">
+              <option value="FLAC">FLAC（保留源参数）</option>
+              <option value="FLAC-16-44" selected>FLAC 16bit / 44.1kHz</option>
+              <option value="FLAC-16-48">FLAC 16bit / 48kHz</option>
+              <option value="FLAC-24-44">FLAC 24bit / 44.1kHz</option>
+              <option value="FLAC-24-48">FLAC 24bit / 48kHz</option>
+              <option value="FLAC-24-96">FLAC 24bit / 96kHz</option>
+              <option value="FLAC-24-192">FLAC 24bit / 192kHz</option>
+              <option value="WAV-16-44">WAV 16bit / 44.1kHz</option>
+              <option value="WAV-24-48">WAV 24bit / 48kHz</option>
+              <option value="WAV-24-96">WAV 24bit / 96kHz</option>
+              <option value="AIFF-16-44">AIFF 16bit / 44.1kHz</option>
+              <option value="AIFF-24-48">AIFF 24bit / 48kHz</option>
+              <option value="AIFF-24-96">AIFF 24bit / 96kHz</option>
+            </optgroup>
+            <optgroup label="有损（kbps）">
+              <option value="MP3-128">MP3 128k</option>
+              <option value="MP3-192">MP3 192k</option>
+              <option value="MP3-256">MP3 256k</option>
+              <option value="MP3-320">MP3 320k</option>
+              <option value="M4A-128">M4A 128k</option>
+              <option value="M4A-192">M4A 192k</option>
+              <option value="M4A-256">M4A 256k</option>
+              <option value="M4A-320">M4A 320k</option>
+              <option value="OPUS-192">OPUS 192k</option>
+              <option value="OGG-256">OGG 256k</option>
+            </optgroup>
+          </select>
+          <label class="chk"><input type="checkbox" id="delete-source" checked> 成功后删源</label>
+        </div>
+        <div class="row">
+          <label>输出目录</label>
+          <input type="text" id="output-dir" class="path" placeholder="留空=原地（保持结构）">
+          <button class="small" id="btn-use-cur-dir">当前路径</button>
+        </div>
+        <div class="row">
+          <label class="chk"><input type="checkbox" id="also-tags"> 转换后自动整理标签</label>
+        </div>
+      </div>
+
+      <div id="ui-tags" class="hidden">
+        <div class="row">
+          <label>命名格式</label>
+          <input type="text" id="name-pattern" class="path"
+                 value="{album_artist} - {title} - {composer} - {album}">
+        </div>
+        <div class="row">
+          <label style="font-size:11.5px">变量</label>
+          <span class="status">{artist} {album_artist} {title} {album} {composer} {track} {disc} {year} {genre} {filename}</span>
+        </div>
+        <div class="row">
+          <label>目标格式</label>
+          <select id="tags-format">
+            <option value="flac" selected>flac</option>
+            <option value="mp3">mp3</option>
+            <option value="m4a">m4a</option>
+            <option value="wav">wav</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="ui-cover" class="hidden">
+        <div class="row">
+          <label>目标格式</label>
+          <select id="cover-format">
+            <option value="flac" selected>flac</option>
+            <option value="mp3">mp3</option>
+            <option value="m4a">m4a</option>
+          </select>
+          <span class="status">（目录内需有 jpg/png 封面）</span>
+        </div>
+      </div>
+
+      <div id="ui-check" class="hidden">
+        <div class="row">
+          <label>检查格式</label>
+          <select id="check-format">
+            <option value="flac" selected>flac</option>
+            <option value="mp3">mp3</option>
+            <option value="m4a">m4a</option>
+            <option value="wav">wav</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:4px;border-top:1px solid var(--border);padding-top:6px">
+        <label>预设</label>
+        <select id="preset-select" style="flex:1;max-width:240px"></select>
+        <button class="small" id="btn-save-preset">保存为预设</button>
+        <button class="small danger" id="btn-del-preset">删除</button>
+      </div>
+
+      <div class="row" style="margin-top:6px;border-top:1px solid var(--border);padding-top:6px">
+        <button class="primary" id="start-btn" style="min-width:116px">▶ 开始执行</button>
+        <button class="small danger hidden" id="cancel-btn" title="取消当前任务">✕ 取消</button>
+        <span class="status" id="task-status"></span>
+        <span class="spacer"></span>
+        <span class="status" id="progress-status">就绪</span>
+      </div>
+      <div class="progress-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+      <div class="loghead" id="log-toggle">日志 <span id="log-tri">▾</span></div>
+      <div class="log" id="log"></div>
+    </div>
+    </div><!-- /p1-main -->
+    <div class="p1-side collapsed" id="p1-side">
+      <div class="pane-head meta-head" id="meta1-head" title="点击收起 / 展开元数据">
+        <span class="chev" id="meta1-chev">▸</span>元数据
+      </div>
+      <div class="detail-panel" id="meta1">
+        <div class="detail-empty">点击文件查看详情</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 页面 B · 文件整理 ==================== -->
+  <section class="page page-organize hidden" id="mod2">
+    <div class="m2-row" id="m2-row">
+      <div class="m2-left" id="m2-left">
+        <div class="pane-head meta-head" id="meta2-head" title="点击收起 / 展开元数据">
+          <span class="chev" id="meta2-chev">◂</span>元数据
+        </div>
+        <div class="detail-panel" id="meta2">
+          <div class="detail-empty">点击右侧文件名查看详情</div>
+        </div>
+      </div>
+
+      <div class="split v-split" id="split2" title="拖动调整左右宽度"></div>
+
+      <div class="m2-right" id="m2-right">
+        <div class="m2-src" id="m2-src">
+          <div class="pathbar pathrow" id="pb2">
+            <div class="pb-crumbs" id="pb2-crumbs" title="点路径段跳转，长按编辑路径"></div>
+          </div>
+          <div class="sortbar">
+            <input type="search" id="s2-search" placeholder="搜索">
+            <button id="s2-view-btn" type="button" class="small"
+                    title="切换文件选择区视图：列表 / 网格（目标目录保持树状）">列表</button>
+            <span class="spacer"></span>
+            <span class="sel-tools hidden" id="s2-sel-tools">
+              <span class="status" id="s2-selinfo">已选 0</span>
+              <button id="s2-selall" class="small">全选</button>
+              <button id="s2-clear" class="small">清空</button>
+            </span>
+          </div>
+          <div class="view-wrap" id="view2"><div class="empty">加载中...</div></div>
+        </div>
+
+        <div class="split h-split" id="split3" title="拖动调整上下高度"></div>
+
+        <div class="m2-tree collapsed" id="m2-tree">
+          <div class="tree-head" id="tree-head" title="点击展开 / 收起目标目录">
+            <span class="pb-caret" id="tree-caret">▸</span>
+            <span class="pane-head" style="margin:0">目标目录</span>
+          </div>
+          <div class="tree-body" id="tree-body">
+            <div class="tree-tabs" id="tree-tabs"></div>
+            <div class="tree" id="tree"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="movebar" id="movebar">
+      <button type="button" class="mv-toggle" id="mv-toggle"
+              title="收起 / 展开移动条">⌃ 收起</button>
+      <span class="status" id="mv-count">已选 0 个文件</span>
+      <div class="mv-body">
+        <select id="mv-conflict" title="同名冲突策略">
+          <option value="skip">跳过同名</option>
+          <option value="rename">重命名</option>
+          <option value="overwrite">覆盖</option>
+        </select>
+        <button class="primary" id="mv-btn" disabled>移动</button>
+        <button id="mv-undo" disabled>撤销</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<audio id="audio-el" preload="metadata"></audio>
+<div class="player-bar hidden" id="player-bar">
+  <div class="pb-cover" id="pb-cover" title="暂无封面">
+    <span class="ph">♪</span>
+  </div>
+  <button type="button" class="pb-btn" id="pb-toggle" title="播放 / 暂停">▶</button>
+  <div class="pb-main">
+    <div class="pb-title" id="pb-title">未在播放</div>
+    <div class="pb-meta" id="pb-meta"></div>
+    <div class="pb-track">
+      <span class="pb-time" id="pb-cur">0:00</span>
+      <div class="pb-wave" id="pb-wave" title="拖动选择进度">
+        <img id="pb-wave-base" class="wave-base" alt="">
+        <img id="pb-wave-hi" class="wave-hi" alt="">
+        <input type="range" id="pb-seek" min="0" max="0" step="0.1" value="0" aria-label="播放进度">
+      </div>
+      <span class="pb-time" id="pb-dur">0:00</span>
+    </div>
+  </div>
+  <input type="range" class="pb-vol" id="pb-vol" min="0" max="1" step="0.01" value="1" title="音量">
+  <button type="button" class="pb-btn" id="pb-ext" title="用系统播放器打开">↗</button>
+  <button type="button" class="pb-btn" id="pb-close" title="关闭播放条">✕</button>
+</div>
+
+<!-- 全局悬浮频谱：默认贴边按钮，点开浮窗，右下角可拖动调整大小 -->
+<button type="button" class="sf-fab" id="sf-fab" title="实时频谱 / 声谱">▤<span>频谱/声谱</span></button>
+<div class="spectrum-float hidden" id="spectrum-float">
+  <div class="sf-head" id="sf-head" title="拖动可移动 / 吸附到左右边缘">
+    <span class="sf-tabs">
+      <button type="button" class="sf-tab active" id="sf-tab-spectrum" data-mode="spectrum">频谱</button>
+      <button type="button" class="sf-tab" id="sf-tab-waterfall" data-mode="waterfall">声谱</button>
+    </span>
+    <span class="sf-track" id="sf-track">未在播放</span>
+    <span class="sf-state" id="sf-state"></span>
+    <button type="button" class="sf-btn" id="sf-min" title="收起">—</button>
+  </div>
+  <canvas id="sf-canvas"></canvas>
+  <b class="sf-resize" id="sf-resize" title="拖动调整大小"></b>
+</div>
+
+<div id="toast-wrap"></div>
+<div id="menu-overlay" class="hidden"><div id="ctx-menu" class="ctx-menu"></div></div>
+
+<div id="sheet-overlay" class="sheet-overlay hidden">
+  <div class="sheet" id="player-sheet">
+    <h3 style="font-size:13px">设置</h3>
+    <div class="row" style="display:block">
+      <label for="cfg-playmode" style="display:block;margin-bottom:3px">播放方式</label>
+      <select id="cfg-playmode" style="width:100%">
+        <option value="web">网页内播放（可拖动进度，不弹播放器）</option>
+        <option value="system">系统播放器（跳转 App，可指定包名）</option>
+      </select>
+    </div>
+    <div class="row" style="display:block;margin-top:8px">
+      <label for="cfg-player" style="display:block;margin-bottom:3px">播放器包名（系统播放器模式使用）</label>
+      <input type="text" id="cfg-player" class="path" style="width:100%"
+             placeholder="com.maxmpz.audioplayer">
+    </div>
+    <div class="row" style="display:block;margin-top:8px">
+      <label for="cfg-activity" style="display:block;margin-bottom:3px">Activity（可选，优先于包名）</label>
+      <input type="text" id="cfg-activity" style="width:100%"
+             placeholder="com.maxmpz.audioplayer/.MainActivity">
+    </div>
+    <p class="hint" style="margin:8px 0 0">
+      网页内播放由后端流式提供音频，进度/暂停/音量都在页面内控制，不会拉起外部 App。
+      只有切到「系统播放器」模式或点播放条上的 ↗ 才会拉起 App。
+    </p>
+    <p class="hint" id="cfg-hint" style="margin:4px 0 0"></p>
+
+    <div style="border-top:1px solid var(--border);margin:12px 0 0"></div>
+    <h3 style="font-size:13px;margin:10px 0 4px">存储源（本地 / WebDAV）</h3>
+    <div id="src-list" class="col-opts" style="gap:6px;margin-bottom:6px"></div>
+    <div class="row" style="gap:6px;align-items:center">
+      <input type="text" id="src-name" class="path" style="flex:1 1 90px;min-width:70px" placeholder="名称（如 NAS）">
+      <input type="text" id="src-url" class="path" style="flex:2 1 140px;min-width:120px" placeholder="https://host/dav">
+    </div>
+    <div class="row" style="gap:6px;align-items:center;margin-top:6px">
+      <input type="text" id="src-user" class="path" style="flex:1 1 90px" placeholder="用户名（可空）">
+      <input type="password" id="src-pass" class="path" style="flex:1 1 90px" placeholder="密码（可空）">
+    </div>
+    <div class="row" style="gap:6px;align-items:center;margin-top:6px">
+      <label class="chk"><input type="checkbox" id="src-readonly" checked> 只读</label>
+      <span class="spacer"></span>
+      <button type="button" class="small" id="src-test">测试连接</button>
+      <button type="button" class="primary small" id="src-save">保存源</button>
+    </div>
+    <p class="hint" style="margin:6px 0 0">
+      WebDAV 支持浏览 / 播放 / 元数据 / 下载（后续）与远端内部移动、删除、新建目录；
+      跨源搬运不做，文件处理只作用于本地。
+    </p>
+
+    <div style="border-top:1px solid var(--border);margin:12px 0 0"></div>
+    <h3 style="font-size:13px;margin:10px 0 4px">界面配置（存本地 JSON）</h3>
+    <p class="hint" id="uicfg-file" style="margin:0 0 6px;word-break:break-all"></p>
+    <div class="row" style="gap:6px;align-items:center">
+      <select id="uicfg-presets" style="flex:1 1 auto;min-width:0"></select>
+      <button type="button" class="small" id="uicfg-load">加载</button>
+      <button type="button" class="small" id="uicfg-del">删除</button>
+    </div>
+    <div class="row" style="gap:6px;align-items:center;margin-top:6px">
+      <input type="text" id="uicfg-name" class="path" style="flex:1 1 auto;min-width:0"
+             placeholder="预设名（如 手机整理）">
+      <button type="button" class="small" id="uicfg-save">保存预设</button>
+    </div>
+    <div class="row" style="gap:6px;margin-top:6px;justify-content:flex-end">
+      <button type="button" class="small" id="uicfg-export">导出 JSON</button>
+      <button type="button" class="small" id="uicfg-import">导入 JSON</button>
+      <input type="file" id="uicfg-file-input" accept=".json,application/json" hidden>
+    </div>
+    <p class="hint" style="margin:6px 0 0">
+      视图 / 排序 / 分栏比例 / 目标目录标签 / 列设置 / 播放器设置等改动会自动写入上面的 JSON 文件，
+      换浏览器或清缓存后打开页面自动恢复。
+    </p>
+    <div class="row" style="margin-top:10px;justify-content:flex-end">
+      <button type="button" class="small" id="cfg-reset">恢复默认</button>
+      <button type="button" class="small" id="cfg-cancel">取消</button>
+      <button type="button" class="primary small" id="cfg-save">保存</button>
+    </div>
+  </div>
+
+  <div class="sheet hidden" id="cols-sheet">
+    <h3 style="font-size:13px">列表表头</h3>
+    <div id="cols-presets" class="col-opts"></div>
+    <div class="col-custom-add">
+      <input type="text" id="col-key" class="path" placeholder="元数据 key（如 genre）">
+      <input type="text" id="col-label" class="path" placeholder="显示名（如 流派）">
+      <button type="button" class="small" id="col-add">添加</button>
+    </div>
+    <div id="cols-custom" class="col-opts"></div>
+    <p class="hint" style="margin:8px 0 0">预设与自定义列都可勾选 / 取消，顺序随勾选与表头拖动；自定义列取消勾选只是隐藏，点 ✕ 才彻底删除。</p>
+    <div class="row" style="margin-top:10px;justify-content:flex-end">
+      <button type="button" class="small" id="cols-reset">恢复默认</button>
+      <button type="button" class="primary small" id="cols-close">完成</button>
+    </div>
+  </div>
+</div>
+<script src="/js/keys.js"></script>
+<script src="/js/store.js"></script>
+<script src="/js/utils.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/sources.js"></script>
+<script src="/js/uicfg.js"></script>
+<script src="/js/wave.js"></script>
+<script src="/js/settings.js"></script>
+<script src="/js/player.js"></script>
+<script src="/js/playmgr.js"></script>
+<script src="/js/thumbmgr.js"></script>
+<script src="/js/columns.js"></script>
+<script src="/js/browse.js"></script>
+<script src="/js/taskrunner.js"></script>
+<script src="/js/metaview.js"></script>
+<script src="/js/treeview.js"></script>
+<script src="/js/movemgr.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/spectrum.js"></script>
+<script src="/js/app.js"></script>
+
+</body>
+</html>

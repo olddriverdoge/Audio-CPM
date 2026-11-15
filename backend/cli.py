@@ -1,0 +1,30 @@
+# -*- coding: utf-8 -*-
+"""命令行入口（Termux / PC / app 壳共用，参数优先于环境变量）。"""
+import argparse
+import os
+
+import uvicorn
+
+from .app import app
+from .config import COVER_CACHE_DIR, PRESETS_FILE, DATA_DIR
+from . import ffbin
+from .jobs import load_tasks
+from . import native_bridge
+
+
+def main():
+    ap = argparse.ArgumentParser(description="AC2 Web 服务")
+    ap.add_argument("--host", default=os.environ.get("AC2_HOST", "127.0.0.1"),
+                    help="监听地址，局域网共享用 0.0.0.0")
+    ap.add_argument("--port", type=int, default=int(os.environ.get("AC2_PORT", "8000")))
+    args = ap.parse_args()
+    ffbin.prepare()
+    native_bridge.register()
+    load_tasks()
+    print(f"数据目录: {DATA_DIR}")
+    print(f"ffmpeg: {ffbin.FFMPEG}")
+    print(f"预设配置文件: {PRESETS_FILE}")
+    print(f"封面缓存: {COVER_CACHE_DIR}")
+    host_display = '127.0.0.1' if args.host == '0.0.0.0' else args.host
+    print(f"打开浏览器访问: http://{host_display}:{args.port}")
+    uvicorn.run(app, host=args.host, port=args.port, log_level="info")

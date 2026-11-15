@@ -1,0 +1,5 @@
+# AC2 Web 运行依赖（Termux / PC / app 壳通用，全部纯 Python）
+starlette>=1.0
+uvicorn>=0.30
+httpx>=0.27
+mutagen>=1.47

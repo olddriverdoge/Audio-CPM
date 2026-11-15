@@ -1,0 +1,44 @@
+  /* ---------- 布局骨架 ---------- */
+  .app{display:flex;flex-direction:column;height:100vh;height:100dvh}
+  .hdr{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:5px 10px;
+       background:var(--panel);border-bottom:1px solid var(--border);flex-wrap:wrap}
+  .logo{font-size:15px;color:var(--accent);font-weight:600;white-space:nowrap}
+  .page{display:flex;flex-direction:column;flex:1 1 0;min-height:0;overflow:hidden;
+        padding:8px 10px}
+  .page.hidden{display:none}
+  .page-process{overflow-y:auto;overflow-x:hidden}
+  .page-organize{padding-bottom:6px}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;
+         padding:9px;margin-bottom:8px}
+  .page-process .panel:last-child{margin-bottom:0}
+
+  .split{flex:0 0 10px;position:relative;background:transparent;touch-action:none;z-index:6}
+  .split::after{content:'';position:absolute;left:0;right:0;top:50%;height:2px;
+    margin-top:-1px;background:var(--border);border-radius:2px}
+  .split:hover::after,.split.dragging::after{background:var(--accent)}
+  .split::before{content:'';position:absolute;left:50%;top:50%;width:4px;height:30px;
+    transform:translate(-50%,-50%);border-radius:2px;background:#3a4757;pointer-events:none}
+  .h-split::before{width:30px;height:4px}
+  .split:hover::before,.split.dragging::before{background:var(--accent)}
+  .v-split{cursor:col-resize}
+  .v-split::after{top:0;bottom:0;left:50%;right:auto;width:2px;height:auto;
+    margin-top:0;margin-left:-1px}
+  .h-split{cursor:row-resize}
+
+  /* 处理页：文件列表 + 右侧元数据/频谱栏（与整理页复用同一套模块） */
+  .page-process{flex-direction:row;overflow:hidden}
+  .p1-main{flex:1 1 auto;display:flex;flex-direction:column;min-width:0;min-height:0;
+    overflow-y:auto;overflow-x:hidden}
+  .p1-side{flex:0 0 30%;max-width:340px;min-width:130px;display:flex;flex-direction:column;
+    min-height:0;padding-left:6px;border-left:1px solid var(--border);overflow:hidden}
+  .p1-side #meta1{flex:1 1 auto;min-height:0;width:100%;overflow:auto;
+    -webkit-overflow-scrolling:touch}
+  /* 收起：只留一条竖排标签贴边 */
+  .p1-side.collapsed{flex:0 0 34px;min-width:34px;padding:0;align-items:center;
+    cursor:pointer;background:var(--panel2)}
+  .p1-side.collapsed #meta1{display:none}
+  .p1-side.collapsed .meta-head{writing-mode:vertical-rl;text-orientation:mixed;
+    letter-spacing:3px;margin:10px 0;white-space:nowrap;display:block;text-align:center;
+    font-size:12px;width:auto!important;min-width:0!important}
+  .p1-side.collapsed .meta-head .chev{display:none}
+  .p1-side.collapsed:hover{background:var(--hl)}
