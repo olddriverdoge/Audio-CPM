@@ -235,7 +235,7 @@ const App = (() => {
   }
   function defaultRootUri() {
     const r = (typeof Sources !== 'undefined') ? Sources.currentRoot() : null;
-    return r ? r.path : 'local:/sdcard/ADM';
+    return r ? r.path : 'local:/sdcard';
   }
   function curSourceId() {
     return (typeof Sources !== 'undefined' && Sources.current) ? Sources.current : 'local';

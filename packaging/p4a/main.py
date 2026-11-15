@@ -52,9 +52,8 @@ def main():
     except BaseException:
         _log(data, "nativeLibraryDir failed:\n" + traceback.format_exc())
 
-    # 先跳过权限弹窗，排除 Activity/权限回调对启动的干扰；
-    # 需要时设 AC2_REQUEST_PERMISSIONS=1 再启用。
-    if os.environ.get("AC2_REQUEST_PERMISSIONS", "0") == "1":
+    # 存储权限：默认请求（targetSdk 28 旧模型）；诊断时可设 AC2_REQUEST_PERMISSIONS=0 跳过。
+    if os.environ.get("AC2_REQUEST_PERMISSIONS", "1") == "1":
         try:
             from android.permissions import request_permissions, Permission
             request_permissions([Permission.READ_EXTERNAL_STORAGE,
