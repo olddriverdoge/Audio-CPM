@@ -95,3 +95,12 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:1.5.1")
     implementation("androidx.media3:media3-session:1.5.1")
 }
+
+/* APK 输出名与项目一致：Audio-CPM-debug.apk */
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.outputs.forEach { output ->
+            output.outputFileName.set("Audio-CPM-${variant.name}.apk")
+        }
+    }
+}

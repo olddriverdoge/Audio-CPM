@@ -66,10 +66,13 @@ def register() -> bool:
         }
     except Exception:
         _playback = None
+    # 波形沿用旧 p4a 的 ffmpeg 子进程路径（waveform._peaks_ffmpeg）。
+    # 不再注册 Ac2Wave（MediaCodec）为 native_provider：它在 24bit FLAC 上实测 3.5~5.7s、
+    # 且峰值质量差（“大量方块”）；而打包的静态 ffmpeg 解 4kHz 单声道只要零点几秒，
+    # 这才是旧版“秒出波形”的真正实现。
     try:
-        # 波形走 Java MediaCodec（旧 p4a 的快速路径），ffmpeg 仅兜底
         from . import waveform
-        waveform.native_provider = waveform._peaks_native
+        waveform.native_provider = None
     except Exception:
         pass
     return available()

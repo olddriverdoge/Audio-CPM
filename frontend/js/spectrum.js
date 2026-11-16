@@ -62,16 +62,21 @@ const Spectrum = (() => {
         const d = new Uint8Array(96);
         for (let i = 0; i < 96; i++) d[i] = Math.max(0, Math.min(255, Math.round((r.bands[i] || 0) * 255)));
         core.data = d;
+        if (r.levels && r.levels.length) {
+          const lv = new Uint8Array(96);
+          for (let i = 0; i < 96; i++) lv[i] = Math.max(0, Math.min(255, Math.round((r.levels[i] || 0) * 255)));
+          core.levels = lv;
+        }
         if (r.sampleRate) core.sampleRate = r.sampleRate;
       } catch (_) {}
-    }, 50);
+    }, 40);
   }
 
   function ensureCore() {
     const hifi = !!(typeof Player !== 'undefined' && Player.hifiActive && Player.hifiActive());
     if (hifi) {
       if (!core || !core.native) {
-        core = {native: true, data: new Uint8Array(96), sampleRate: 48000, ctx: null, analyser: null};
+        core = {native: true, data: new Uint8Array(96), levels: new Uint8Array(96), sampleRate: 48000, ctx: null, analyser: null};
         startPcmPoll();
       }
       return core;
@@ -283,9 +288,10 @@ const Spectrum = (() => {
       const spanBins = Math.max(2, Math.round(core.data.length * area.topHz / nyq));
       const step = Math.max(1, Math.floor(Math.max(bars, spanBins) / bars));
       const bw = area.gw / bars;
+      const src = (core.levels && core.levels.length) ? core.levels : core.data;
       for (let i = 0; i < bars; i++) {
         let sum = 0;
-        for (let j = 0; j < step; j++) sum += core.data[i * step + j] || 0;
+        for (let j = 0; j < step; j++) sum += src[i * step + j] || 0;
         const v = (sum / step) / 255;
         const bh = Math.max(1, v * area.gh);
         const x = area.x0 + i * bw;

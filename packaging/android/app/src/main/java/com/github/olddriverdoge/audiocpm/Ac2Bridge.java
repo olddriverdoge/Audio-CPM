@@ -244,18 +244,25 @@ public class Ac2Bridge {
     public static String spectrum() {
         try {
             float[] b = SpectrumProcessor.getBands();
-            StringBuilder sb = new StringBuilder(1024);
+            float[] lv = SpectrumProcessor.getLevels();
+            StringBuilder sb = new StringBuilder(2048);
             sb.append("{\"ok\":true,\"service\":").append(PlaybackService.getPlayer() != null)
               .append(",\"format\":").append(SpectrumProcessor.describe())
               .append(",\"sampleRate\":").append(SpectrumProcessor.getSampleRate()).append(",\"bands\":[");
-            for (int i = 0; i < b.length; i++) {
-                if (i > 0) sb.append(',');
-                sb.append(Math.round(b[i] * 1000) / 1000.0);
-            }
+            appendFloats(sb, b);
+            sb.append("],\"levels\":[");
+            appendFloats(sb, lv);
             sb.append("]}");
             return sb.toString();
         } catch (Throwable t) {
             return "{\"ok\":false,\"error\":\"" + esc(String.valueOf(t)) + "\"}";
+        }
+    }
+
+    private static void appendFloats(StringBuilder sb, float[] arr) {
+        for (int i = 0; i < arr.length; i++) {
+            if (i > 0) sb.append(',');
+            sb.append(Math.round(arr[i] * 1000) / 1000.0);
         }
     }
 

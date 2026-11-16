@@ -68,10 +68,10 @@
     flex:0 1 auto;min-width:0}
   /* 收起后脱离文档流、贴右边缘，把高度让给目录树等模块 */
   .movebar.collapsed{position:fixed;right:10px;bottom:16px;z-index:340;margin:0;padding:0;
-    width:auto;border:1px solid var(--border);border-radius:999px;
-    background:rgba(20,26,34,.95);box-shadow:0 4px 14px rgba(0,0,0,.45)}
+    width:auto;border:none;border-radius:0;background:transparent;box-shadow:none}
   .movebar.collapsed .mv-body,.movebar.collapsed .status{display:none}
-  .movebar.collapsed .mv-toggle{padding:5px 12px;border-radius:999px;border:none}
+  .movebar.collapsed .mv-toggle{padding:6px 11px;border-radius:6px;border:1px solid var(--border);
+    background:var(--panel);color:var(--text);box-shadow:0 2px 8px rgba(0,0,0,.35)}
   body.has-player .movebar.collapsed{bottom:72px}
 
   /* 目标目录多标签 */

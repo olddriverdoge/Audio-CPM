@@ -19,6 +19,8 @@ import java.nio.ByteOrder;
 public class SpectrumProcessor extends BaseAudioProcessor {
     private static final int FFT_N = 2048;
     private static volatile float[] bands = new float[96];
+    /** 频谱柱状（快速响应）：平滑更轻，专门给频谱条用，避免和声谱共用 0.8 平滑导致卡顿/延迟。 */
+    private static volatile float[] levels = new float[96];
     private static volatile int sampleRate = 48000;
     private static volatile boolean enabled = false;
     private static volatile int encoding = C.ENCODING_PCM_16BIT;
@@ -29,6 +31,7 @@ public class SpectrumProcessor extends BaseAudioProcessor {
     private final float[] im = new float[FFT_N];
     private final float[] mono = new float[FFT_N];
     private final float[] prev = new float[96];
+    private final float[] prevLevels = new float[96];
     private int fill = 0;
 
     public SpectrumProcessor() {
@@ -42,6 +45,7 @@ public class SpectrumProcessor extends BaseAudioProcessor {
     public static void setEnabled(boolean b) { enabled = b; }
     public static boolean isEnabled() { return enabled; }
     public static float[] getBands() { return bands.clone(); }
+    public static float[] getLevels() { return levels.clone(); }
     public static int getSampleRate() { return sampleRate; }
     /** 排查用：当前输入格式。 */
     public static String describe() {
@@ -67,6 +71,7 @@ public class SpectrumProcessor extends BaseAudioProcessor {
     protected void onReset() {
         fill = 0;
         bands = new float[96];
+        levels = new float[96];
     }
 
     @Override
@@ -138,6 +143,7 @@ public class SpectrumProcessor extends BaseAudioProcessor {
         }
         fft(re, im);
         float[] out = new float[96];
+        float[] outLevels = new float[96];
         // 线性频率分档（和 WebAudio getByteFrequencyData 的 1024 个线性 bin 同源，
         // 再用 96 档做平均；对数分档会让低频只有 1 个 bin，显得一根根柱子又高又跳）。
         final int half = FFT_N / 2;
@@ -157,11 +163,15 @@ public class SpectrumProcessor extends BaseAudioProcessor {
             double amp = mag / (double) FFT_N;
             double db = 20.0 * Math.log10(Math.max(amp, 1e-7));
             float v = (float) Math.max(0.0, Math.min(1.0, (db - minDb) / (maxDb - minDb)));
-            // 0.8 时间平滑，和 AnalyserNode.smoothingTimeConstant 一致，避免柱子乱跳。
+            // 声谱：0.8 平滑，稳定、观感接近 AnalyserNode。
             prev[b] = prev[b] * 0.8f + v * 0.2f;
             out[b] = prev[b];
+            // 频谱条：0.35 平滑，响应更快、延迟更低。
+            prevLevels[b] = prevLevels[b] * 0.35f + v * 0.65f;
+            outLevels[b] = prevLevels[b];
         }
         bands = out;
+        levels = outLevels;
     }
 
     private static void fft(float[] re, float[] im) {
