@@ -61,7 +61,7 @@ echo ">> configure"
   --disable-doc --disable-ffplay --disable-ffprobe \
   --enable-ffmpeg \
   --disable-network --disable-avdevice \
-  --disable-zlib --disable-bzlib --disable-lzma --disable-iconv \
+  --disable-bzlib --disable-lzma --disable-iconv \
   --disable-sdl2 --disable-xlib --disable-libxcb \
   --enable-protocol=file,pipe \
   --enable-filter=aresample,volume,anull,scale \

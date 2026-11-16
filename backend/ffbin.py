@@ -105,6 +105,13 @@ def _probe_capabilities() -> None:
         if STATE['mode'] in ('native', 'linker64') else False
 
 
+def _why(out: str, err) -> str:
+    """把执行失败的简短原因压成一行（异常优先，否则取输出尾部）。"""
+    if err is not None:
+        return ('%s: %s' % (type(err).__name__, err))[:160]
+    return ' '.join((out or '').split())[-160:]
+
+
 def prepare() -> str:
     """幂等：定位可执行文件、确定执行方式、跑一次能力自检。"""
     global FFMPEG, ENV, LAUNCHER
@@ -132,6 +139,7 @@ def prepare() -> str:
         if not os.path.isfile(path):
             continue
         err2 = None
+        out2 = ''
         env = dict(os.environ)
         if native:
             env['LD_LIBRARY_PATH'] = native
@@ -155,7 +163,7 @@ def prepare() -> str:
                     _log('mode=linker64 path=%s version=%s' % (path, STATE['version']))
                     return FFMPEG
         STATE['error'] = ('direct=%s linker=%s'
-                          % (str(err)[:120], str(err2)[:120] if native else 'n/a'))
+                          % (_why(out, err), _why(out2, err2) if native else 'n/a'))
         _log('exec failed for %s: %s' % (path, STATE['error']))
 
     STATE.update(ffmpeg=False, mode='unavailable', error=STATE['error'] or 'ffmpeg not found')
