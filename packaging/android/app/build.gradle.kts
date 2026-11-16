@@ -21,6 +21,25 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    /*
+     * 固定调试签名：CI 每次跑都是新机器，AGP 自动生成的 debug.keystore 每次不同，
+     * 导致新包不能覆盖安装。这里用仓库内固定的调试密钥（仅调试用途，非发布签名）。
+     */
+    signingConfigs {
+        create("ac2") {
+            storeFile = file("../ac2-debug.keystore")
+            storePassword = "ac2debug"
+            keyAlias = "ac2"
+            keyPassword = "ac2debug"
+        }
+    }
+
+    buildTypes {
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("ac2")
+        }
+    }
+
     packaging {
         jniLibs {
             useLegacyPackaging = true
