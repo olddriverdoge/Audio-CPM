@@ -30,7 +30,5 @@ android.permissions = READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,INTERNET
 android.archs = arm64-v8a
 android.accept_sdk_license = True
 android.add_src = ../android/java
-android.gradle_dependencies = androidx.core:core:1.12.0
-android.add_resources = ../android/res
 android.extra_manifest_application_arguments = ../android/extra_manifest_application.xml
 android.extra_manifest_xml = ../android/extra_manifest.xml

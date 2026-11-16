@@ -4,8 +4,6 @@ import android.content.ComponentName;
 import android.content.Intent;
 import android.net.Uri;
 
-import androidx.core.content.FileProvider;
-
 import org.kivy.android.PythonActivity;
 
 import java.io.File;
@@ -56,7 +54,7 @@ public class Ac2Bridge {
                 return "{\"status\":\"error\",\"message\":\"no activity\"}";
             }
             String authority = act.getPackageName() + ".fileprovider";
-            Uri uri = FileProvider.getUriForFile(act, authority, f);
+            Uri uri = Uri.parse("content://" + authority + Uri.encode(path, "/"));
             Intent i = new Intent(Intent.ACTION_VIEW);
             i.setDataAndType(uri, mimeOf(path));
             i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);

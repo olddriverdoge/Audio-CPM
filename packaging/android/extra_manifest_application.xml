@@ -1,9 +1,5 @@
     <provider
-        android:name="androidx.core.content.FileProvider"
+        android:name="com.github.olddriverdoge.audiocpm.Ac2FileProvider"
         android:authorities="com.github.olddriverdoge.audiocpm.fileprovider"
         android:exported="false"
-        android:grantUriPermissions="true">
-        <meta-data
-            android:name="android.support.FILE_PROVIDER_PATHS"
-            android:resource="@xml/file_paths" />
-    </provider>
+        android:grantUriPermissions="true" />
