@@ -28,11 +28,14 @@ public class SpectrumProcessor extends BaseAudioProcessor {
     private final float[] re = new float[FFT_N];
     private final float[] im = new float[FFT_N];
     private final float[] mono = new float[FFT_N];
+    private final float[] prev = new float[96];
     private int fill = 0;
 
     public SpectrumProcessor() {
+        // 与 WebAudio AnalyserNode 一致用 Blackman 窗（低频泄漏更小，观感接近旧版）。
         for (int i = 0; i < FFT_N; i++) {
-            window[i] = (float) (0.5 - 0.5 * Math.cos(2 * Math.PI * i / (FFT_N - 1)));
+            double x = 2.0 * Math.PI * i / (FFT_N - 1);
+            window[i] = (float) (0.42 - 0.5 * Math.cos(x) + 0.08 * Math.cos(2 * x));
         }
     }
 
@@ -135,26 +138,28 @@ public class SpectrumProcessor extends BaseAudioProcessor {
         }
         fft(re, im);
         float[] out = new float[96];
-        double minHz = 30.0;
-        double maxHz = Math.min(20000.0, sampleRate / 2.0);
+        // 线性频率分档（和 WebAudio getByteFrequencyData 的 1024 个线性 bin 同源，
+        // 再用 96 档做平均；对数分档会让低频只有 1 个 bin，显得一根根柱子又高又跳）。
+        final int half = FFT_N / 2;
+        final double minDb = -100.0, maxDb = -30.0;   // WebAudio analyser 默认值
         for (int b = 0; b < 96; b++) {
-            double f0 = minHz * Math.pow(maxHz / minHz, b / 96.0);
-            double f1 = minHz * Math.pow(maxHz / minHz, (b + 1) / 96.0);
-            int k0 = Math.max(1, (int) (f0 * FFT_N / sampleRate));
-            int k1 = Math.min(FFT_N / 2 - 1, (int) (f1 * FFT_N / sampleRate));
+            int k0 = Math.max(1, (int) Math.round(b * half / 96.0));
+            int k1 = Math.min(half - 1, (int) Math.round((b + 1) * half / 96.0) - 1);
+            if (k1 < k0) k1 = k0;
             float sum = 0f;
             int n = 0;
             for (int k = k0; k <= k1; k++) {
                 sum += (float) Math.hypot(re[k], im[k]);
                 n++;
             }
-            float v = n > 0 ? sum / n : 0f;
-            // 与 WebAudio analyser 对齐：幅度按 N 归一化（单频满幅 A=1 的峰值 bin ≈ 0.25，
-            // 即 -12dB），避免之前按 N/4 归一化导致整体偏高 12dB。
-            double amp = v / (double) FFT_N;
-            double db = 20.0 * Math.log10(Math.max(amp, 1e-5));   // -100..0 dB
-            // 前端坐标轴是 -100..0dB，bands 取 0..1 线性映射；之前的 log10(1+v*30)/2 会全频拉满。
-            out[b] = (float) Math.max(0.0, Math.min(1.0, (db + 100.0) / 100.0));
+            float mag = n > 0 ? sum / n : 0f;
+            // Blackman 下幅度按 N 归一化；再套 WebAudio 的 -100..-30dB 映射。
+            double amp = mag / (double) FFT_N;
+            double db = 20.0 * Math.log10(Math.max(amp, 1e-7));
+            float v = (float) Math.max(0.0, Math.min(1.0, (db - minDb) / (maxDb - minDb)));
+            // 0.8 时间平滑，和 AnalyserNode.smoothingTimeConstant 一致，避免柱子乱跳。
+            prev[b] = prev[b] * 0.8f + v * 0.2f;
+            out[b] = prev[b];
         }
         bands = out;
     }

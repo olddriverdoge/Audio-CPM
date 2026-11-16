@@ -98,7 +98,12 @@ public class PlaybackService extends MediaSessionService {
         session = new MediaSession.Builder(this, player)
                 .setSessionActivity(pi)
                 .build();
-        Log.i(TAG, "MediaSession created, player ready");
+        // 关键：把 session 注册进 MediaSessionService。
+        // 不 addSession 时，service 不会给 session 挂 MediaSessionListener，
+        // onNotificationRefreshRequired 永远不触发，通知栏/前台服务也就不会出现
+        // （本机 notifEnabled=true 却始终无通知，就是这个原因）。
+        addSession(session);
+        Log.i(TAG, "MediaSession created and added, player ready");
     }
 
     private void ensureChannel() {
