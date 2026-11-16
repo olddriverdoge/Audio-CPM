@@ -5,6 +5,7 @@ import os
 import threading
 
 from ..config import DEFAULT_ROOT, STORAGE_FILE
+from .. import native_bridge
 from .ref import Ref, parse_ref, to_uri, local_uri, dav_uri
 
 _lock = threading.Lock()
@@ -66,6 +67,8 @@ def roots() -> list:
                     "external_player", "move", "delete", "mkdir", "convert"]
             if os.environ.get('AC2_ANDROID'):
                 caps.append('android')
+            if native_bridge.playback_available():
+                caps.append('hifi_play')
             out.append({
                 "id": sid, "kind": "local", "name": s.get('name') or '本机',
                 "path": local_uri(root), "root": root,

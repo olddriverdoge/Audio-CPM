@@ -25,6 +25,7 @@ const Player = (() => {
   });
   coverEl.appendChild(coverImg);
   let seeking = false;
+  let hifi = false, hifiPlaying = false, hifiPos = 0, hifiDur = 0, hifiTimer = 0;
 
   function fmt(t) {
     if (!isFinite(t) || t < 0) t = 0;
@@ -32,13 +33,39 @@ const Player = (() => {
     return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0');
   }
   function setToggle(playing) { btnToggle.textContent = playing ? '⏸' : '▶'; }
+  function hifiAvailable() {
+    try {
+      const r = (typeof Sources !== 'undefined') ? Sources.currentRoot() : null;
+      return !!(r && r.caps && r.caps.indexOf('hifi_play') >= 0);
+    } catch (_) { return false; }
+  }
+  function stopHifiPoll() { if (hifiTimer) { clearInterval(hifiTimer); hifiTimer = 0; } }
+  function startHifiPoll() {
+    stopHifiPoll();
+    hifiTimer = setInterval(async () => {
+      if (!hifi) return;
+      try {
+        const s = await Api.playbackState();
+        if (!s || !s.ok) return;
+        hifiPos = Number(s.positionMs) || 0;
+        hifiDur = Number(s.durationMs) || 0;
+        hifiPlaying = !!s.playing;
+        const d = hifiDur / 1000, p = hifiPos / 1000;
+        if (d > 0) { seek.max = String(d); durEl.textContent = fmt(d); }
+        if (!seeking) { seek.value = String(p); curEl.textContent = fmt(p); }
+        setPct(d > 0 ? p / d * 100 : 0);
+        setToggle(hifiPlaying);
+        paintButtons(cur);
+      } catch (_) {}
+    }, 250);
+  }
   function syncMediaState(playing) {
     try { if ('mediaSession' in navigator) navigator.mediaSession.playbackState = playing ? 'playing' : 'paused'; }
     catch (_) {}
   }
   // 行内/磁贴播放按钮：当前曲目在播时显示 ⏸，其余 ▶（避免"点了没反应"的错觉）
   function paintButtons(path) {
-    const on = !!path && !!cur && !audio.paused;
+    const on = !!path && !!cur && (hifi ? hifiPlaying : !audio.paused);
     document.querySelectorAll('[data-act="play"]').forEach(b => {
       const row = b.closest('[data-path]');
       const active = !!(row && path && row.dataset.path === path) && on;
@@ -98,6 +125,7 @@ const Player = (() => {
   }
   // 当前进度百分比（0~100）
   function pct() {
+    if (hifi && hifiDur > 0) return Math.max(0, Math.min(100, hifiPos / hifiDur * 100));
     const d = audio.duration;
     if (!isFinite(d) || d <= 0) return 0;
     return Math.max(0, Math.min(100, (audio.currentTime || 0) / d * 100));
@@ -159,6 +187,10 @@ const Player = (() => {
     syncBar();
   }
   function close() {
+    if (hifi) {
+      try { Api.playbackStop(); } catch (_) {}
+      hifi = false; hifiPlaying = false; stopHifiPoll();
+    }
     try { audio.pause(); } catch (_) {}
     audio.removeAttribute('src');
     try { audio.load(); } catch (_) {}
@@ -189,6 +221,17 @@ const Player = (() => {
     notifyMeta();
     applyMeta(path);
     setCover(path);
+    if (hifiAvailable() && String(path).indexOf('dav:') !== 0) {
+      try {
+        const r = await Api.playbackOpen(path, 0, 0, 0, 0);
+        if (r && r.ok) {
+          hifi = true; hifiPlaying = true; hifiPos = 0; hifiDur = 0;
+          setWave(path); paintRows(); show(); startHifiPoll(); setToggle(true);
+          return;
+        }
+      } catch (_) {}
+    }
+    hifi = false;
     setWave(path);
     paintRows();
     audio.src = '/api/stream?path=' + encodeURIComponent(path);
@@ -241,9 +284,16 @@ const Player = (() => {
   }
   // 按横向比例跳转（整理页点击行/磁贴一步到位）
   function seekRatio(r) {
-    const d = audio.duration;
+    const d = hifi ? hifiDur / 1000 : audio.duration;
     if (!isFinite(d) || d <= 0) return;
     const t = Math.max(0, Math.min(1, Number(r) || 0)) * d;
+    if (hifi) {
+      const ms = Math.round(t * 1000);
+      Api.playbackSeek(ms).catch(() => {});
+      hifiPos = ms; seek.value = String(t); curEl.textContent = fmt(t);
+      setPct(d > 0 ? t / d * 100 : 0);
+      return;
+    }
     audio.currentTime = t;
     seek.value = String(t);
     curEl.textContent = fmt(t);
@@ -252,6 +302,12 @@ const Player = (() => {
   }
   function toggle() {
     if (!cur) return;
+    if (hifi) {
+      if (hifiPlaying) { Api.playbackPause().catch(() => {}); hifiPlaying = false; }
+      else { Api.playbackResume().catch(() => {}); hifiPlaying = true; }
+      setToggle(hifiPlaying); paintButtons(cur);
+      return;
+    }
     if (audio.paused) audio.play().catch(() => {}); else audio.pause();
   }
   function external() {
@@ -304,7 +360,10 @@ const Player = (() => {
   const commitSeek = () => {
     if (!seeking) return;
     const t = Number(seek.value);
-    if (isFinite(t)) audio.currentTime = t;
+    if (isFinite(t)) {
+      if (hifi) { Api.playbackSeek(Math.round(t * 1000)).catch(() => {}); hifiPos = t * 1000; }
+      else audio.currentTime = t;
+    }
     seeking = false;
   };
   seek.addEventListener('change', commitSeek);
@@ -318,6 +377,7 @@ const Player = (() => {
   // 行内点击（含播放行按横向比例跳转）统一由 BrowseView.onRowClick → App.playRowClick 处理
 
   return {open, toggle, close, external, syncBar, paintRows, pct, seekRatio, onMeta,
+          hifiActive: () => hifi, hifiPlaying: () => hifiPlaying,
           get current() { return cur; },
           get meta() { return curInfo ? Object.assign({}, curInfo) : null; },
           audio};

@@ -50,7 +50,33 @@ const Spectrum = (() => {
     return pal;
   }
 
+  let pcmTimer = 0;
+  function startPcmPoll() {
+    if (pcmTimer) return;
+    try { Api.playbackSpectrum(true); } catch (_) {}
+    pcmTimer = setInterval(async () => {
+      if (!core || !core.native) return;
+      try {
+        const r = await Api.playbackSpectrum();
+        if (!r || !r.ok || !r.bands) return;
+        const d = new Uint8Array(64);
+        for (let i = 0; i < 64; i++) d[i] = Math.max(0, Math.min(255, Math.round((r.bands[i] || 0) * 255)));
+        core.data = d;
+        if (r.sampleRate) core.sampleRate = r.sampleRate;
+      } catch (_) {}
+    }, 100);
+  }
+
   function ensureCore() {
+    const hifi = !!(typeof Player !== 'undefined' && Player.hifiActive && Player.hifiActive());
+    if (hifi) {
+      if (!core || !core.native) {
+        core = {native: true, data: new Uint8Array(64), sampleRate: 48000, ctx: null, analyser: null};
+        startPcmPoll();
+      }
+      return core;
+    }
+    if (core && core.native) core = null;
     if (core) {
       if (core.ctx.state === 'suspended') core.ctx.resume().catch(() => {});
       return core;
@@ -79,7 +105,7 @@ const Spectrum = (() => {
     if (canvas.height !== h) canvas.height = h;
   }
 
-  function nyquist() { return ((core && core.ctx.sampleRate) || 48000) / 2; }
+  function nyquist() { return ((core && (core.sampleRate || (core.ctx && core.ctx.sampleRate))) || 48000) / 2; }
 
   function computeArea(w, h, padL, padB) {
     return {x0: padL, y0: 2, gw: w - padL - 4, gh: h - padB - 2,
@@ -235,7 +261,7 @@ const Spectrum = (() => {
     // 两种模式坐标系隔离：频谱 X=频率 / Y=dB；声谱 X=时间 / Y=频率
     const area = computeArea(w, h, 30, 14);
     if (mode !== 'waterfall') drawAxes(w, h, 30, 14);
-    const paused = !core || Player.audio.paused;
+    const paused = !core || (core.native ? !(Player.hifiPlaying && Player.hifiPlaying()) : Player.audio.paused);
     if (paused) {
       if (mode === 'waterfall') {
         drawWaterfall(area);
@@ -249,8 +275,10 @@ const Spectrum = (() => {
       raf = requestAnimationFrame(draw);
       return;
     }
-    if (core.ctx.state === 'suspended') core.ctx.resume().catch(() => {});
-    core.analyser.getByteFrequencyData(core.data);
+    if (!core.native) {
+      if (core.ctx.state === 'suspended') core.ctx.resume().catch(() => {});
+      core.analyser.getByteFrequencyData(core.data);
+    }
     if (mode === 'waterfall') {
       drawWaterfall(area);
       setState('声谱');

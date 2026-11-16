@@ -21,12 +21,14 @@ fullscreen = 1
 p4a.bootstrap = webview
 p4a.port = 8765
 p4a.branch = develop
+android.enable_androidx = True
+android.gradle_dependencies = androidx.media3:media3-exoplayer:1.5.1, androidx.media3:media3-session:1.5.1
 p4a.local_recipes = recipes
 
 # Android 目标（targetSdk 28：/sdcard 旧权限 + app 目录 exec 豁免）
 android.api = 28
 android.minapi = 24
-android.permissions = READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,INTERNET
+android.permissions = READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,INTERNET,FOREGROUND_SERVICE,FOREGROUND_SERVICE_MEDIA_PLAYBACK
 android.archs = arm64-v8a
 android.accept_sdk_license = True
 android.add_src = ../android/java
