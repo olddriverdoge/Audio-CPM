@@ -1,10 +1,13 @@
 package com.github.olddriverdoge.audiocpm;
 
+import android.content.Context;
 import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
 
+import java.io.File;
 import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.ByteBuffer;
@@ -29,6 +32,74 @@ public final class Ac2Wave {
 
     public static boolean peaks(String srcPath, int buckets, String outPath) {
         if (buckets < 8) buckets = 8;
+        // 优先走已打包的静态 ffmpeg：解码 4 分钟 FLAC 约 0.2~0.5s；
+        // MediaCodec 逐帧路径在 24bit FLAC 上要 4~6s（真机实测），只作兜底。
+        if (ffmpegPeaks(srcPath, buckets, outPath)) return true;
+        return codecPeaks(srcPath, buckets, outPath);
+    }
+
+    /** 用 libffmpegbin.so 解成 8kHz 单声道 s16le，边读边算 100ms 窗口峰值。 */
+    private static boolean ffmpegPeaks(String srcPath, int buckets, String outPath) {
+        Process proc = null;
+        try {
+            Context ctx = Ac2App.get();
+            if (ctx == null) return false;
+            File bin = new File(ctx.getApplicationInfo().nativeLibraryDir, "libffmpegbin.so");
+            if (!bin.isFile()) return false;
+            int rate = probeRate(srcPath);
+            proc = new ProcessBuilder(bin.getAbsolutePath(), "-v", "error",
+                    "-i", srcPath, "-f", "s16le", "-ac", "1", "-ar", "8000", "-")
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .start();
+            InputStream is = proc.getInputStream();
+            byte[] buf = new byte[8192];
+            int windowFrames = 800;   // 8kHz * 100ms
+            ArrayList<Double> windows = new ArrayList<>();
+            double curMax = 0.0;
+            int inWin = 0, n;
+            while ((n = is.read(buf)) > 0) {
+                for (int i = 0; i + 1 < n; i += 2) {
+                    short v = (short) (((buf[i + 1] & 0xFF) << 8) | (buf[i] & 0xFF));
+                    double a = Math.abs(v) / 32768.0;
+                    if (a > curMax) curMax = a;
+                    if (++inWin >= windowFrames) {
+                        windows.add(curMax);
+                        curMax = 0.0;
+                        inWin = 0;
+                    }
+                }
+            }
+            proc.waitFor();
+            if (windows.isEmpty()) return false;
+            double[] peaks = downsample(windows, buckets);
+            return writeJson(outPath, peaks, rate);
+        } catch (Throwable t) {
+            return false;
+        } finally {
+            if (proc != null) proc.destroy();
+        }
+    }
+
+    /** 只用 MediaExtractor 读元数据，不解码。 */
+    private static int probeRate(String srcPath) {
+        MediaExtractor ex = new MediaExtractor();
+        try {
+            ex.setDataSource(srcPath);
+            for (int i = 0; i < ex.getTrackCount(); i++) {
+                MediaFormat f = ex.getTrackFormat(i);
+                String mime = f.getString(MediaFormat.KEY_MIME);
+                if (mime != null && mime.startsWith("audio/")) {
+                    return getInt(f, MediaFormat.KEY_SAMPLE_RATE, 44100);
+                }
+            }
+        } catch (Throwable ignored) {
+        } finally {
+            try { ex.release(); } catch (Throwable ignored) {}
+        }
+        return 44100;
+    }
+
+    private static boolean codecPeaks(String srcPath, int buckets, String outPath) {
         MediaExtractor ex = new MediaExtractor();
         MediaCodec dec = null;
         try {

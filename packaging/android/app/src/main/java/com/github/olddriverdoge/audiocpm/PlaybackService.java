@@ -1,8 +1,12 @@
 package com.github.olddriverdoge.audiocpm;
 
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 import android.util.Log;
 
 import java.io.File;
@@ -10,7 +14,9 @@ import java.io.FileWriter;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
+import androidx.core.app.NotificationCompat;
 import androidx.media3.common.AudioAttributes;
+import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.common.C;
@@ -21,10 +27,13 @@ import androidx.media3.exoplayer.audio.AudioSink;
 import androidx.media3.exoplayer.audio.DefaultAudioSink;
 import androidx.media3.session.MediaSession;
 import androidx.media3.session.MediaSessionService;
+import androidx.media3.session.MediaStyleNotificationHelper;
 
 /** 本地 HiFi 播放服务：ExoPlayer + MediaSession（通知栏/锁屏/后台播放由 Media3 负责）。 */
 public class PlaybackService extends MediaSessionService {
     private static final String TAG = "AC2";
+    private static final String CHANNEL_ID = "ac2_playback";
+    private static final int NOTIF_ID = 1001;
     private static volatile ExoPlayer player;
     private static volatile MediaSession session;
     private static volatile String lastError = "";
@@ -39,6 +48,7 @@ public class PlaybackService extends MediaSessionService {
     public void onCreate() {
         super.onCreate();
         Log.i(TAG, "PlaybackService.onCreate");
+        ensureChannel();
         /*
          * ExoPlayer.Builder 没有公开的 setAudioSink（1.5.x），
          * 官方扩展点是 DefaultRenderersFactory#buildAudioSink。
@@ -89,6 +99,105 @@ public class PlaybackService extends MediaSessionService {
                 .setSessionActivity(pi)
                 .build();
         Log.i(TAG, "MediaSession created, player ready");
+    }
+
+    private void ensureChannel() {
+        try {
+            if (Build.VERSION.SDK_INT >= 26) {
+                NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                NotificationChannel ch = new NotificationChannel(
+                        CHANNEL_ID, "播放控制", NotificationManager.IMPORTANCE_LOW);
+                ch.setShowBadge(false);
+                ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+                nm.createNotificationChannel(ch);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "create channel failed", t);
+        }
+    }
+
+    /**
+     * 自己接管通知：Media3 默认通知在本机没有出现（notifEnabled=true），
+     * 所以直接覆写 onUpdateNotification 并用 MediaStyle 手动维护，
+     * 保证通知栏/锁屏一定有媒体卡片，且播放时把服务拉进前台。
+     */
+    @Override
+    public void onUpdateNotification(MediaSession session, boolean startInForegroundRequired) {
+        try {
+            Notification n = buildNotification(session);
+            if (startInForegroundRequired) {
+                startForeground(NOTIF_ID, n);
+            } else {
+                NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                nm.notify(NOTIF_ID, n);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "own notification failed", t);
+            super.onUpdateNotification(session, startInForegroundRequired);
+        }
+    }
+
+    private Notification buildNotification(MediaSession session) {
+        Player p = session.getPlayer();
+        String title = "AC2";
+        try {
+            MediaItem mi = p.getCurrentMediaItem();
+            if (mi != null && mi.localConfiguration != null && mi.localConfiguration.uri != null) {
+                String path = mi.localConfiguration.uri.getPath();
+                if (path != null) title = new File(path).getName();
+            }
+        } catch (Throwable ignored) {
+        }
+        boolean playing = p.isPlaying();
+        Intent open = new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent content = PendingIntent.getActivity(this, 0, open,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        PendingIntent toggle = serviceAction("AC2_TOGGLE", 11);
+        PendingIntent prev = serviceAction("AC2_PREV", 12);
+        PendingIntent next = serviceAction("AC2_NEXT", 13);
+        NotificationCompat.Builder b = new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_media_play)
+                .setContentTitle(title)
+                .setContentText("AC2 · HiFi")
+                .setContentIntent(content)
+                .setOngoing(playing)
+                .setOnlyAlertOnce(true)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
+                .addAction(android.R.drawable.ic_media_previous, "上一首", prev)
+                .addAction(playing ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play,
+                        playing ? "暂停" : "播放", toggle)
+                .addAction(android.R.drawable.ic_media_next, "下一首", next);
+        b.setStyle(new MediaStyleNotificationHelper.MediaStyle(session)
+                .setShowActionsInCompactView(0, 1, 2));
+        return b.build();
+    }
+
+    private PendingIntent serviceAction(String action, int code) {
+        Intent i = new Intent(this, PlaybackService.class).setAction(action);
+        return PendingIntent.getService(this, code, i,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        String action = intent == null ? null : intent.getAction();
+        if (action != null && player != null) {
+            if ("AC2_TOGGLE".equals(action)) {
+                if (player.isPlaying()) player.pause(); else player.play();
+                return START_STICKY;
+            }
+            if ("AC2_NEXT".equals(action)) {
+                if (player.hasNextMediaItem()) player.seekToNextMediaItem();
+                return START_STICKY;
+            }
+            if ("AC2_PREV".equals(action)) {
+                if (player.hasPreviousMediaItem()) player.seekToPreviousMediaItem();
+                else player.seekTo(0);
+                return START_STICKY;
+            }
+        }
+        return super.onStartCommand(intent, flags, startId);
     }
 
     /** 把异常链压成一行，diag 里直接能看到根因类型。 */

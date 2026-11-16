@@ -59,19 +59,19 @@ const Spectrum = (() => {
       try {
         const r = await Api.playbackSpectrum();
         if (!r || !r.ok || !r.bands) return;
-        const d = new Uint8Array(64);
-        for (let i = 0; i < 64; i++) d[i] = Math.max(0, Math.min(255, Math.round((r.bands[i] || 0) * 255)));
+        const d = new Uint8Array(96);
+        for (let i = 0; i < 96; i++) d[i] = Math.max(0, Math.min(255, Math.round((r.bands[i] || 0) * 255)));
         core.data = d;
         if (r.sampleRate) core.sampleRate = r.sampleRate;
       } catch (_) {}
-    }, 100);
+    }, 50);
   }
 
   function ensureCore() {
     const hifi = !!(typeof Player !== 'undefined' && Player.hifiActive && Player.hifiActive());
     if (hifi) {
       if (!core || !core.native) {
-        core = {native: true, data: new Uint8Array(64), sampleRate: 48000, ctx: null, analyser: null};
+        core = {native: true, data: new Uint8Array(96), sampleRate: 48000, ctx: null, analyser: null};
         startPcmPoll();
       }
       return core;

@@ -17,8 +17,8 @@ import java.nio.ByteOrder;
  * ENCODING_PCM_FLOAT，早期实现一律按 16bit short 读，频谱会是一团噪声或全零。
  */
 public class SpectrumProcessor extends BaseAudioProcessor {
-    private static final int FFT_N = 1024;
-    private static volatile float[] bands = new float[64];
+    private static final int FFT_N = 2048;
+    private static volatile float[] bands = new float[96];
     private static volatile int sampleRate = 48000;
     private static volatile boolean enabled = false;
     private static volatile int encoding = C.ENCODING_PCM_16BIT;
@@ -63,7 +63,7 @@ public class SpectrumProcessor extends BaseAudioProcessor {
     @Override
     protected void onReset() {
         fill = 0;
-        bands = new float[64];
+        bands = new float[96];
     }
 
     @Override
@@ -134,12 +134,12 @@ public class SpectrumProcessor extends BaseAudioProcessor {
             im[i] = 0f;
         }
         fft(re, im);
-        float[] out = new float[64];
-        double minHz = 40.0;
+        float[] out = new float[96];
+        double minHz = 30.0;
         double maxHz = Math.min(20000.0, sampleRate / 2.0);
-        for (int b = 0; b < 64; b++) {
-            double f0 = minHz * Math.pow(maxHz / minHz, b / 64.0);
-            double f1 = minHz * Math.pow(maxHz / minHz, (b + 1) / 64.0);
+        for (int b = 0; b < 96; b++) {
+            double f0 = minHz * Math.pow(maxHz / minHz, b / 96.0);
+            double f1 = minHz * Math.pow(maxHz / minHz, (b + 1) / 96.0);
             int k0 = Math.max(1, (int) (f0 * FFT_N / sampleRate));
             int k1 = Math.min(FFT_N / 2 - 1, (int) (f1 * FFT_N / sampleRate));
             float sum = 0f;
@@ -149,8 +149,9 @@ public class SpectrumProcessor extends BaseAudioProcessor {
                 n++;
             }
             float v = n > 0 ? sum / n : 0f;
-            // Hann 窗下单频幅度 A 的峰值 bin 约为 A*N/4，除以 N/4 得到接近线性幅度。
-            double amp = v / (FFT_N / 4.0);
+            // 与 WebAudio analyser 对齐：幅度按 N 归一化（单频满幅 A=1 的峰值 bin ≈ 0.25，
+            // 即 -12dB），避免之前按 N/4 归一化导致整体偏高 12dB。
+            double amp = v / (double) FFT_N;
             double db = 20.0 * Math.log10(Math.max(amp, 1e-5));   // -100..0 dB
             // 前端坐标轴是 -100..0dB，bands 取 0..1 线性映射；之前的 log10(1+v*30)/2 会全频拉满。
             out[b] = (float) Math.max(0.0, Math.min(1.0, (db + 100.0) / 100.0));
