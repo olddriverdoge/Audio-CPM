@@ -21,6 +21,13 @@ public class SpectrumProcessor extends BaseAudioProcessor {
     private static volatile float[] bands = new float[96];
     /** 频谱柱状（快速响应）：平滑更轻，专门给频谱条用，避免和声谱共用 0.8 平滑导致卡顿/延迟。 */
     private static volatile float[] levels = new float[96];
+    /**
+     * 频谱条（48 个对数频段，等倍频程划分，取频段内峰值，快起慢落）。
+     * 不是把 96 个线性 bin 做移动平均——那样低频被压成 1~2 根柱子，跟听到的声音对不上。
+     */
+    private static final int BARS = 48;
+    private static final double BAR_F0 = 40.0, BAR_F1 = 20000.0;
+    private static volatile float[] bars = new float[BARS];
     private static volatile int sampleRate = 48000;
     private static volatile boolean enabled = false;
     private static volatile int encoding = C.ENCODING_PCM_16BIT;
@@ -32,6 +39,7 @@ public class SpectrumProcessor extends BaseAudioProcessor {
     private final float[] mono = new float[FFT_N];
     private final float[] prev = new float[96];
     private final float[] prevLevels = new float[96];
+    private final float[] barPrev = new float[BARS];
     private int fill = 0;
 
     public SpectrumProcessor() {
@@ -46,6 +54,7 @@ public class SpectrumProcessor extends BaseAudioProcessor {
     public static boolean isEnabled() { return enabled; }
     public static float[] getBands() { return bands.clone(); }
     public static float[] getLevels() { return levels.clone(); }
+    public static float[] getBars() { return bars.clone(); }
     public static int getSampleRate() { return sampleRate; }
     /** 排查用：当前输入格式。 */
     public static String describe() {
@@ -72,6 +81,7 @@ public class SpectrumProcessor extends BaseAudioProcessor {
         fill = 0;
         bands = new float[96];
         levels = new float[96];
+        bars = new float[BARS];
     }
 
     @Override
@@ -175,6 +185,34 @@ public class SpectrumProcessor extends BaseAudioProcessor {
         }
         bands = out;
         levels = outLevels;
+
+        // ---- 频谱条：对数频段（每段一个倍频程的等分），取段内峰值，快起慢落 ----
+        final double binHz = (double) sampleRate / FFT_N;
+        final double logF0 = Math.log(BAR_F0);
+        final double logSpan = Math.log(BAR_F1) - logF0;
+        final double cg = 0.42 * FFT_N;          // Blackman 相干增益
+        float[] outBars = new float[BARS];
+        for (int b = 0; b < BARS; b++) {
+            double f0 = Math.exp(logF0 + logSpan * b / BARS);
+            double f1 = Math.exp(logF0 + logSpan * (b + 1) / BARS);
+            int k0 = Math.max(1, (int) Math.floor(f0 / binHz));
+            int k1 = Math.max(k0, (int) Math.ceil(f1 / binHz));
+            k1 = Math.min(FFT_N / 2 - 1, k1);
+            float peak = 0f;
+            for (int k = k0; k <= k1; k++) {
+                float m = (float) Math.hypot(re[k], im[k]);
+                if (m > peak) peak = m;         // 峰值而非平均：音调/鼓点不会被邻近 bin 稀释
+            }
+            // 单边谱 + 窗增益补偿：满幅正弦 ≈ 1.0
+            double amp = 2.0 * peak / cg;
+            double db = 20.0 * Math.log10(Math.max(amp, 1e-7));
+            float v = (float) Math.max(0.0, Math.min(1.0, (db + 100.0) / 70.0));
+            // 快起慢落（约 3:1），上升跟手、下降自然，不会像移动平均那样糊成一片
+            if (v > barPrev[b]) barPrev[b] += (v - barPrev[b]) * 0.55f;
+            else barPrev[b] += (v - barPrev[b]) * 0.12f;
+            outBars[b] = barPrev[b];
+        }
+        bars = outBars;
     }
 
     private static void fft(float[] re, float[] im) {

@@ -61,6 +61,11 @@ const Spectrum = (() => {
       for (let i = 0; i < 96; i++) lv[i] = Math.max(0, Math.min(255, Math.round((r.levels[i] || 0) * 255)));
       core.levels = lv;
     }
+    if (r.bars && r.bars.length) {
+      const bs = new Uint8Array(r.bars.length);
+      for (let i = 0; i < r.bars.length; i++) bs[i] = Math.max(0, Math.min(255, Math.round((r.bars[i] || 0) * 255)));
+      core.bars = bs;
+    }
     if (r.sampleRate) core.sampleRate = r.sampleRate;
   }
   function startPcmPoll() {
@@ -92,7 +97,7 @@ const Spectrum = (() => {
     const hifi = !!(typeof Player !== 'undefined' && Player.hifiActive && Player.hifiActive());
     if (hifi) {
       if (!core || !core.native) {
-        core = {native: true, data: new Uint8Array(96), levels: new Uint8Array(96), sampleRate: 48000, ctx: null, analyser: null};
+        core = {native: true, data: new Uint8Array(96), levels: new Uint8Array(96), bars: new Uint8Array(48), sampleRate: 48000, ctx: null, analyser: null};
         startPcmPoll();
       }
       return core;
@@ -145,16 +150,17 @@ const Spectrum = (() => {
       g.stroke();
       g.fillText(String(db), x0 - 3, y);
     });
-    const marks = [0, 4000, 8000, 12000, 16000, 20000, 24000].filter(v => v <= topHz + 1);
+    // 对数刻度：与频谱条的对数频段一一对应（40Hz~20kHz）
+    const marks = [50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000].filter(v => v <= topHz + 1);
     g.textAlign = 'center';
     g.textBaseline = 'top';
     marks.forEach(hz => {
-      const x = x0 + gw * (hz / topHz);
+      const x = x0 + gw * (Math.log(hz / 40) / Math.log(20000 / 40));
       g.beginPath();
       g.moveTo(Math.round(x) + .5, y0);
       g.lineTo(Math.round(x) + .5, y0 + gh);
       g.stroke();
-      g.fillText(hz === 0 ? '0' : (hz / 1000) + 'k',
+      g.fillText(hz >= 1000 ? (hz / 1000) + 'k' : String(hz),
         Math.min(x0 + gw - 8, Math.max(x0 + 6, x)), y0 + gh + 2);
     });
     g.strokeStyle = 'rgba(148,163,184,.6)';
@@ -303,16 +309,11 @@ const Spectrum = (() => {
       drawWaterfall(area);
       setState('声谱');
     } else {
-      const nyq = nyquist();
-      const bars = 48;
-      const spanBins = Math.max(2, Math.round(core.data.length * area.topHz / nyq));
-      const step = Math.max(1, Math.floor(Math.max(bars, spanBins) / bars));
+      const src = core.bars || core.data;
+      const bars = src.length || 48;
       const bw = area.gw / bars;
-      const src = (core.levels && core.levels.length) ? core.levels : core.data;
       for (let i = 0; i < bars; i++) {
-        let sum = 0;
-        for (let j = 0; j < step; j++) sum += src[i * step + j] || 0;
-        const v = (sum / step) / 255;
+        const v = (src[i] || 0) / 255;
         const bh = Math.max(1, v * area.gh);
         const x = area.x0 + i * bw;
         const grad = g.createLinearGradient(0, area.y0 + area.gh, 0, area.y0 + area.gh - bh);
