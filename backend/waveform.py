@@ -141,6 +141,7 @@ def _peaks_native(path: str, buckets: int) -> Optional[List[float]]:
     tmp = None
     try:
         import tempfile
+        os.makedirs(WAVE_CACHE_DIR, exist_ok=True)
         fd, tmp = tempfile.mkstemp(suffix='.json', dir=WAVE_CACHE_DIR)
         os.close(fd)
         os.unlink(tmp)
@@ -189,14 +190,23 @@ def compute_wave_peaks(path: str, buckets: int = 160) -> list:
 
     ext = os.path.splitext(path)[1].lower()
     peaks = None
-    # ffmpeg 主路径：一次解码到 4kHz 单声道，几十 MB 的文件也在百毫秒级；
-    # 之前把 Java MediaCodec 桥排在前面，导致每首歌都要全量解码 + 跨语言传数组，慢一个量级。
-    if ffbin.available():
+    # MediaCodec 原生路径优先：不起子进程、硬件/系统解码器，旧 p4a 版的"秒出波形"就是这条；
+    # ffmpeg 作为兜底（支持 APE/DSD 等 MediaCodec 不认的格式）。
+    if native_provider is not None:
+        tn = time.perf_counter()
+        try:
+            peaks = native_provider(path, buckets)
+        except Exception as e:
+            _log('waveform native fail %s: %s' % (os.path.basename(path), e))
+            peaks = None
+        if peaks:
+            _log('waveform native %s %.0fms' % (os.path.basename(path), (time.perf_counter() - tn) * 1000))
+        else:
+            peaks = None
+    if peaks is None and ffbin.available():
         got = _peaks_ffmpeg(path, buckets)
         if got:
             peaks = got
-    if peaks is None:
-        _log('waveform ffmpeg unavailable/failed, fallback native: %s' % os.path.basename(path))
     if peaks is None and ext == '.wav':
         # 纯 Python 只适合短 WAV（ffmpeg 不可用时兜底）
         peaks = _peaks_wave_pcm(path, buckets)

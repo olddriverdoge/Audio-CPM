@@ -66,6 +66,12 @@ def register() -> bool:
         }
     except Exception:
         _playback = None
+    try:
+        # 波形走 Java MediaCodec（旧 p4a 的快速路径），ffmpeg 仅兜底
+        from . import waveform
+        waveform.native_provider = waveform._peaks_native
+    except Exception:
+        pass
     return available()
 
 

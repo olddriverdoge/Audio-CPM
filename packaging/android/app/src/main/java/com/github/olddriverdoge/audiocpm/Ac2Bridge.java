@@ -180,6 +180,8 @@ public class Ac2Bridge {
             long dur = (rawDur <= 0 || rawDur == androidx.media3.common.C.TIME_UNSET) ? 0 : rawDur;
             boolean playing = onMain(() -> p.isPlaying(), false);
             int idx = onMain(() -> p.getCurrentMediaItemIndex(), -1);
+            int pbState = onMain(() -> p.getPlaybackState(), 1);
+            float vol = onMain(() -> p.getVolume(), 1f);
             String cur = onMain(() -> {
                 MediaItem mi = p.getCurrentMediaItem();
                 if (mi == null || mi.localConfiguration == null || mi.localConfiguration.uri == null) return "";
@@ -188,6 +190,8 @@ public class Ac2Bridge {
             return "{\"ok\":true,\"positionMs\":" + pos + ",\"durationMs\":" + dur
                     + ",\"playing\":" + playing + ",\"index\":" + idx
                     + ",\"path\":\"" + esc(cur) + "\""
+                    + ",\"playbackState\":" + pbState + ",\"volume\":" + vol
+                    + ",\"error\":\"" + esc(PlaybackService.getLastError()) + "\""
                     + ",\"sampleRate\":" + sSampleRate + ",\"bitDepth\":" + sBitDepth
                     + ",\"channels\":" + sChannels
                     + ",\"outputMode\":\"shared\",\"isResampling\":false,\"dacName\":\"\"}";
