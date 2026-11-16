@@ -182,6 +182,14 @@ public class Ac2Bridge {
             int idx = onMain(() -> p.getCurrentMediaItemIndex(), -1);
             int pbState = onMain(() -> p.getPlaybackState(), 1);
             float vol = onMain(() -> p.getVolume(), 1f);
+            boolean notif = true;
+            try {
+                Context ctx0 = Ac2App.get();
+                android.app.NotificationManager nm = ctx0 == null ? null
+                        : (android.app.NotificationManager) ctx0.getSystemService(Context.NOTIFICATION_SERVICE);
+                if (nm != null) notif = nm.areNotificationsEnabled();
+            } catch (Throwable ignored) {
+            }
             String cur = onMain(() -> {
                 MediaItem mi = p.getCurrentMediaItem();
                 if (mi == null || mi.localConfiguration == null || mi.localConfiguration.uri == null) return "";
@@ -192,6 +200,7 @@ public class Ac2Bridge {
                     + ",\"path\":\"" + esc(cur) + "\""
                     + ",\"playbackState\":" + pbState + ",\"volume\":" + vol
                     + ",\"error\":\"" + esc(PlaybackService.getLastError()) + "\""
+                    + ",\"notifEnabled\":" + notif""
                     + ",\"sampleRate\":" + sSampleRate + ",\"bitDepth\":" + sBitDepth
                     + ",\"channels\":" + sChannels
                     + ",\"outputMode\":\"shared\",\"isResampling\":false,\"dacName\":\"\"}";

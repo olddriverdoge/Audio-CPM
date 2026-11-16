@@ -139,6 +139,7 @@ def _peaks_native(path: str, buckets: int) -> Optional[List[float]]:
     except Exception:
         return None
     tmp = None
+    t0 = time.perf_counter()
     try:
         import tempfile
         os.makedirs(WAVE_CACHE_DIR, exist_ok=True)
@@ -146,14 +147,18 @@ def _peaks_native(path: str, buckets: int) -> Optional[List[float]]:
         os.close(fd)
         os.unlink(tmp)
         if not bool(Cls.peaks(str(path), int(buckets), tmp)):
+            _log('waveform native decode-false %s %.0fms' % (os.path.basename(path), (time.perf_counter() - t0) * 1000))
             return None
         with open(tmp, 'r', encoding='utf-8') as f:
             d = json.load(f)
         peaks = d.get('peaks')
         if not isinstance(peaks, list) or not peaks:
+            _log('waveform native empty-json %s %.0fms' % (os.path.basename(path), (time.perf_counter() - t0) * 1000))
             return None
+        _log('waveform native-ac2wave %s %.0fms' % (os.path.basename(path), (time.perf_counter() - t0) * 1000))
         return [float(x) for x in peaks]
-    except Exception:
+    except Exception as e:
+        _log('waveform native exception %s: %s %.0fms' % (os.path.basename(path), e, (time.perf_counter() - t0) * 1000))
         return None
     finally:
         if tmp:

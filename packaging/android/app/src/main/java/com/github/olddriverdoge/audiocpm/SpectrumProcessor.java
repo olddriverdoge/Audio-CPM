@@ -93,6 +93,9 @@ public class SpectrumProcessor extends BaseAudioProcessor {
         ByteBuffer tmp = ByteBuffer.allocateDirect(size).order(ByteOrder.LITTLE_ENDIAN);
         tmp.put(inputBuffer.duplicate());
         tmp.flip();
+        // 必须把输入消费掉：AudioProcessingPipeline 用 (输入前剩余 - 调用后剩余) 判断是否有进展，
+        // 不消费会导致同一段 PCM 被反复喂进来，真机表现就是“一小段声音不停重复”。
+        inputBuffer.position(inputBuffer.limit());
         ByteBuffer out = replaceOutputBuffer(size);
         out.put(tmp);
         out.flip();

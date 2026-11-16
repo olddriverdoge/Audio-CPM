@@ -88,6 +88,15 @@ async def playback_diag(request):
                 err = f.read()[-3000:]
     except Exception:
         pass
+    wlog = ''
+    try:
+        lp = os.path.join(DATA_DIR, 'ac2.log')
+        if os.path.exists(lp):
+            with open(lp, 'r', encoding='utf-8', errors='ignore') as f:
+                lines = [ln.rstrip() for ln in f.readlines()[-400:] if 'waveform' in ln]
+            wlog = '\n'.join(lines[-25:])
+    except Exception:
+        pass
     return JSONResponse({
         'ok': True,
         'android': bool(os.environ.get('AC2_ANDROID')),
@@ -95,6 +104,7 @@ async def playback_diag(request):
         'state': st,
         'spectrum': sp,
         'errorLog': err,
+        'waveformLog': wlog,
     })
 
 
