@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """目录浏览 / 图片 / 探测（本地 + WebDAV）。Starlette 版。"""
+import logging
 import mimetypes
 import os
 
@@ -15,6 +16,7 @@ from ..storage import get_dav_client, local_uri, parse_ref, to_uri
 from ..storage.dav import HttpRangeFile
 
 routes = []
+logger = logging.getLogger("ac2.browse")
 
 
 def _quote(s):
@@ -50,6 +52,7 @@ def api_browse(request: Request):
     except Exception as e:
         raise HTTPException(400, f"无法读取目录: {e}")
     dir_cover = None
+    skipped = 0
     for name in names:
         full = os.path.join(p, name)
         try:
@@ -66,8 +69,14 @@ def api_browse(request: Request):
                                   "size": os.path.getsize(full), "mtime": os.path.getmtime(full)})
                     if dir_cover is None:
                         dir_cover = '/api/image?path=' + _quote(local_uri(full))
-        except Exception:
-            continue
+        except Exception as e:
+            # 不再静默跳过：安卓上没有存储权限时 /sdcard 能列目录名、但 stat 文件失败，
+            # 表现为“只剩文件夹、歌曲为空”，必须能从日志里看到原因。
+            skipped += 1
+            logger.debug("browse: stat failed for %s: %s", full, e)
+    if skipped:
+        logger.warning("browse: %d entries skipped in %s (stat 失败，通常是未授予存储权限)",
+                       skipped, p)
     parent = os.path.dirname(p.rstrip(os.sep)) or "/"
     return J({"path": local_uri(p), "parent": local_uri(parent),
               "dirs": dirs, "files": files, "cover": dir_cover})

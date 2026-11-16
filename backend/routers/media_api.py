@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """封面 / 缩略图 / 波形 / 流式播放 / 系统播放器。Starlette 版。"""
 import hashlib
+import logging
 import mimetypes
 import os
 import re
@@ -23,6 +24,7 @@ from ..storage.dav import HttpRangeFile
 from ..waveform import compute_wave_peaks
 
 routes = []
+logger = logging.getLogger("ac2.media")
 
 THUMB_SIZES = (48, 96, 128, 192)
 PLAYER_RE = re.compile(r'^[A-Za-z0-9._]+$')
@@ -123,6 +125,15 @@ def api_stream(request: Request):
         return StreamingResponse(gen(), status_code=resp.status_code,
                                  media_type=mt, headers=headers)
     if not os.path.isfile(ref.path):
+        # 区分“文件不存在”和“有文件但没权限”：安卓上未授权时 stat 同样返回 False，
+        # 直接报 404 会让人误以为文件丢了。
+        try:
+            os.stat(ref.path)
+        except PermissionError as e:
+            logger.warning("stream: permission denied %s: %s", ref.path, e)
+            raise HTTPException(403, "无权限读取该文件，请在系统设置里授予“所有文件访问权限”")
+        except Exception as e:
+            logger.warning("stream: stat failed %s: %s", ref.path, e)
         raise HTTPException(404, "file not found")
     ext = os.path.splitext(ref.path)[1].lower()
     if ext not in MEDIA_EXTS:
