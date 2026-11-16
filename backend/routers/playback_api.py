@@ -4,7 +4,19 @@ from starlette.concurrency import run_in_threadpool
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
+import os
+import time
+
 from .. import native_bridge
+from ..config import DATA_DIR
+
+
+def _log(msg):
+    try:
+        with open(os.path.join(DATA_DIR, 'ac2.log'), 'a', encoding='utf-8') as f:
+            f.write(time.strftime('%Y-%m-%d %H:%M:%S ') + str(msg) + '\n')
+    except Exception:
+        pass
 
 
 async def _body(request):
@@ -23,6 +35,7 @@ async def playback_open(request):
         int(d.get('sampleRate') or 0),
         int(d.get('bitDepth') or 0),
         int(d.get('channels') or 0))
+    _log('playback open %s -> %s' % (d.get('path'), r))
     return JSONResponse(r)
 
 
@@ -47,6 +60,19 @@ async def playback_state(request):
     return JSONResponse(await run_in_threadpool(native_bridge.playback_state))
 
 
+async def playback_diag(request):
+    """真机排查入口：浏览器打开 http://127.0.0.1:8765/api/playback/diag 即可。"""
+    st = await run_in_threadpool(native_bridge.playback_state)
+    sp = await run_in_threadpool(native_bridge.playback_spectrum, None)
+    return JSONResponse({
+        'ok': True,
+        'android': bool(os.environ.get('AC2_ANDROID')),
+        'bridge': native_bridge.playback_available(),
+        'state': st,
+        'spectrum': sp,
+    })
+
+
 async def playback_spectrum(request):
     enabled = request.query_params.get('enabled')
     r = await run_in_threadpool(native_bridge.playback_spectrum,
@@ -62,4 +88,5 @@ routes = [
     Route('/api/playback/seek', playback_seek, methods=['POST']),
     Route('/api/playback/state', playback_state, methods=['GET']),
     Route('/api/playback/spectrum', playback_spectrum, methods=['GET']),
+    Route('/api/playback/diag', playback_diag, methods=['GET']),
 ]

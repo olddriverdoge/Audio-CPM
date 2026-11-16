@@ -200,6 +200,16 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void openNotificationSettings() {
+        try {
+            Intent i = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
+            startActivity(i);
+        } catch (Exception e) {
+            Log.w(TAG, "open notification settings failed", e);
+        }
+    }
+
     private void showAllFilesDialog() {
         new AlertDialog.Builder(this)
                 .setTitle("需要文件访问权限")
@@ -235,6 +245,22 @@ public class MainActivity extends Activity {
             boolean ok = results[i] == PackageManager.PERMISSION_GRANTED;
             Log.i(TAG, "permission " + permissions[i] + " granted=" + ok);
             if (ok) grantedNow = true;
+        }
+        if (requestCode == REQ_NOTIFICATIONS) {
+            // 通知栏是 HiFi 的可见入口，被拒时明确告诉用户去哪儿开
+            boolean anyNotif = false;
+            for (int i = 0; i < permissions.length && i < results.length; i++) {
+                if (Manifest.permission.POST_NOTIFICATIONS.equals(permissions[i])
+                        && results[i] == PackageManager.PERMISSION_GRANTED) anyNotif = true;
+            }
+            if (!anyNotif) {
+                new AlertDialog.Builder(this)
+                        .setTitle("通知权限未开启")
+                        .setMessage("播放时通知栏/锁屏不会出现播放控件。可在系统设置里为本应用打开通知。")
+                        .setPositiveButton("去设置", (d, w) -> openNotificationSettings())
+                        .setNegativeButton("知道了", null)
+                        .show();
+            }
         }
         if (grantedNow && webView != null) {
             webView.post(() -> webView.reload());

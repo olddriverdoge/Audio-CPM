@@ -231,7 +231,16 @@ const Player = (() => {
           setWave(path); paintRows(); show(); startHifiPoll(); setToggle(true);
           return;
         }
-      } catch (_) {}
+        // 失败不静默：写日志 + 一次性提示，便于真机排查（否则只会"悄悄退回网页播放"）
+        const why = (r && (r.error || r.message)) || 'unknown';
+        Utils.log('warn', 'HiFi 打开失败，已回退网页播放: ' + why);
+        if (!window.__ac2HifiWarned) {
+          window.__ac2HifiWarned = true;
+          Utils.toast('HiFi 未启用，已回退网页播放：' + why, 'warn');
+        }
+      } catch (e) {
+        Utils.log('warn', 'HiFi 打开异常，已回退网页播放: ' + (e && e.message || e));
+      }
     }
     hifi = false;
     setWave(path);

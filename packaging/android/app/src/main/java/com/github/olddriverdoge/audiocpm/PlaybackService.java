@@ -3,6 +3,7 @@ package com.github.olddriverdoge.audiocpm;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.util.Log;
 
 import androidx.media3.common.AudioAttributes;
 import androidx.media3.common.C;
@@ -16,6 +17,7 @@ import androidx.media3.session.MediaSessionService;
 
 /** 本地 HiFi 播放服务：ExoPlayer + MediaSession（通知栏/锁屏/后台播放由 Media3 负责）。 */
 public class PlaybackService extends MediaSessionService {
+    private static final String TAG = "AC2";
     private static volatile ExoPlayer player;
     private static volatile MediaSession session;
 
@@ -27,6 +29,7 @@ public class PlaybackService extends MediaSessionService {
     @Override
     public void onCreate() {
         super.onCreate();
+        Log.i(TAG, "PlaybackService.onCreate");
         /*
          * ExoPlayer.Builder 没有公开的 setAudioSink（1.5.x），
          * 官方扩展点是 DefaultRenderersFactory#buildAudioSink。
@@ -56,10 +59,12 @@ public class PlaybackService extends MediaSessionService {
         session = new MediaSession.Builder(this, player)
                 .setSessionActivity(pi)
                 .build();
+        Log.i(TAG, "MediaSession created, player ready");
     }
 
     @Override
     public MediaSession onGetSession(MediaSession.ControllerInfo controllerInfo) {
+        Log.i(TAG, "onGetSession from " + (controllerInfo == null ? "?" : controllerInfo.getPackageName()));
         return session;
     }
 
@@ -71,6 +76,7 @@ public class PlaybackService extends MediaSessionService {
 
     @Override
     public void onDestroy() {
+        Log.i(TAG, "PlaybackService.onDestroy");
         if (session != null) session.release();
         if (player != null) player.release();
         session = null;

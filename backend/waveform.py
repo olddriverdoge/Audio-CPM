@@ -11,13 +11,23 @@ import hashlib
 import json
 import os
 import threading
+import time
 from typing import Dict, List, Optional
 
-from .config import WAVE_CACHE_DIR
+from .config import DATA_DIR, WAVE_CACHE_DIR
 from . import ffbin
 
 _wave_mem: Dict[str, list] = {}
 _wave_mem_lock = threading.Lock()
+
+
+def _log(msg: str) -> None:
+    """把耗时/回退路径写进 ac2.log，便于真机排查。"""
+    try:
+        with open(os.path.join(DATA_DIR, 'ac2.log'), 'a', encoding='utf-8') as f:
+            f.write(time.strftime('%Y-%m-%d %H:%M:%S ') + msg + '\n')
+    except Exception:
+        pass
 WAVE_MEM_MAX = 60
 
 # 可选的原生解码钩子：app 内由 Kotlin 桥注册，返回 0~1 未归一化峰值或 None
@@ -155,6 +165,7 @@ def compute_wave_peaks(path: str, buckets: int = 160) -> list:
     except OSError:
         return []
     key = hashlib.md5(stamp.encode('utf-8', 'ignore')).hexdigest()
+    t0 = time.perf_counter()
     with _wave_mem_lock:
         hit = _wave_mem.get(key)
     if hit is not None:
@@ -173,25 +184,22 @@ def compute_wave_peaks(path: str, buckets: int = 160) -> list:
 
     ext = os.path.splitext(path)[1].lower()
     peaks = None
-    if native_provider is not None:
-        try:
-            peaks = native_provider(path, buckets)
-        except Exception:
-            peaks = None
-    if peaks is None and ext == '.wav':
-        peaks = _peaks_wave_pcm(path, buckets)
-    if peaks is None and ffbin.available():
-        # ffmpeg 是主路径（质量最好）；app 包已内置，Termux/PC 用 PATH
+    # ffmpeg 主路径：一次解码到 4kHz 单声道，几十 MB 的文件也在百毫秒级；
+    # 之前把 Java MediaCodec 桥排在前面，导致每首歌都要全量解码 + 跨语言传数组，慢一个量级。
+    if ffbin.available():
         got = _peaks_ffmpeg(path, buckets)
         if got:
             peaks = got
+    if peaks is None and ext == '.wav':
+        # 纯 Python 只适合短 WAV（ffmpeg 不可用时兜底）
+        peaks = _peaks_wave_pcm(path, buckets)
     if peaks is None:
-        # ffmpeg 不可用或解码失败：退回 MediaCodec（app 内兜底）
         peaks = _peaks_native(path, buckets)
     if peaks is None:
         peaks = _peaks_ffmpeg(path, buckets)
     if not peaks:
         return []
+    _log('waveform %s buckets=%d %.0fms' % (os.path.basename(path), buckets, (time.perf_counter() - t0) * 1000))
     peaks = _norm(peaks)
     with _wave_mem_lock:
         if len(_wave_mem) >= WAVE_MEM_MAX:

@@ -1,22 +1,28 @@
 package com.github.olddriverdoge.audiocpm;
 
-import androidx.media3.common.audio.AudioProcessor;
+import androidx.media3.common.C;
 import androidx.media3.common.audio.AudioProcessor.AudioFormat;
 import androidx.media3.common.audio.BaseAudioProcessor;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * 挂在 ExoPlayer DefaultAudioSink 上的 PCM 旁路：只读样本算频谱，音频原样透传。
  *
  * 注意：BaseAudioProcessor 要求子类在 queueInput 里用 replaceOutputBuffer 消费输入，
  * 否则音频会被丢弃（早期 p4a 版本写成 super.queueInput(inputBuffer)，是错的）。
+ *
+ * 采样格式必须按 AudioFormat.encoding 走：ExoPlayer 在 24bit 源 / 浮点输出时会用
+ * ENCODING_PCM_FLOAT，早期实现一律按 16bit short 读，频谱会是一团噪声或全零。
  */
 public class SpectrumProcessor extends BaseAudioProcessor {
     private static final int FFT_N = 1024;
     private static volatile float[] bands = new float[64];
     private static volatile int sampleRate = 48000;
     private static volatile boolean enabled = false;
+    private static volatile int encoding = C.ENCODING_PCM_16BIT;
+    private static volatile int channels = 2;
 
     private final float[] window = new float[FFT_N];
     private final float[] re = new float[FFT_N];
@@ -31,12 +37,21 @@ public class SpectrumProcessor extends BaseAudioProcessor {
     }
 
     public static void setEnabled(boolean b) { enabled = b; }
+    public static boolean isEnabled() { return enabled; }
     public static float[] getBands() { return bands.clone(); }
     public static int getSampleRate() { return sampleRate; }
+    /** 排查用：当前输入格式。 */
+    public static String describe() {
+        return "{\"sampleRate\":" + sampleRate + ",\"channels\":" + channels
+                + ",\"encoding\":" + encoding + ",\"enabled\":" + enabled + "}";
+    }
 
     @Override
     protected AudioFormat onConfigure(AudioFormat inputFormat) {
         sampleRate = inputFormat.sampleRate;
+        channels = Math.max(1, inputFormat.channelCount);
+        encoding = inputFormat.encoding;
+        fill = 0;
         return inputFormat;
     }
 
@@ -54,21 +69,53 @@ public class SpectrumProcessor extends BaseAudioProcessor {
     @Override
     public void queueInput(ByteBuffer inputBuffer) {
         int size = inputBuffer.remaining();
-        if (enabled && size >= 2) {
+        if (enabled && size > 0) {
+            int bytes = bytesPerSample(encoding);
+            int frame = bytes * channels;
             ByteBuffer dup = inputBuffer.duplicate();
-            while (dup.remaining() >= 2) {
-                short s = dup.getShort();
-                mono[fill++] = s / 32768f;
+            dup.order(ByteOrder.LITTLE_ENDIAN);
+            while (frame > 0 && dup.remaining() >= frame) {
+                mono[fill++] = readSample(dup, bytes);
                 if (fill >= FFT_N) {
                     compute();
                     fill = 0;
                 }
+                // 跳过本帧剩余声道
+                int skip = frame - bytes;
+                if (skip > 0) dup.position(dup.position() + skip);
             }
         }
         // 原样透传（必须 consume 输入缓冲区）
         ByteBuffer out = replaceOutputBuffer(size);
         out.put(inputBuffer);
         out.flip();
+    }
+
+    private static int bytesPerSample(int enc) {
+        switch (enc) {
+            case C.ENCODING_PCM_8BIT: return 1;
+            case C.ENCODING_PCM_24BIT: return 3;
+            case C.ENCODING_PCM_32BIT:
+            case C.ENCODING_PCM_FLOAT: return 4;
+            default: return 2;
+        }
+    }
+
+    /** 读当前帧第一声道并归一化到 [-1,1]。 */
+    private float readSample(ByteBuffer b, int bytes) {
+        if (bytes == 1) {
+            return ((b.get() & 0xFF) - 128) / 128.0f;
+        }
+        if (bytes == 3) {
+            int b0 = b.get() & 0xFF, b1 = b.get() & 0xFF, b2 = b.get();
+            int v = (b2 << 16) | (b1 << 8) | b0;   // b2 带符号，高位自动扩展
+            return v / 8388608.0f;
+        }
+        if (bytes == 4) {
+            if (encoding == C.ENCODING_PCM_FLOAT) return b.getFloat();
+            return b.getInt() / 2147483648.0f;
+        }
+        return b.getShort() / 32768.0f;
     }
 
     private void compute() {

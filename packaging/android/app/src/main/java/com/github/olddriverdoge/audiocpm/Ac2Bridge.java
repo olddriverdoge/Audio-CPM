@@ -9,6 +9,7 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
+import android.util.Log;
 
 import androidx.media3.common.MediaItem;
 import androidx.media3.exoplayer.ExoPlayer;
@@ -22,6 +23,7 @@ import java.util.concurrent.TimeUnit;
  * 由 Python 侧的 backend/native_bridge.py 通过 Chaquopy 的 jclass 调用。
  */
 public class Ac2Bridge {
+    private static final String TAG = "AC2";
 
     private static volatile int sSampleRate = 0;
     private static volatile int sBitDepth = 0;
@@ -125,10 +127,13 @@ public class Ac2Bridge {
     public static String play(String path, int startMs, int sampleRate, int bitDepth, int channels) {
         try {
             Context ctx = Ac2App.get();
-            if (ctx == null) return "{\"ok\":false,\"error\":\"no context\"}";
-            if (!ensureService(ctx)) return "{\"ok\":false,\"error\":\"playback service unavailable\"}";
+            if (ctx == null) { Log.w(TAG, "play: no context"); return "{\"ok\":false,\"error\":\"no context\"}"; }
+            if (!ensureService(ctx)) {
+                Log.w(TAG, "play: service unavailable");
+                return "{\"ok\":false,\"error\":\"playback service unavailable\"}";
+            }
             final File f = new File(path);
-            if (!f.isFile()) return "{\"ok\":false,\"error\":\"file not found\"}";
+            if (!f.isFile()) { Log.w(TAG, "play: not a file " + path); return "{\"ok\":false,\"error\":\"file not found\"}"; }
             sSampleRate = sampleRate;
             sBitDepth = bitDepth;
             sChannels = channels;
@@ -140,8 +145,10 @@ public class Ac2Bridge {
                 p.play();
                 return true;
             }, false);
+            Log.i(TAG, "play " + path + " startMs=" + startMs + " -> " + ok);
             return ok ? "{\"ok\":true}" : "{\"ok\":false,\"error\":\"play failed\"}";
         } catch (Throwable t) {
+            Log.w(TAG, "play failed", t);
             return "{\"ok\":false,\"error\":\"" + esc(String.valueOf(t)) + "\"}";
         }
     }
@@ -185,7 +192,9 @@ public class Ac2Bridge {
         try {
             float[] b = SpectrumProcessor.getBands();
             StringBuilder sb = new StringBuilder(1024);
-            sb.append("{\"ok\":true,\"sampleRate\":").append(SpectrumProcessor.getSampleRate()).append(",\"bands\":[");
+            sb.append("{\"ok\":true,\"service\":").append(PlaybackService.getPlayer() != null)
+              .append(",\"format\":").append(SpectrumProcessor.describe())
+              .append(",\"sampleRate\":").append(SpectrumProcessor.getSampleRate()).append(",\"bands\":[");
             for (int i = 0; i < b.length; i++) {
                 if (i > 0) sb.append(',');
                 sb.append(Math.round(b[i] * 1000) / 1000.0);

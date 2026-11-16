@@ -31,7 +31,8 @@ def main():
     ffbin.prepare()
     _log("cli: ffbin=%s caps=%s" % (ffbin.FFMPEG, ffbin.capabilities()))
     native_bridge.register()
-    _log("cli: native_bridge available=%s" % native_bridge.available())
+    _log("cli: native_bridge available=%s playback=%s"
+         % (native_bridge.available(), native_bridge.playback_available()))
     load_tasks()
     _log("cli: tasks loaded")
     print(f"数据目录: {DATA_DIR}")
