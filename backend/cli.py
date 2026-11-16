@@ -26,7 +26,7 @@ def main():
     ap.add_argument("--host", default=os.environ.get("AC2_HOST", "127.0.0.1"),
                     help="监听地址，局域网共享用 0.0.0.0")
     ap.add_argument("--port", type=int, default=int(os.environ.get("AC2_PORT", "8000")))
-    args = ap.parse_args()
+    args, _ = ap.parse_known_args()
     _log("cli: prepared args host=%s port=%s" % (args.host, args.port))
     ffbin.prepare()
     _log("cli: ffbin.FFMPEG=%s" % ffbin.FFMPEG)

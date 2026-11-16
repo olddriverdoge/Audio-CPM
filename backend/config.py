@@ -10,7 +10,7 @@ import os
 import tempfile
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FRONTEND_DIR = os.path.join(ROOT_DIR, 'frontend')
+FRONTEND_DIR = os.environ.get('AC2_FRONTEND_DIR') or os.path.join(ROOT_DIR, 'frontend')
 SCRIPT_DIR = ROOT_DIR
 
 # 可写数据目录（app 内不能写安装目录，用 AC2_DATA_DIR 指向 filesDir）
