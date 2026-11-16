@@ -214,6 +214,8 @@ const Player = (() => {
     if (!path) throw new Error('空路径');
     const ratio = Math.max(0, Math.min(0.999, Number(startRatio) || 0));
     cur = path;
+    // 切歌前先停掉 WebView 那一路，避免 HiFi 与网页播放同时出声（爆音/叠音）
+    try { audio.pause(); } catch (_) {}
     titleEl.textContent = Utils.basename(path);
     titleEl.title = path;
     if (metaEl) metaEl.textContent = '';
