@@ -58,7 +58,7 @@ public class PlaybackService extends MediaSessionService {
         player.addListener(new Player.Listener() {
             @Override
             public void onPlayerError(PlaybackException error) {
-                lastError = error.errorCodeName + ": " + error.getMessage();
+                lastError = error.getErrorCodeName() + ": " + error.getMessage();
                 Log.e(TAG, "player error " + lastError, error);
             }
 
