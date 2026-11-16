@@ -101,7 +101,7 @@ tasks.named("assembleDebug") {
     doLast {
         val apkDir = layout.buildDirectory.dir("outputs/apk/debug").get().asFile
         apkDir.listFiles { f -> f.name == "app-debug.apk" }?.firstOrNull()?.let {
-            it.renameTo(java.io.File(apkDir, "Audio-CPM-debug.apk"))
+            it.renameTo(File(apkDir, "Audio-CPM-debug.apk"))
         }
     }
 }
