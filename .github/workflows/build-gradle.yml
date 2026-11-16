@@ -42,7 +42,7 @@ jobs:
         if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
         run: |
           SRC=/tmp/ffmpeg-build/ffmpeg-8.0.1
-          for c in FLAC_ENCODER AAC_ENCODER ALAC_ENCODER PCM_S16LE_ENCODER FLAC_DECODER MP3_DECODER APE_DECODER DSD_LSBF_DECODER MOV_DEMUXER FLAC_MUXER IPOD_MUXER ARESAMPLE_FILTER; do
+          for c in FLAC_ENCODER AAC_ENCODER ALAC_ENCODER PCM_S16LE_ENCODER MJPEG_ENCODER FLAC_DECODER MP3_DECODER APE_DECODER DSD_LSBF_DECODER MJPEG_DECODER PNG_DECODER MOV_DEMUXER FLAC_MUXER IPOD_MUXER IMAGE2_MUXER ARESAMPLE_FILTER SCALE_FILTER AAC_ADTSTOASC_BSF; do
             v=$(grep -E "^#define CONFIG_${c} " "$SRC/config_components.h" | awk '{print $3}')
             echo "$c = ${v:-MISSING}"
             if [ "${v:-0}" != "1" ]; then echo "!! 组件缺失: $c" >&2; exit 1; fi

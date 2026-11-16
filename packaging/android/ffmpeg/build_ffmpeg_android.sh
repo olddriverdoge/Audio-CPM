@@ -60,16 +60,17 @@ echo ">> configure"
   --disable-everything \
   --disable-doc --disable-ffplay --disable-ffprobe \
   --enable-ffmpeg \
-  --disable-network --disable-avdevice --disable-swscale \
+  --disable-network --disable-avdevice \
   --disable-zlib --disable-bzlib --disable-lzma --disable-iconv \
   --disable-sdl2 --disable-xlib --disable-libxcb \
   --enable-protocol=file,pipe \
-  --enable-filter=aresample,volume,anull \
-  --enable-decoder=aac,mp3,flac,alac,ape,wavpack,vorbis,opus,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,pcm_s16be,pcm_s24be,dsd_lsbf,dsd_msbf,dsd_lsbf_planar,dsd_msbf_planar \
-  --enable-encoder=flac,alac,aac,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,pcm_s16be,wavpack \
-  --enable-demuxer=flac,mp3,wav,aiff,mov,ogg,ape,wv,dsf,dff,aac \
-  --enable-muxer=flac,ipod,wav,aiff,mp3 \
+  --enable-filter=aresample,volume,anull,scale \
+  --enable-decoder=aac,mp3,flac,alac,ape,wavpack,vorbis,opus,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,pcm_s16be,pcm_s24be,dsd_lsbf,dsd_msbf,dsd_lsbf_planar,dsd_msbf_planar,mjpeg,png \
+  --enable-encoder=flac,alac,aac,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,pcm_s16be,wavpack,mjpeg \
+  --enable-demuxer=flac,mp3,wav,aiff,mov,ogg,ape,wv,dsf,dff,aac,image2 \
+  --enable-muxer=flac,ipod,wav,aiff,mp3,image2 \
   --enable-parser=aac,mpegaudio,flac,vorbis,opus \
+  --enable-bsf=aac_adtstoasc \
   --enable-small --disable-symver \
   --disable-shared --enable-static \
   --extra-cflags="-O3 -fPIC -DANDROID" \
