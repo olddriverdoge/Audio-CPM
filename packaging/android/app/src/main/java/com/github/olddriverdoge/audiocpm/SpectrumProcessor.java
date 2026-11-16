@@ -86,8 +86,15 @@ public class SpectrumProcessor extends BaseAudioProcessor {
             }
         }
         // 原样透传（必须 consume 输入缓冲区）
+        // 注意：replaceOutputBuffer() 返回的是本处理器内部的 buffer，而管线有时会把同一个
+        // ByteBuffer 对象当输入传进来，直接 out.put(inputBuffer) 会抛
+        // IllegalArgumentException: The source buffer is this buffer（真机已复现）。
+        // 所以先复制到独立的临时缓冲，再写回输出缓冲。
+        ByteBuffer tmp = ByteBuffer.allocateDirect(size).order(ByteOrder.LITTLE_ENDIAN);
+        tmp.put(inputBuffer.duplicate());
+        tmp.flip();
         ByteBuffer out = replaceOutputBuffer(size);
-        out.put(inputBuffer);
+        out.put(tmp);
         out.flip();
     }
 
