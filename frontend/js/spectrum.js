@@ -15,7 +15,7 @@ const Spectrum = (() => {
 
   // 声谱缓冲（时间轴横向、频率纵向；新数据从右侧进入，向左滚动）
   const wf = document.createElement('canvas');
-  let wfCtx = null, wfW = 0, wfH = 0;
+  let wfCtx = null, wfW = 0, wfH = 0, wfLast = 0;
   let palette = null;
 
   function setState(t) { if (stateEl) stateEl.textContent = t || ''; }
@@ -51,24 +51,40 @@ const Spectrum = (() => {
   }
 
   let pcmTimer = 0;
+  function applySpectrum(r) {
+    if (!r || !r.ok || !r.bands) return;
+    const d = new Uint8Array(96);
+    for (let i = 0; i < 96; i++) d[i] = Math.max(0, Math.min(255, Math.round((r.bands[i] || 0) * 255)));
+    core.data = d;
+    if (r.levels && r.levels.length) {
+      const lv = new Uint8Array(96);
+      for (let i = 0; i < 96; i++) lv[i] = Math.max(0, Math.min(255, Math.round((r.levels[i] || 0) * 255)));
+      core.levels = lv;
+    }
+    if (r.sampleRate) core.sampleRate = r.sampleRate;
+  }
   function startPcmPoll() {
     if (pcmTimer) return;
     try { Api.playbackSpectrum(true); } catch (_) {}
+    // 高刷路径：直接同步调用 Java（WebView JS 桥），跟 requestAnimationFrame 走，
+    // 帧率由屏幕刷新率决定（60/90/120Hz），绕开 HTTP 轮询的延迟。
+    const nat = (typeof window.Ac2Native === 'object' && window.Ac2Native
+                 && typeof window.Ac2Native.spectrum === 'function');
+    if (nat) {
+      const tick = () => {
+        if (!pcmTimer) return;
+        if (core && core.native) {
+          try { const s = window.Ac2Native.spectrum(); if (s) applySpectrum(JSON.parse(s)); } catch (_) {}
+        }
+        requestAnimationFrame(tick);
+      };
+      pcmTimer = 1;
+      requestAnimationFrame(tick);
+      return;
+    }
     pcmTimer = setInterval(async () => {
       if (!core || !core.native) return;
-      try {
-        const r = await Api.playbackSpectrum();
-        if (!r || !r.ok || !r.bands) return;
-        const d = new Uint8Array(96);
-        for (let i = 0; i < 96; i++) d[i] = Math.max(0, Math.min(255, Math.round((r.bands[i] || 0) * 255)));
-        core.data = d;
-        if (r.levels && r.levels.length) {
-          const lv = new Uint8Array(96);
-          for (let i = 0; i < 96; i++) lv[i] = Math.max(0, Math.min(255, Math.round((r.levels[i] || 0) * 255)));
-          core.levels = lv;
-        }
-        if (r.sampleRate) core.sampleRate = r.sampleRate;
-      } catch (_) {}
+      try { applySpectrum(await Api.playbackSpectrum()); } catch (_) {}
     }, 33);
   }
 
@@ -185,12 +201,16 @@ const Spectrum = (() => {
     const H = Math.max(1, Math.round(area.gh));
     resizeWf(W, H);
     if (!wfCtx) return;
-    // 左移一列（自身拷贝）；不支持 drawImage 的环境退化为清屏
+    // 左移一列（自身拷贝）；列速固定 ~60fps，避免高刷屏上滚动变快。
+    // 不支持 drawImage 的环境退化为清屏
+    const now = performance.now();
+    const advance = (wfLast === 0) || (now - wfLast >= 16.7);
+    if (advance) wfLast = now;
     wfCtx.globalCompositeOperation = 'copy';
     try {
-      if (typeof wfCtx.drawImage === 'function') wfCtx.drawImage(wf, -1, 0);
-      else wfCtx.fillStyle = '#000';
-    } catch (_) { wfCtx.fillStyle = '#000'; }
+      if (typeof wfCtx.drawImage === 'function' && advance) wfCtx.drawImage(wf, -1, 0);
+      else if (typeof wfCtx.drawImage !== 'function') wfCtx.fillRect(0, 0, W, H);
+    } catch (_) { wfCtx.fillRect(0, 0, W, H); }
     if (typeof wfCtx.drawImage !== 'function') wfCtx.fillRect(0, 0, W, H);
     wfCtx.globalCompositeOperation = 'source-over';
 
@@ -353,7 +373,11 @@ const Spectrum = (() => {
     box.classList.toggle('hidden', !open);
     if (fab) fab.style.display = open ? 'none' : '';
     if (open) { applySize(); applyPos(); layoutCanvas(); paintTrack(); paintTabs(); start(); }
-    else { stop(); setState(''); }
+    else {
+      stop(); setState('');
+      stopPcmPoll();
+      try { Api.playbackSpectrum(false); } catch (_) {}
+    }
   }
 
   function toggle() {

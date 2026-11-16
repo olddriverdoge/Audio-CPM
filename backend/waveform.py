@@ -93,8 +93,12 @@ def _peaks_wave_pcm(path: str, buckets: int) -> Optional[List[float]]:
 
 def _peaks_ffmpeg(path: str, buckets: int) -> List[float]:
     import subprocess
+    # 用 -f wav 而非 -f s16le：音频专用 ffmpeg 白名单里 wav muxer 一定存在，
+    # 而 s16le muxer 在早期裁剪版里没编进去（真机报 "Requested output format 's16le' is not known"，
+    # 波形因此静默回退 MediaCodec，慢 3~10s 且峰值全是方块）。
+    # wav 只多 44 字节头，代价可忽略。
     cmd = ffbin.cmd('-v', 'error', '-nostdin', '-i', path, '-vn',
-           '-ac', '1', '-ar', '4000', '-f', 's16le', '-')
+           '-ac', '1', '-ar', '4000', '-f', 'wav', '-')
     t0 = time.perf_counter()
     try:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -103,14 +107,17 @@ def _peaks_ffmpeg(path: str, buckets: int) -> List[float]:
     except Exception as e:
         _log('waveform ffmpeg exec fail %s: %s' % (os.path.basename(path), e))
         return []
-    if len(raw) < 2:
+    # 定位 WAV data 块（pipe 输出头是标准 44 字节，find 更稳）
+    idx = raw.find(b'data')
+    if idx < 0 or idx + 8 > len(raw):
         err = (proc.stderr or b'').decode('utf-8', 'ignore').strip().replace('\n', ' ')[:300]
-        _log('waveform ffmpeg rc=%s empty out %s: %s' % (proc.returncode, os.path.basename(path), err))
+        _log('waveform ffmpeg rc=%s no-data %s: %s' % (proc.returncode, os.path.basename(path), err))
         return []
-    _log('waveform ffmpeg %s bytes=%d %.0fms' % (os.path.basename(path), len(raw), (time.perf_counter() - t0) * 1000))
+    pcm = raw[idx + 8:]
+    _log('waveform ffmpeg %s bytes=%d %.0fms' % (os.path.basename(path), len(pcm), (time.perf_counter() - t0) * 1000))
     samples = array.array('h')
     try:
-        samples.frombytes(raw[:len(raw) - (len(raw) % 2)])
+        samples.frombytes(pcm[:len(pcm) - (len(pcm) % 2)])
     except Exception:
         return []
     if not samples:

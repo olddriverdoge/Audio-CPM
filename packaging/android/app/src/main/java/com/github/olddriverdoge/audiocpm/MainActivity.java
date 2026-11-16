@@ -96,6 +96,14 @@ public class MainActivity extends Activity {
                 return true;
             }
         });
+        // 频谱高刷通道：JS 直接同步调用 Java（绕过 HTTP 轮询的序列化/线程开销），
+        // 供前端 requestAnimationFrame 90Hz 级刷新使用。
+        webView.addJavascriptInterface(new Object() {
+            @android.webkit.JavascriptInterface
+            public String spectrum() {
+                try { return Ac2Bridge.spectrum(); } catch (Throwable t) { return "{}"; }
+            }
+        }, "Ac2Native");
         WebView.setWebContentsDebuggingEnabled(true);
         root.addView(webView, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
