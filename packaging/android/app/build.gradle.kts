@@ -36,7 +36,17 @@ val copyFrontend by tasks.registering(Copy::class) {
     from("../../../frontend")
     into(layout.buildDirectory.dir("generated/assets/frontend"))
 }
-tasks.named("preBuild") { dependsOn(copyFrontend) }
+
+/* Python 源码 staging：只把 backend 放进 Chaquopy 源目录，避免扫描仓库根 */
+val copyPython by tasks.registering(Copy::class) {
+    from("../../../backend") {
+        exclude("**/__pycache__/**", "**/*.pyc")
+    }
+    into(layout.buildDirectory.dir("generated/python/backend"))
+}
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("PythonSources") }
+    .configureEach { dependsOn(copyPython) }
+tasks.named("preBuild") { dependsOn(copyFrontend, copyPython) }
 
 chaquopy {
     defaultConfig {
@@ -51,7 +61,7 @@ chaquopy {
     }
     sourceSets {
         getByName("main") {
-            srcDir("../../..")
+            srcDir("${layout.buildDirectory.get().asFile}/generated/python")
         }
     }
 }
