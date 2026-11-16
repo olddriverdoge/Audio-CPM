@@ -580,3 +580,22 @@ curl -s -X POST http://127.0.0.1:8000/api/move \
 - DSH 用户级 skill：`~/.dsh/skills/efficient-file-reading/SKILL.md`（大文件分页读取约束）
 - DSH 配置：`~/.dsh/profiles/web/cordis.patch.yml` 中 `readLimit: 500`，重启 dsh web 生效
 - AC2 服务当前用 nohup 常驻，PID/日志见项目根目录
+
+---
+
+## Android 新壳补齐（2026-11-16，`fix/android-shell`）
+
+- **FFmpeg**：CI 新增 `ffmpeg` 作业，用 NDK 27 编 8.0.1 音频专用静态单文件（2.28 MB，16 KB 页对齐），
+  产物 `libffmpegbin.so` 放 `src/main/jniLibs/arm64-v8a`，与 APK 一起分发（artifact + cache，冷构建 15~25 分钟）。
+- **执行链路**：`backend/ffbin.py` 从「复制到 filesDir」改为「`nativeLibraryDir` 直执行」，
+  失败退 `/system/bin/linker64`，再失败标 `ffmpeg=False`；`ffbin.cmd()` 统一拼命令行（含 launcher）。
+- **能力自检**：启动跑 `-version`/`-decoders`/`-encoders`，写 `ac2.log`，`GET /api/capabilities`
+  下发给前端；前端按 `formats` 裁剪输出格式，`ffmpeg=false` 时禁用转换。
+- **格式策略**：app 内不提供 mp3/ogg/opus 输出（未编外部编码器），转换入口返回明确错误；
+  PC/Termux 走 PATH 的 ffmpeg 仍按 `has_encoder()` 判断。
+- **HiFi**：`PlaybackService`（Media3 1.5.1 `MediaSessionService` + `ExoPlayer`），
+  `DefaultRenderersFactory#buildAudioSink` 挂 `SpectrumProcessor`（PCM 旁路，`replaceOutputBuffer` 透传）；
+  通知栏/锁屏/后台由 MediaSession 负责，`onTaskRemoved` 留空以保持后台播放。
+- **爆音**：移除 `createMediaElementSource` + `connect(destination)` 对主播放链路的接管；
+  频谱只在 HiFi 下可用，切歌前先暂停 WebView 那一路。
+- **已知风险**：`nativeLibraryDir` 里 `.so` 的 x 位未在真机确认，首版 APK 自带自检（`ac2.log`/`/api/capabilities`）。

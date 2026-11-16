@@ -1,5 +1,9 @@
 # Android 壳层问题交接（给下一个 agent）
 
+> **状态更新（2026-11-16）**：本文列的 4 个问题已在 `446c747` 修复；随后在 `56e156b`/`5a7647d`/`d992230`
+> 补齐了 FFmpeg（CI 自编音频专用 8.0.1）与 Media3 HiFi/通知栏，详见 `packaging/android/FFMPEG_AND_HIFI.md`。
+> 下面保留原始问题描述，仅作背景。
+
 分支：`fix/android-shell`（从 `cloud/agent` 开出；`cloud/agent` 已与 GitHub main 同步）
 包名：`com.github.olddriverdoge.audiocpm`
 构建：GitHub Actions `build-gradle`（`.github/workflows/build-gradle.yml`），产物 artifact `ac2-gradle-apk`
