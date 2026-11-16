@@ -47,10 +47,10 @@ public final class Ac2Wave {
             File bin = new File(ctx.getApplicationInfo().nativeLibraryDir, "libffmpegbin.so");
             if (!bin.isFile()) return false;
             int rate = probeRate(srcPath);
-            proc = new ProcessBuilder(bin.getAbsolutePath(), "-v", "error",
-                    "-i", srcPath, "-f", "s16le", "-ac", "1", "-ar", "8000", "-")
-                    .redirectError(ProcessBuilder.Redirect.DISCARD)
-                    .start();
+            ProcessBuilder pb = new ProcessBuilder(bin.getAbsolutePath(), "-v", "error",
+                    "-i", srcPath, "-f", "s16le", "-ac", "1", "-ar", "8000", "-");
+            pb.redirectError(new File(ctx.getCacheDir(), "wave_err.txt"));
+            proc = pb.start();
             InputStream is = proc.getInputStream();
             byte[] buf = new byte[8192];
             int windowFrames = 800;   // 8kHz * 100ms
