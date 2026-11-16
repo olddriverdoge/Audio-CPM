@@ -279,10 +279,13 @@ def api_waveform(request: Request):
         raise HTTPException(404, "file not found")
     if os.path.splitext(path)[1].lower() not in MEDIA_EXTS:
         raise HTTPException(400, "not media")
+    import time as _t
+    _t0 = _t.perf_counter()
     peaks = compute_wave_peaks(path, buckets)
+    _ms = int((_t.perf_counter() - _t0) * 1000)
     if not peaks:
         raise HTTPException(500, "decode failed")
-    return J({"path": path, "buckets": len(peaks), "peaks": peaks})
+    return J({"path": path, "buckets": len(peaks), "peaks": peaks, "ms": _ms})
 
 
 routes.append(Route('/api/play', api_play, methods=['POST']))

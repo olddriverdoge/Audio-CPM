@@ -149,7 +149,11 @@ public class SpectrumProcessor extends BaseAudioProcessor {
                 n++;
             }
             float v = n > 0 ? sum / n : 0f;
-            out[b] = Math.min(1f, (float) (Math.log10(1.0 + v * 30.0) / 2.0));
+            // Hann 窗下单频幅度 A 的峰值 bin 约为 A*N/4，除以 N/4 得到接近线性幅度。
+            double amp = v / (FFT_N / 4.0);
+            double db = 20.0 * Math.log10(Math.max(amp, 1e-5));   // -100..0 dB
+            // 前端坐标轴是 -100..0dB，bands 取 0..1 线性映射；之前的 log10(1+v*30)/2 会全频拉满。
+            out[b] = (float) Math.max(0.0, Math.min(1.0, (db + 100.0) / 100.0));
         }
         bands = out;
     }

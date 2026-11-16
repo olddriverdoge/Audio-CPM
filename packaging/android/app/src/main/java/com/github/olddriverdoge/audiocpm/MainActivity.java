@@ -70,6 +70,32 @@ public class MainActivity extends Activity {
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setAllowFileAccess(false);
         webView.setWebViewClient(new WebViewClient());
+        // 没有 WebChromeClient 时，JS 的 alert()/confirm() 会被静默吞掉：
+        // 表现就是“长按删除没弹窗、也没删成功”。这里显式用系统对话框接管。
+        webView.setWebChromeClient(new android.webkit.WebChromeClient() {
+            @Override
+            public boolean onJsAlert(android.webkit.WebView v, String url, String message,
+                                     final android.webkit.JsResult result) {
+                new AlertDialog.Builder(MainActivity.this)
+                        .setMessage(message)
+                        .setPositiveButton("好", (d, w) -> result.confirm())
+                        .setOnCancelListener(d -> result.cancel())
+                        .show();
+                return true;
+            }
+
+            @Override
+            public boolean onJsConfirm(android.webkit.WebView v, String url, String message,
+                                       final android.webkit.JsResult result) {
+                new AlertDialog.Builder(MainActivity.this)
+                        .setMessage(message)
+                        .setPositiveButton("确定", (d, w) -> result.confirm())
+                        .setNegativeButton("取消", (d, w) -> result.cancel())
+                        .setOnCancelListener(d -> result.cancel())
+                        .show();
+                return true;
+            }
+        });
         WebView.setWebContentsDebuggingEnabled(true);
         root.addView(webView, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
