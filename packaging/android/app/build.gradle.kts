@@ -97,7 +97,7 @@ dependencies {
 }
 
 /* APK 输出名与项目一致：Audio-CPM-debug.apk */
-tasks.named("assembleDebug") {
+tasks.matching { it.name == "assembleDebug" }.configureEach {
     doLast {
         val apkDir = layout.buildDirectory.dir("outputs/apk/debug").get().asFile
         apkDir.listFiles { f -> f.name == "app-debug.apk" }?.firstOrNull()?.let {
