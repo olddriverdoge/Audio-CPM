@@ -69,7 +69,7 @@ const Spectrum = (() => {
         }
         if (r.sampleRate) core.sampleRate = r.sampleRate;
       } catch (_) {}
-    }, 40);
+    }, 33);
   }
 
   function ensureCore() {

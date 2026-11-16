@@ -86,7 +86,10 @@ public class SpectrumProcessor extends BaseAudioProcessor {
                 mono[fill++] = readSample(dup, bytes);
                 if (fill >= FFT_N) {
                     compute();
-                    fill = 0;
+                    // 50% 重叠：保留后一半，下一帧只需再填 1024 个样本 → 约 47fps，
+                    // 不再被 2048 窗口限制在 23fps（频谱卡顿的主因）。
+                    System.arraycopy(mono, FFT_N / 2, mono, 0, FFT_N / 2);
+                    fill = FFT_N / 2;
                 }
                 // 跳过本帧剩余声道
                 int skip = frame - bytes;
