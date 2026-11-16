@@ -24,7 +24,7 @@
 
     <application
         android:name=".Ac2App"
-        android:label="AC2"
+        android:label="Audio-CPM"
         android:usesCleartextTraffic="true"
         android:extractNativeLibs="true"
         android:theme="@android:style/Theme.Material.NoActionBar">
