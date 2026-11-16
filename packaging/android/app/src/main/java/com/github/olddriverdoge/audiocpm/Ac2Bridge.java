@@ -200,7 +200,7 @@ public class Ac2Bridge {
                     + ",\"path\":\"" + esc(cur) + "\""
                     + ",\"playbackState\":" + pbState + ",\"volume\":" + vol
                     + ",\"error\":\"" + esc(PlaybackService.getLastError()) + "\""
-                    + ",\"notifEnabled\":" + notif""
+                    + ",\"notifEnabled\":" + notif
                     + ",\"sampleRate\":" + sSampleRate + ",\"bitDepth\":" + sBitDepth
                     + ",\"channels\":" + sChannels
                     + ",\"outputMode\":\"shared\",\"isResampling\":false,\"dacName\":\"\"}";
