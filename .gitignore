@@ -19,3 +19,6 @@ build.log
 *.aab
 packaging/tests/node_modules
 packaging/tests/package-lock.json
+
+ac2.log
+ac2_screen.png
