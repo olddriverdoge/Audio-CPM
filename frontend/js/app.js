@@ -647,6 +647,17 @@ const App = (() => {
     }
     document.addEventListener('visibilitychange', refreshOnResume);
     window.addEventListener('focus', refreshOnResume);
+
+    /* app(WebView) 内禁用频谱入口：MediaElementSource 会接管 <audio>，易引发爆音/切后台问题 */
+    try {
+      const caps = (Sources.currentRoot() || {}).caps || [];
+      if (caps.indexOf('android') >= 0) {
+        const fab = document.getElementById('sf-fab');
+        if (fab) fab.style.display = 'none';
+        const sf = document.getElementById('spectrum-float');
+        if (sf) sf.classList.add('hidden');
+      }
+    } catch (_) {}
   }
 
   async function defaultRoot() {

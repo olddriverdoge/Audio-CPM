@@ -2,6 +2,7 @@
 """p4a 启动器：注入环境变量 → 日志 → 权限 → 原生桥 → 启动 backend.cli.main。"""
 import os
 import sys
+import threading
 import time
 import traceback
 from pathlib import Path
@@ -52,27 +53,43 @@ def main():
     except BaseException:
         _log(data, "nativeLibraryDir failed:\n" + traceback.format_exc())
 
-    # 存储权限：默认请求（targetSdk 28 旧模型）；诊断时可设 AC2_REQUEST_PERMISSIONS=0 跳过。
+    # 先等权限结果再启动服务：授权后页面加载时已有权限，无需重启 app。
+    started = {"done": False}
+
+    def _start():
+        if started["done"]:
+            return
+        started["done"] = True
+        try:
+            _log(data, "before import backend.cli")
+            from backend.cli import main as run
+            _log(data, "imported backend.cli; calling run()")
+            run()
+            _log(data, "run() returned")
+        except BaseException:
+            tb = traceback.format_exc()
+            _log(data, "FATAL:\n" + tb)
+            print(tb, file=sys.stderr)
+            raise
+
     if os.environ.get("AC2_REQUEST_PERMISSIONS", "1") == "1":
         try:
             from android.permissions import request_permissions, Permission
+            ev = threading.Event()
+
+            def _cb(permissions=None, grants=None):
+                _log(data, "permissions result: %s" % (grants,))
+                ev.set()
+
             request_permissions([Permission.READ_EXTERNAL_STORAGE,
-                                 Permission.WRITE_EXTERNAL_STORAGE])
-            _log(data, "storage permissions requested")
+                                 Permission.WRITE_EXTERNAL_STORAGE], callback=_cb)
+            _log(data, "waiting for storage permissions")
+            ev.wait()
+        except TypeError:
+            _log(data, "permissions callback unsupported; start now")
         except BaseException:
             _log(data, "permissions failed:\n" + traceback.format_exc())
-
-    try:
-        _log(data, "before import backend.cli")
-        from backend.cli import main as run
-        _log(data, "imported backend.cli; calling run()")
-        run()
-        _log(data, "run() returned")
-    except BaseException:
-        tb = traceback.format_exc()
-        _log(data, "FATAL:\n" + tb)
-        print(tb, file=sys.stderr)
-        raise
+    _start()
 
 
 if __name__ == "__main__":

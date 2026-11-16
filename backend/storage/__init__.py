@@ -62,11 +62,14 @@ def roots() -> list:
         kind = s.get('kind', 'local')
         if kind == 'local':
             root = (s.get('roots') or [DEFAULT_ROOT])[0]
+            caps = ["browse", "meta", "play", "waveform", "tags_write",
+                    "external_player", "move", "delete", "mkdir", "convert"]
+            if os.environ.get('AC2_ANDROID'):
+                caps.append('android')
             out.append({
                 "id": sid, "kind": "local", "name": s.get('name') or '本机',
                 "path": local_uri(root), "root": root,
-                "caps": ["browse", "meta", "play", "waveform", "tags_write",
-                         "external_player", "move", "delete", "mkdir", "convert"],
+                "caps": caps,
                 "readonly": False,
             })
         elif kind == 'dav':
