@@ -95,14 +95,19 @@ def _peaks_ffmpeg(path: str, buckets: int) -> List[float]:
     import subprocess
     cmd = ffbin.cmd('-v', 'error', '-nostdin', '-i', path, '-vn',
            '-ac', '1', '-ar', '4000', '-f', 's16le', '-')
+    t0 = time.perf_counter()
     try:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                               timeout=120, env=ffbin.ENV)
         raw = proc.stdout or b''
-    except Exception:
+    except Exception as e:
+        _log('waveform ffmpeg exec fail %s: %s' % (os.path.basename(path), e))
         return []
     if len(raw) < 2:
+        err = (proc.stderr or b'').decode('utf-8', 'ignore').strip().replace('\n', ' ')[:300]
+        _log('waveform ffmpeg rc=%s empty out %s: %s' % (proc.returncode, os.path.basename(path), err))
         return []
+    _log('waveform ffmpeg %s bytes=%d %.0fms' % (os.path.basename(path), len(raw), (time.perf_counter() - t0) * 1000))
     samples = array.array('h')
     try:
         samples.frombytes(raw[:len(raw) - (len(raw) % 2)])
@@ -190,6 +195,8 @@ def compute_wave_peaks(path: str, buckets: int = 160) -> list:
         got = _peaks_ffmpeg(path, buckets)
         if got:
             peaks = got
+    if peaks is None:
+        _log('waveform ffmpeg unavailable/failed, fallback native: %s' % os.path.basename(path))
     if peaks is None and ext == '.wav':
         # 纯 Python 只适合短 WAV（ffmpeg 不可用时兜底）
         peaks = _peaks_wave_pcm(path, buckets)
@@ -199,7 +206,7 @@ def compute_wave_peaks(path: str, buckets: int = 160) -> list:
         peaks = _peaks_ffmpeg(path, buckets)
     if not peaks:
         return []
-    _log('waveform %s buckets=%d %.0fms' % (os.path.basename(path), buckets, (time.perf_counter() - t0) * 1000))
+    _log('waveform done %s buckets=%d %.0fms' % (os.path.basename(path), buckets, (time.perf_counter() - t0) * 1000))
     peaks = _norm(peaks)
     with _wave_mem_lock:
         if len(_wave_mem) >= WAVE_MEM_MAX:

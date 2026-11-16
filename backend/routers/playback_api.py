@@ -9,6 +9,7 @@ import time
 
 from .. import native_bridge
 from ..config import DATA_DIR
+from ..storage import parse_ref
 
 
 def _log(msg):
@@ -26,16 +27,31 @@ async def _body(request):
         return {}
 
 
+def _local_path(raw):
+    """前端传的是 local:/sdcard/... 这种引用，Java 侧只认真实路径。"""
+    try:
+        ref = parse_ref(raw or '')
+        if ref.kind == 'local':
+            return ref.path
+    except Exception:
+        pass
+    return raw or ''
+
+
 async def playback_open(request):
     d = await _body(request)
+    raw = d.get('path') or ''
+    path = _local_path(raw)
+    if path.startswith('dav:'):
+        return JSONResponse({'ok': False, 'error': 'HiFi 只支持本机文件'})
     r = await run_in_threadpool(
         native_bridge.playback_open,
-        d.get('path') or '',
+        path,
         int(d.get('startMs') or 0),
         int(d.get('sampleRate') or 0),
         int(d.get('bitDepth') or 0),
         int(d.get('channels') or 0))
-    _log('playback open %s -> %s' % (d.get('path'), r))
+    _log('playback open %s -> %s' % (path, r))
     return JSONResponse(r)
 
 
@@ -73,6 +89,19 @@ async def playback_diag(request):
     })
 
 
+async def playback_queue(request):
+    d = await _body(request)
+    raw = d.get('paths') or []
+    paths = [_local_path(x) for x in raw if x]
+    if not paths:
+        return JSONResponse({'ok': False, 'error': 'empty queue'})
+    r = await run_in_threadpool(
+        native_bridge.playback_queue, paths,
+        int(d.get('index') or 0), int(d.get('startMs') or 0))
+    _log('playback queue size=%d index=%s -> %s' % (len(paths), d.get('index'), r))
+    return JSONResponse(r)
+
+
 async def playback_spectrum(request):
     enabled = request.query_params.get('enabled')
     r = await run_in_threadpool(native_bridge.playback_spectrum,
@@ -88,5 +117,6 @@ routes = [
     Route('/api/playback/seek', playback_seek, methods=['POST']),
     Route('/api/playback/state', playback_state, methods=['GET']),
     Route('/api/playback/spectrum', playback_spectrum, methods=['GET']),
+    Route('/api/playback/queue', playback_queue, methods=['POST']),
     Route('/api/playback/diag', playback_diag, methods=['GET']),
 ]

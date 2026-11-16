@@ -61,6 +61,7 @@ def register() -> bool:
             'stop': lambda: _call('stop'),
             'state': lambda: _call('state'),
             'spectrum': lambda: _call('spectrum'),
+            'queue': lambda paths, idx, ms: _call('setQueue', list(paths), int(idx or 0), int(ms or 0)),
             'spectrum_enabled': lambda b: Bridge.setSpectrumEnabled(bool(b)),
         }
     except Exception:
@@ -91,6 +92,15 @@ def playback_open(path, start_ms=0, sample_rate=0, bit_depth=0, channels=0):
         return {'ok': False, 'error': 'not_supported'}
     try:
         return _playback['play'](path, start_ms, sample_rate, bit_depth, channels)
+    except Exception as e:
+        return {'ok': False, 'error': str(e)[:300]}
+
+
+def playback_queue(paths, index=0, start_ms=0):
+    if not _playback:
+        return {'ok': False, 'error': 'not_supported'}
+    try:
+        return _playback['queue'](paths, index, start_ms)
     except Exception as e:
         return {'ok': False, 'error': str(e)[:300]}
 

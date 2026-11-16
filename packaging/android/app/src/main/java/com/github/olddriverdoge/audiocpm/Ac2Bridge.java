@@ -15,6 +15,8 @@ import androidx.media3.common.MediaItem;
 import androidx.media3.exoplayer.ExoPlayer;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -174,14 +176,52 @@ public class Ac2Bridge {
             ExoPlayer p = PlaybackService.getPlayer();
             if (p == null) return "{\"ok\":false,\"error\":\"not playing\"}";
             long pos = onMain(() -> p.getCurrentPosition(), 0L);
-            long dur = onMain(() -> p.getDuration(), 0L);
+            long rawDur = onMain(() -> p.getDuration(), 0L);
+            long dur = (rawDur <= 0 || rawDur == androidx.media3.common.C.TIME_UNSET) ? 0 : rawDur;
             boolean playing = onMain(() -> p.isPlaying(), false);
+            int idx = onMain(() -> p.getCurrentMediaItemIndex(), -1);
+            String cur = onMain(() -> {
+                MediaItem mi = p.getCurrentMediaItem();
+                if (mi == null || mi.localConfiguration == null || mi.localConfiguration.uri == null) return "";
+                return mi.localConfiguration.uri.getPath();
+            }, "");
             return "{\"ok\":true,\"positionMs\":" + pos + ",\"durationMs\":" + dur
-                    + ",\"playing\":" + playing
+                    + ",\"playing\":" + playing + ",\"index\":" + idx
+                    + ",\"path\":\"" + esc(cur) + "\""
                     + ",\"sampleRate\":" + sSampleRate + ",\"bitDepth\":" + sBitDepth
                     + ",\"channels\":" + sChannels
                     + ",\"outputMode\":\"shared\",\"isResampling\":false,\"dacName\":\"\"}";
         } catch (Throwable t) {
+            return "{\"ok\":false,\"error\":\"" + esc(String.valueOf(t)) + "\"}";
+        }
+    }
+
+    /** 原生队列：交给 ExoPlayer 的 playlist，切后台也能按顺序自动下一首。 */
+    public static String setQueue(String[] paths, int startIndex, int startMs) {
+        try {
+            Context ctx = Ac2App.get();
+            if (ctx == null) return "{\"ok\":false,\"error\":\"no context\"}";
+            if (!ensureService(ctx)) return "{\"ok\":false,\"error\":\"playback service unavailable\"}";
+            final List<MediaItem> items = new ArrayList<>();
+            for (String path : paths) {
+                if (path == null) continue;
+                File f = new File(path);
+                if (f.isFile()) items.add(MediaItem.fromUri(Uri.fromFile(f)));
+            }
+            if (items.isEmpty()) return "{\"ok\":false,\"error\":\"queue empty\"}";
+            final int idx = Math.max(0, Math.min(items.size() - 1, startIndex));
+            Boolean ok = onMain(() -> {
+                ExoPlayer p = PlaybackService.getPlayer();
+                p.setMediaItems(items, idx, Math.max(0, startMs));
+                p.prepare();
+                p.play();
+                return true;
+            }, false);
+            Log.i(TAG, "queue size=" + items.size() + " index=" + idx + " -> " + ok);
+            return ok ? "{\"ok\":true,\"size\":" + items.size() + ",\"index\":" + idx + "}"
+                    : "{\"ok\":false,\"error\":\"queue failed\"}";
+        } catch (Throwable t) {
+            Log.w(TAG, "queue failed", t);
             return "{\"ok\":false,\"error\":\"" + esc(String.valueOf(t)) + "\"}";
         }
     }

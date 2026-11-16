@@ -53,6 +53,7 @@ const Api = (() => {
     coverUrl: p => '/api/cover?path=' + enc(p) + '&t=' + Date.now(),
     playbackOpen: (path, startMs, sampleRate, bitDepth, channels) => jpost('/api/playback/open', {path, startMs, sampleRate, bitDepth, channels}),
     playbackState: () => jfetch('/api/playback/state'),
+  playbackQueue: (paths, index, startMs) => jpost('/api/playback/queue', {paths, index, startMs}),
     playbackSpectrum: enabled => jfetch('/api/playback/spectrum' + (enabled === undefined ? '' : ('?enabled=' + (enabled ? '1' : '0')))),
     playbackPause: () => jpost('/api/playback/pause', {}),
     playbackResume: () => jpost('/api/playback/resume', {}),

@@ -40,6 +40,23 @@ const Player = (() => {
     } catch (_) { return false; }
   }
   function stopHifiPoll() { if (hifiTimer) { clearInterval(hifiTimer); hifiTimer = 0; } }
+  /** 原生播放器切歌后，把界面同步到新曲目（不重新发起播放）。 */
+  function adoptNative(p) {
+    if (!p || p === cur) return;
+    cur = p;
+    try { audio.pause(); audio.removeAttribute('src'); } catch (_) {}
+    titleEl.textContent = Utils.basename(p);
+    titleEl.title = p;
+    if (metaEl) metaEl.textContent = '';
+    curInfo = {title: Utils.basename(p), artist: '', composer: '', album: ''};
+    notifyMeta();
+    applyMeta(p);
+    setCover(p);
+    setWave(p);
+    paintRows();
+    try { if (typeof App !== 'undefined' && App.onPlayed) App.onPlayed(p); } catch (_) {}
+  }
+
   function startHifiPoll() {
     stopHifiPoll();
     hifiTimer = setInterval(async () => {
@@ -50,6 +67,11 @@ const Player = (() => {
         hifiPos = Number(s.positionMs) || 0;
         hifiDur = Number(s.durationMs) || 0;
         hifiPlaying = !!s.playing;
+        // 原生队列自动下一首后，前端要跟着换标题/封面/波形
+        if (s.path) {
+          const ref = 'local:' + s.path;
+          if (ref !== cur) adoptNative(ref);
+        }
         const d = hifiDur / 1000, p = hifiPos / 1000;
         if (d > 0) { seek.max = String(d); durEl.textContent = fmt(d); }
         if (!seeking) { seek.value = String(p); curEl.textContent = fmt(p); }
@@ -225,7 +247,10 @@ const Player = (() => {
     setCover(path);
     if (hifiAvailable() && String(path).indexOf('dav:') !== 0) {
       try {
-        const r = await Api.playbackOpen(path, 0, 0, 0, 0);
+        const q = (typeof App !== 'undefined' && App.hifiQueue) ? App.hifiQueue(path) : null;
+        const r = (q && q.paths && q.paths.length > 1)
+          ? await Api.playbackQueue(q.paths, q.index, 0)
+          : await Api.playbackOpen(path, 0, 0, 0, 0);
         if (r && r.ok) {
           hifi = true; hifiPlaying = true; hifiPos = 0; hifiDur = 0;
           setWave(path); paintRows(); show(); startHifiPoll(); setToggle(true);

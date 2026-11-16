@@ -313,6 +313,18 @@ const App = (() => {
     const arr = (p === 'organize' && bv2) ? bv2.visible() : (bv1 ? bv1.visible() : []);
     return arr.filter(f => f && f.path && isAudioPath(f.path));   // 顺序播放只在音频之间走
   }
+  /**
+   * 交给原生 ExoPlayer 的顺序队列（后台自动下一首靠它，不依赖 WebView 的 JS 定时器）。
+   * 只取本机文件、限定窗口大小，避免把整库塞给播放器。
+   */
+  function hifiQueue(path) {
+    const list = playbackList().filter(f => f.path && f.path.indexOf('dav:') !== 0);
+    const i = list.findIndex(f => f.path === path);
+    if (i < 0) return null;
+    const from = Math.max(0, i - 20), to = Math.min(list.length, i + 80);
+    const paths = list.slice(from, to).map(f => f.path);
+    return {paths, index: i - from};
+  }
   function autoplayOn() { return Store.get(K.autoplay, false) === true; }
   function paintAutoplay() {
     const b = document.getElementById('btn-autoplay');
@@ -717,7 +729,7 @@ const App = (() => {
 
   return {
     init, browse, srcBrowse, onPlayed, updateMoveBar, isGridView, refreshColumns,
-    playNext, autoplayNext, autoplayOn,
+    playNext, autoplayNext, autoplayOn, hifiQueue,
     get path() { return currentPath; },
     get srcPath() { return srcPath; },
     selection: () => (bv1 ? bv1.selected() : []),
