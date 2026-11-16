@@ -97,10 +97,11 @@ dependencies {
 }
 
 /* APK 输出名与项目一致：Audio-CPM-debug.apk */
-androidComponents {
-    onVariants(selector().all()) { variant ->
-        variant.outputs.forEach { output ->
-            output.outputFileName.set("Audio-CPM-${variant.name}.apk")
+tasks.named("assembleDebug") {
+    doLast {
+        val apkDir = layout.buildDirectory.dir("outputs/apk/debug").get().asFile
+        apkDir.listFiles { f -> f.name == "app-debug.apk" }?.firstOrNull()?.let {
+            it.renameTo(java.io.File(apkDir, "Audio-CPM-debug.apk"))
         }
     }
 }
