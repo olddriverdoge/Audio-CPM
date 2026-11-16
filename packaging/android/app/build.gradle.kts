@@ -22,7 +22,11 @@ android {
     }
 
     packaging {
-        jniLibs { useLegacyPackaging = true }
+        jniLibs {
+            useLegacyPackaging = true
+            // 二进制在 CI 里已经 strip 过，别让 AGP 再尝试（构建机没装 NDK 时会告警）
+            keepDebugSymbols += "**/libffmpegbin.so"
+        }
     }
 
     sourceSets.getByName("main") {
@@ -68,4 +72,7 @@ chaquopy {
 
 dependencies {
     implementation("androidx.core:core:1.13.1")
+    // HiFi 播放：ExoPlayer + MediaSession（通知栏 / 锁屏 / 后台播放）
+    implementation("androidx.media3:media3-exoplayer:1.5.1")
+    implementation("androidx.media3:media3-session:1.5.1")
 }

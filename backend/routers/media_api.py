@@ -189,12 +189,39 @@ def api_thumb(request: Request):
         os.makedirs(COVER_CACHE_DIR, exist_ok=True)
     except Exception:
         pass
-    cmd = [ffbin.FFMPEG, '-y', '-i', path, '-an', '-vcodec', 'mjpeg',
-           '-vf', f'scale={size}:-1', '-frames:v', '1', '-f', 'image2', temp]
-    ok, err = execute(cmd, timeout=20)
-    if not ok or not os.path.exists(temp):
-        raise HTTPException(500, (err or 'extract failed')[-300:])
-    return FileResponse(temp, media_type="image/jpeg")
+
+    if _ffmpeg_ready():
+        cmd = ffbin.cmd('-y', '-i', path, '-an', '-vcodec', 'mjpeg',
+               '-vf', f'scale={size}:-1', '-frames:v', '1', '-f', 'image2', temp)
+        ok, err = execute(cmd, timeout=20)
+        if ok and os.path.exists(temp):
+            return FileResponse(temp, media_type="image/jpeg")
+        logger.warning("thumb: ffmpeg 失败，回退 mutagen 原图: %s", (err or '')[-200:])
+    else:
+        logger.debug("thumb: 无 ffmpeg，使用 mutagen 原图（%s）", path)
+
+    # app 内没有 ffmpeg：直接用 mutagen 取内嵌封面原图，缩放交给前端 CSS
+    got = cover_bytes(path)
+    if not got:
+        raise HTTPException(404, "no cover")
+    data, mime = got
+    ext = '.png' if 'png' in (mime or '').lower() else '.jpg'
+    raw_path = os.path.join(COVER_CACHE_DIR, h + ext)
+    if not os.path.exists(raw_path):
+        try:
+            tmp = raw_path + '.tmp'
+            with open(tmp, 'wb') as f:
+                f.write(data)
+            os.replace(tmp, raw_path)
+        except Exception as e:
+            logger.warning("thumb: 缓存写入失败 %s: %s", raw_path, e)
+            return Response(content=data, media_type=mime or 'image/jpeg')
+    return FileResponse(raw_path, media_type=mime or 'image/jpeg')
+
+
+def _ffmpeg_ready() -> bool:
+    """ffmpeg 是否可用（含 linker64 兜底方式的探测结果）。"""
+    return ffbin.available()
 
 
 def api_cover(request: Request):

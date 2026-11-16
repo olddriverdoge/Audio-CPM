@@ -53,7 +53,7 @@ def clean_text(text):
 
 def check_hwaccel_support():
     try:
-        r = subprocess.run([ffbin.FFMPEG, '-hwaccels'], capture_output=True, text=True,
+        r = subprocess.run(ffbin.cmd('-hwaccels'), capture_output=True, text=True,
                            timeout=5, env=ffbin.ENV)
         return 'mediacodec' in r.stdout.lower()
     except Exception:
@@ -85,8 +85,8 @@ def parse_format_spec(spec: str) -> dict:
             "sr": sr, "bitrate": bitrate, "spec": spec}
 
 AUDIO_CODEC_MAP = {
-    'flac':'flac','mp3':'libmp3lame','m4a':'aac','aac':'aac',
-    'ogg':'libvorbis','opus':'libopus','alac':'alac',
+    'flac': 'flac', 'mp3': 'libmp3lame', 'm4a': 'aac', 'aac': 'aac',
+    'ogg': 'libvorbis', 'opus': 'libopus', 'alac': 'alac',
 }
 
 def pick_audio_codec(codec: str, bits: Optional[int]) -> str:

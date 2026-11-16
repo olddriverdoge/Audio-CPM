@@ -330,6 +330,44 @@ const App = (() => {
   }
   function autoplayNext() { return autoplayOn() ? playNext() : false; }
 
+  /* 输出格式按后端能力裁剪：app 包里的 ffmpeg 只编了 flac/aac/pcm，mp3/ogg/opus 直接不展示 */
+  const FMT_CODEC = v => {
+    const c = String(v || '').split('-')[0].toLowerCase();
+    return c === 'aiff' ? 'aif' : c;
+  };
+  async function applyCapabilities() {
+    let caps = null;
+    try { caps = await Api.caps(); } catch (_) { return; }
+    window.AC2CAPS = caps;
+    const sel = document.getElementById('fmt-select');
+    if (!sel) return;
+    const allowed = new Set(caps.formats || []);
+    for (const op of [...sel.querySelectorAll('option')]) {
+      if (!allowed.has(FMT_CODEC(op.value))) op.remove();
+    }
+    for (const g of [...sel.querySelectorAll('optgroup')]) {
+      if (!g.children.length) g.remove();
+    }
+    const convRadio = document.querySelector('input[name="task"][value="convert"]');
+    if (!caps.ffmpeg) {
+      sel.disabled = true;
+      const op = document.createElement('option');
+      op.value = '';
+      op.textContent = '当前包不含 ffmpeg，转换不可用';
+      sel.appendChild(op);
+      if (convRadio) {
+        convRadio.disabled = true;
+        const alt = document.querySelector('input[name="task"][value="tags"]');
+        if (alt) { alt.checked = true; alt.dispatchEvent(new Event('change')); }
+      }
+      Utils.log('warn', 'ffmpeg 不可用：' + (caps.error || caps.mode || ''));
+    } else if (!sel.options.length) {
+      sel.disabled = true;
+    } else if (!sel.value) {
+      sel.selectedIndex = 0;
+    }
+  }
+
   async function init() {
     // 先恢复本地 JSON 配置，后续初始化读到的才是一致状态
     await Promise.all([
@@ -337,6 +375,8 @@ const App = (() => {
       (typeof Sources !== 'undefined') ? Sources.refresh() : Promise.resolve(),
     ]);
     if (typeof UiCfg !== 'undefined') UiCfg.init();
+    // 能力下发要在任何任务面板交互之前完成，避免先渲染出不可用的格式
+    await applyCapabilities();
     if (typeof Sources !== 'undefined') {
       Sources.init();
       Sources.onSelect(async root => {

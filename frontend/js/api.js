@@ -21,6 +21,7 @@ const Api = (() => {
     body: JSON.stringify(body)
   });
   return {
+    caps: () => jfetch('/api/capabilities'),
     browse: p => jfetch('/api/browse?path=' + enc(p)),
     probe: p => jfetch('/api/probe_file?path=' + enc(p)),
     editTags: (path, tags, remove) => jpost('/api/edit_tags', {path, tags, remove}),

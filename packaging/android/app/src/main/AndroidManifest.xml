@@ -15,7 +15,15 @@
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="29" />
 
+    <!-- HiFi 播放的前台服务与通知栏 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- MediaSession 在锁屏/通知栏显示媒体控制 -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <application
+        android:name=".Ac2App"
         android:label="AC2"
         android:usesCleartextTraffic="true"
         android:extractNativeLibs="true"
@@ -31,14 +39,21 @@
             </intent-filter>
         </activity>
 
+        <!-- 外部播放器用的只读 content:// 提供者 -->
         <provider
-            android:name="androidx.core.content.FileProvider"
+            android:name=".Ac2FileProvider"
             android:authorities="${applicationId}.fileprovider"
             android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
-        </provider>
+            android:grantUriPermissions="true" />
+
+        <!-- HiFi 播放服务：ExoPlayer + MediaSession（通知栏 / 锁屏 / 后台） -->
+        <service
+            android:name=".PlaybackService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

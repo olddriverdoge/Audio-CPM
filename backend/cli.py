@@ -29,7 +29,7 @@ def main():
     args, _ = ap.parse_known_args()
     _log("cli: prepared args host=%s port=%s" % (args.host, args.port))
     ffbin.prepare()
-    _log("cli: ffbin.FFMPEG=%s" % ffbin.FFMPEG)
+    _log("cli: ffbin=%s caps=%s" % (ffbin.FFMPEG, ffbin.capabilities()))
     native_bridge.register()
     _log("cli: native_bridge available=%s" % native_bridge.available())
     load_tasks()

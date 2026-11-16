@@ -21,15 +21,26 @@ def playback_available() -> bool:
     return _playback is not None
 
 
+def _bridge_class():
+    """拿到原生桥 Class：Chaquopy 的 jclass 或 Termux/p4a 的 jnius autoclass。"""
+    try:
+        from java import jclass  # type: ignore  （Chaquopy）
+        return jclass('com.github.olddriverdoge.audiocpm.Ac2Bridge'), 'chaquopy'
+    except Exception:
+        pass
+    try:
+        from jnius import autoclass  # type: ignore  （python-for-android / Termux）
+        return autoclass('com.github.olddriverdoge.audiocpm.Ac2Bridge'), 'jnius'
+    except Exception:
+        return None, ''
+
+
 def register() -> bool:
     if not (os.environ.get('AC2_ANDROID') or os.environ.get('ANDROID_ARGUMENT')):
         return False
-    try:
-        from jnius import autoclass  # type: ignore
-        Bridge = autoclass('com.github.olddriverdoge.audiocpm.Ac2Bridge')
-    except Exception:
+    Bridge, _impl = _bridge_class()
+    if Bridge is None:
         return False
-
     global _open_external, _has_all, _playback
     try:
         _open_external = lambda path, pkg, act: json.loads(Bridge.open(path, pkg or '', act or ''))

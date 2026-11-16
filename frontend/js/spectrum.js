@@ -76,26 +76,21 @@ const Spectrum = (() => {
       }
       return core;
     }
-    if (core && core.native) core = null;
-    if (core) {
-      if (core.ctx.state === 'suspended') core.ctx.resume().catch(() => {});
-      return core;
+    /*
+     * 非 HiFi（WebDAV 走 WebView 播放）不再接管 WebAudio。
+     * 之前 createMediaElementSource + connect(destination) 会把主播放链路拉进
+     * WebAudio（Android WebView 重采样 / 切后台渲染限流），是"开频谱就爆音"的根因。
+     * 现在频谱只在本地 HiFi（ExoPlayer PCM 旁路）下提供。
+     */
+    if (core && !core.native) {
+      try { core.analyser.disconnect(); } catch (_) {}
+      stopPcmPoll();
     }
-    const Ctor = window.AudioContext || window.webkitAudioContext;
-    if (!Ctor) return null;
-    try {
-      const ctx = new Ctor();
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 256;
-      analyser.smoothingTimeConstant = 0.78;
-      const audio = Player.audio;
-      ctx.createMediaElementSource(audio).connect(analyser);
-      analyser.connect(ctx.destination);
-      core = { ctx, analyser, data: new Uint8Array(analyser.frequencyBinCount), takeover: false };
-      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
-      return core;
-    } catch (e) { return null; }
+    core = null;
+    return null;
   }
+
+  function stopPcmPoll() { if (pcmTimer) { clearInterval(pcmTimer); pcmTimer = 0; } }
 
   function layoutCanvas() {
     if (!canvas) return;
@@ -449,7 +444,7 @@ const Spectrum = (() => {
     audio.addEventListener('pause', () => { if (open) setState('暂停'); });
     audio.addEventListener('ended', () => { if (open) setState('结束'); });
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden || !open || !core) return;
+      if (document.hidden || !open || !core || !core.ctx) return;
       if (core.ctx.state === 'suspended') core.ctx.resume().catch(() => {});
     });
   }

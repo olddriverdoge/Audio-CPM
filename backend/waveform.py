@@ -83,8 +83,8 @@ def _peaks_wave_pcm(path: str, buckets: int) -> Optional[List[float]]:
 
 def _peaks_ffmpeg(path: str, buckets: int) -> List[float]:
     import subprocess
-    cmd = [ffbin.FFMPEG, '-v', 'error', '-nostdin', '-i', path, '-vn',
-           '-ac', '1', '-ar', '4000', '-f', 's16le', '-']
+    cmd = ffbin.cmd('-v', 'error', '-nostdin', '-i', path, '-vn',
+           '-ac', '1', '-ar', '4000', '-f', 's16le', '-')
     try:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                               timeout=120, env=ffbin.ENV)
@@ -109,6 +109,42 @@ def _peaks_ffmpeg(path: str, buckets: int) -> List[float]:
             continue
         peaks.append(max(abs(min(chunk)), abs(max(chunk))) / 32768.0)
     return peaks
+
+
+def _peaks_native(path: str, buckets: int) -> Optional[List[float]]:
+    """app 内走 Java Ac2Wave（MediaExtractor + MediaCodec），无需 ffmpeg。
+
+    Chaquopy 把 Java 结果写成临时 JSON 再读回，避免数组类型转换差异。
+    """
+    if not os.environ.get('AC2_ANDROID'):
+        return None
+    try:
+        from java import jclass  # type: ignore  # Chaquopy 提供
+        Cls = jclass('com.github.olddriverdoge.audiocpm.Ac2Wave')
+    except Exception:
+        return None
+    tmp = None
+    try:
+        import tempfile
+        fd, tmp = tempfile.mkstemp(suffix='.json', dir=WAVE_CACHE_DIR)
+        os.close(fd)
+        os.unlink(tmp)
+        if not bool(Cls.peaks(str(path), int(buckets), tmp)):
+            return None
+        with open(tmp, 'r', encoding='utf-8') as f:
+            d = json.load(f)
+        peaks = d.get('peaks')
+        if not isinstance(peaks, list) or not peaks:
+            return None
+        return [float(x) for x in peaks]
+    except Exception:
+        return None
+    finally:
+        if tmp:
+            try:
+                os.unlink(tmp)
+            except Exception:
+                pass
 
 
 def compute_wave_peaks(path: str, buckets: int = 160) -> list:
@@ -144,6 +180,14 @@ def compute_wave_peaks(path: str, buckets: int = 160) -> list:
             peaks = None
     if peaks is None and ext == '.wav':
         peaks = _peaks_wave_pcm(path, buckets)
+    if peaks is None and ffbin.available():
+        # ffmpeg 是主路径（质量最好）；app 包已内置，Termux/PC 用 PATH
+        got = _peaks_ffmpeg(path, buckets)
+        if got:
+            peaks = got
+    if peaks is None:
+        # ffmpeg 不可用或解码失败：退回 MediaCodec（app 内兜底）
+        peaks = _peaks_native(path, buckets)
     if peaks is None:
         peaks = _peaks_ffmpeg(path, buckets)
     if not peaks:

@@ -62,6 +62,20 @@ def convert_album_v2(iopath, format_spec, output_dir=None, delete_source=True,
     if progress_cb:
         progress_cb({"event":"plan","phase":"convert","total":total,
                      "folder":iopath,"spec":format_spec,"codec":codec})
+    # 编码器能力校验：mp3/ogg/opus 在 app 包里没有编译，PC/Termux 走 PATH 时通常有
+    unsupported = None
+    if not audio_codec:
+        unsupported = '当前版本不支持 %s 输出（ffmpeg 未编译对应编码器）' % codec.upper()
+    elif not ffbin.has_encoder(audio_codec):
+        unsupported = '当前 ffmpeg 缺少 %s 编码器，无法输出 %s' % (audio_codec, codec.upper())
+    if unsupported:
+        for i, f in enumerate(files):
+            result["failed"] += 1
+            result["files"].append({"file": f, "status": "error", "error": unsupported})
+            if progress_cb:
+                progress_cb({"event":"file_done","index":i+1,"total":total,
+                             "file":f,"status":"error","error":unsupported})
+        return result
     for idx, input_file in enumerate(files):
         cancel.check()
         src_ext = os.path.splitext(input_file)[1].lower().lstrip('.')
@@ -100,8 +114,8 @@ def convert_album_v2(iopath, format_spec, output_dir=None, delete_source=True,
         base = os.path.splitext(os.path.basename(input_file))[0]
         output_file = os.path.join(out_dir, f"{base}.{codec}")
         temp_file   = os.path.join(out_dir, f".{base}.ac2tmp.{codec}")
-        cmd = [ffbin.FFMPEG, '-y', '-i', input_file, '-map', '0',
-               '-c:a', audio_codec, '-c:v', 'copy']
+        cmd = ffbin.cmd('-y', '-i', input_file, '-map', '0',
+               '-c:a', audio_codec, '-c:v', 'copy')
         if codec in ('mp3','m4a','aac'):
             cmd += ['-b:a', f'{bitrate}k'] if bitrate else ['-b:a','320k']
         else:
@@ -269,11 +283,11 @@ def modify_cover_v2(iopath, formats='flac', only_files=None, progress_cb=None):
         try:
             temp1 = os.path.join(iopath, f".{os.path.basename(f)}.ac2nocc")
             temp2 = os.path.join(iopath, f".{os.path.basename(f)}.ac2cc")
-            execute([ffbin.FFMPEG,'-y','-i',f,'-map','0','-map','-0:v',
-                     '-c','copy','-metadata','cover=', temp1])
-            ok, err = execute([ffbin.FFMPEG,'-y','-i',temp1,'-i',cover_path,
+            execute(ffbin.cmd('-y','-i',f,'-map','0','-map','-0:v',
+                     '-c','copy','-metadata','cover=', temp1))
+            ok, err = execute(ffbin.cmd('-y','-i',temp1,'-i',cover_path,
                                '-map','0','-map','1','-c','copy',
-                               '-disposition:1','attached_pic', temp2])
+                               '-disposition:1','attached_pic', temp2))
             if ok and os.path.exists(temp2):
                 os.replace(temp2, f)
                 result["success"] += 1

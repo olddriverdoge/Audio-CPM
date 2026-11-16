@@ -5,6 +5,7 @@ import os
 import threading
 
 from ..config import DEFAULT_ROOT, STORAGE_FILE
+from .. import ffbin
 from .. import native_bridge
 from .ref import Ref, parse_ref, to_uri, local_uri, dav_uri
 
@@ -64,7 +65,9 @@ def roots() -> list:
         if kind == 'local':
             root = (s.get('roots') or [DEFAULT_ROOT])[0]
             caps = ["browse", "meta", "play", "waveform", "tags_write",
-                    "external_player", "move", "delete", "mkdir", "convert"]
+                    "external_player", "move", "delete", "mkdir"]
+            if ffbin.available():
+                caps.append('convert')
             if os.environ.get('AC2_ANDROID'):
                 caps.append('android')
             if native_bridge.playback_available():

@@ -42,6 +42,7 @@ public class MainActivity extends Activity {
     private static final int REQ_ALL_FILES = 1001;
     private static final int REQ_MEDIA_AUDIO = 1002;
     private static final int REQ_LEGACY_STORAGE = 1003;
+    private static final int REQ_NOTIFICATIONS = 1004;
 
     private static final String PREFS = "ac2_shell";
     private static final String KEY_ALL_FILES_PROMPTED = "all_files_prompted";
@@ -188,6 +189,14 @@ public class MainActivity extends Activity {
                 != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.READ_MEDIA_AUDIO},
                     REQ_MEDIA_AUDIO);
+        }
+
+        // 通知栏播放控制需要 POST_NOTIFICATIONS（33+）
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                    REQ_NOTIFICATIONS);
         }
     }
 

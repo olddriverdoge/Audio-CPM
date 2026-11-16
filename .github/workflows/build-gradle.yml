@@ -4,7 +4,63 @@ on:
   workflow_dispatch:
 
 jobs:
+  # ---------------------------------------------------------------- FFmpeg
+  # 独立作业：NDK 编译音频专用 ffmpeg（静态单文件），产出 libffmpegbin.so。
+  # 命中缓存时约 1 分钟，冷构建约 15~25 分钟。
+  ffmpeg:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Android NDK
+        run: |
+          SDKM=$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | head -1)
+          yes | "$SDKM" --licenses >/dev/null 2>&1 || true
+          "$SDKM" "ndk;27.0.12077973"
+          ls -d "$ANDROID_HOME"/ndk/*
+
+      - name: Cache ffmpeg output
+        id: cache-ffmpeg
+        uses: actions/cache@v4
+        with:
+          path: packaging/android/ffmpeg/out
+          key: ffmpeg-8.0.1-arm64-${{ hashFiles('packaging/android/ffmpeg/build_ffmpeg_android.sh') }}
+
+      - name: Build ffmpeg (arm64, audio-only)
+        if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.0.12077973
+        run: |
+          chmod +x packaging/android/ffmpeg/build_ffmpeg_android.sh
+          packaging/android/ffmpeg/build_ffmpeg_android.sh
+
+      - name: Verify ffmpeg components
+        if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
+        run: |
+          SRC=/tmp/ffmpeg-build/ffmpeg-8.0.1
+          for c in FLAC_ENCODER AAC_ENCODER ALAC_ENCODER PCM_S16LE_ENCODER FLAC_DECODER MP3_DECODER APE_DECODER DSD_LSBF_DECODER MOV_DEMUXER FLAC_MUXER IPOD_MUXER ARESAMPLE_FILTER; do
+            v=$(grep -E "^#define CONFIG_${c} " "$SRC/config_components.h" | awk '{print $3}')
+            echo "$c = ${v:-MISSING}"
+            if [ "${v:-0}" != "1" ]; then echo "!! 组件缺失: $c" >&2; exit 1; fi
+          done
+
+      - name: Show ffmpeg artifact
+        run: |
+          ls -l packaging/android/ffmpeg/out/libffmpegbin.so
+          file packaging/android/ffmpeg/out/libffmpegbin.so
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-android-arm64
+          path: packaging/android/ffmpeg/out/libffmpegbin.so
+
+  # ---------------------------------------------------------------- APK
   build:
+    needs: ffmpeg
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -27,6 +83,15 @@ jobs:
           SDKM=$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | head -1)
           yes | "$SDKM" --licenses >/dev/null 2>&1 || true
           "$SDKM" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Download ffmpeg binary
+        uses: actions/download-artifact@v4
+        with:
+          name: ffmpeg-android-arm64
+          path: packaging/android/app/src/main/jniLibs/arm64-v8a
+
+      - name: Show jniLibs
+        run: ls -l packaging/android/app/src/main/jniLibs/arm64-v8a/
 
       - uses: gradle/actions/setup-gradle@v4
         with:
