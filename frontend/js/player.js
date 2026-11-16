@@ -34,6 +34,7 @@ const Player = (() => {
   }
   function setToggle(playing) { btnToggle.textContent = playing ? '⏸' : '▶'; }
   function hifiAvailable() {
+    if (window.__ac2HifiBroken) return false;   // 本会话已确认 HiFi 起不来，别再反复失败
     try {
       const r = (typeof Sources !== 'undefined') ? Sources.currentRoot() : null;
       return !!(r && r.caps && r.caps.indexOf('hifi_play') >= 0);
@@ -66,6 +67,17 @@ const Player = (() => {
         if (!s || !s.ok) return;
         hifiPos = Number(s.positionMs) || 0;
         hifiDur = Number(s.durationMs) || 0;
+        if (s.error) {
+          window.__ac2HifiBroken = true;
+          stopHifiPoll();
+          hifi = false;
+          Utils.log('err', 'HiFi 播放失败: ' + s.error);
+          Utils.toast('HiFi 播放失败，已切回网页播放', 'warn');
+          audio.src = '/api/stream?path=' + encodeURIComponent(cur || '');
+          audio.play().catch(() => {});
+          setToggle(false);
+          return;
+        }
         hifiPlaying = !!s.playing;
         // 原生队列自动下一首后，前端要跟着换标题/封面/波形
         if (s.path) {

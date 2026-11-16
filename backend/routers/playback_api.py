@@ -80,12 +80,21 @@ async def playback_diag(request):
     """真机排查入口：浏览器打开 http://127.0.0.1:8765/api/playback/diag 即可。"""
     st = await run_in_threadpool(native_bridge.playback_state)
     sp = await run_in_threadpool(native_bridge.playback_spectrum, None)
+    err = ''
+    try:
+        fp = os.path.join(DATA_DIR, 'player_error.txt')
+        if os.path.exists(fp):
+            with open(fp, 'r', encoding='utf-8', errors='ignore') as f:
+                err = f.read()[-3000:]
+    except Exception:
+        pass
     return JSONResponse({
         'ok': True,
         'android': bool(os.environ.get('AC2_ANDROID')),
         'bridge': native_bridge.playback_available(),
         'state': st,
         'spectrum': sp,
+        'errorLog': err,
     })
 
 

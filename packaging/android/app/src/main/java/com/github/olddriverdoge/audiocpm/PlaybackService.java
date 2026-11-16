@@ -5,6 +5,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.util.Log;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+
 import androidx.media3.common.AudioAttributes;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
@@ -58,8 +63,9 @@ public class PlaybackService extends MediaSessionService {
         player.addListener(new Player.Listener() {
             @Override
             public void onPlayerError(PlaybackException error) {
-                lastError = error.getErrorCodeName() + ": " + error.getMessage();
+                lastError = error.getErrorCodeName() + " / " + describe(error);
                 Log.e(TAG, "player error " + lastError, error);
+                dumpError(error);
             }
 
             @Override
@@ -83,6 +89,35 @@ public class PlaybackService extends MediaSessionService {
                 .setSessionActivity(pi)
                 .build();
         Log.i(TAG, "MediaSession created, player ready");
+    }
+
+    /** 把异常链压成一行，diag 里直接能看到根因类型。 */
+    static String describe(Throwable root) {
+        StringBuilder sb = new StringBuilder();
+        Throwable t = root;
+        for (int d = 0; t != null && d < 6; d++) {
+            if (d > 0) sb.append(" <- ");
+            sb.append(t.getClass().getSimpleName());
+            String m = t.getMessage();
+            if (m != null && !m.isEmpty()) sb.append(": ").append(m);
+            t = t.getCause();
+        }
+        return sb.toString();
+    }
+
+    /** 完整堆栈落盘，便于 adb/诊断接口取。 */
+    private void dumpError(Throwable error) {
+        try {
+            StringWriter sw = new StringWriter();
+            error.printStackTrace(new PrintWriter(sw));
+            File f = new File(getFilesDir(), "player_error.txt");
+            try (FileWriter w = new FileWriter(f, false)) {
+                w.write(String.valueOf(System.currentTimeMillis()));
+                w.write('\n');
+                w.write(sw.toString());
+            }
+        } catch (Throwable ignored) {
+        }
     }
 
     @Override
