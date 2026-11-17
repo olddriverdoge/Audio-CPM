@@ -250,13 +250,16 @@ public class Ac2Bridge {
             if (json != null) {
                 float floor = -80f, rel = 0.12f;
                 int bars = SpectrumProcessor.getBarCount();
+                int spec = 0;
                 String f = num(json, "floorDb");
                 if (f != null) floor = Float.parseFloat(f);
                 String r = num(json, "release");
                 if (r != null) rel = Float.parseFloat(r);
                 String b = num(json, "bars");
                 if (b != null) bars = (int) Float.parseFloat(b);
-                SpectrumProcessor.setParams(floor, rel, bars);
+                String sc = num(json, "spec");
+                if (sc != null) spec = (int) Float.parseFloat(sc);
+                SpectrumProcessor.setParams(floor, rel, bars, spec);
             }
             return "{\"ok\":true}";
         } catch (Throwable t) {
@@ -284,6 +287,7 @@ public class Ac2Bridge {
             float[] lv = SpectrumProcessor.getLevels();
             float[] bs = SpectrumProcessor.getBars();
             float[] lb = SpectrumProcessor.getLinBars();
+            float[] sp = SpectrumProcessor.getSpec();
             StringBuilder sb = new StringBuilder(2048);
             sb.append("{\"ok\":true,\"service\":").append(PlaybackService.getPlayer() != null)
               .append(",\"format\":").append(SpectrumProcessor.describe())
@@ -295,6 +299,8 @@ public class Ac2Bridge {
             appendFloats(sb, bs);
             sb.append("],\"linbars\":[");
             appendFloats(sb, lb);
+            sb.append("],\"spec\":[");
+            appendFloats(sb, sp);
             sb.append("]}");
             return sb.toString();
         } catch (Throwable t) {

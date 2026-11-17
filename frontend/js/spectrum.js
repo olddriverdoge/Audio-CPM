@@ -13,6 +13,8 @@ const Spectrum = (() => {
   let xScale = 'log';                  // log | lin（频谱 X 轴与柱数据同时切换）
   let hideTimer = 0;
   let pausedAt = 0, idleTimer = 0, stopped = false;
+  const DPR = Math.min(3, Math.max(1, window.devicePixelRatio || 1));
+  let cssW = 0, cssH = 0;
   let peakVals = [], peakAt = [];       // 峰值保持
   const resize = document.getElementById('sf-resize');
   const g = canvas ? canvas.getContext('2d') : null;
@@ -49,6 +51,8 @@ const Spectrum = (() => {
       stops = [[0,0,4],[40,11,84],[101,21,110],[159,42,99],[212,72,66],[245,125,21],[250,193,39],[252,255,164]];
     } else if (kind === 'gray') {
       stops = [[0,0,0],[64,64,64],[128,128,128],[192,192,192],[255,255,255]];
+    } else if (kind === 'flame') {
+      stops = [[0,0,0],[30,0,0],[90,0,4],[160,12,0],[220,60,0],[255,140,0],[255,220,80],[255,255,255]];
     } else {
       stops = [
         [0, 0, 0], [0, 0, 70], [40, 0, 120], [110, 0, 140], [170, 0, 110],
@@ -88,8 +92,14 @@ const Spectrum = (() => {
       for (let i = 0; i < r.linbars.length; i++) lb[i] = Math.max(0, Math.min(255, Math.round((r.linbars[i] || 0) * 255)));
       core.linbars = lb;
     }
+    if (r.spec && r.spec.length) {
+      const sp = new Uint8Array(r.spec.length);
+      for (let i = 0; i < r.spec.length; i++) sp[i] = Math.max(0, Math.min(255, Math.round((r.spec[i] || 0) * 255)));
+      core.spec = sp;
+    }
     if (r.sampleRate) core.sampleRate = r.sampleRate;
-    hist.push({t: performance.now(), data: d, bars: core.bars, linbars: core.linbars, levels: core.levels});
+    hist.push({t: performance.now(), data: d, bars: core.bars, linbars: core.linbars,
+               spec: core.spec, levels: core.levels});
     if (hist.length > 260) hist.shift();
   }
 
@@ -131,7 +141,7 @@ const Spectrum = (() => {
     const hifi = !!(typeof Player !== 'undefined' && Player.hifiActive && Player.hifiActive());
     if (hifi) {
       if (!core || !core.native) {
-        core = {native: true, data: new Uint8Array(96), levels: new Uint8Array(96), bars: new Uint8Array(48), linbars: new Uint8Array(48), sampleRate: 48000, ctx: null, analyser: null};
+        core = {native: true, data: new Uint8Array(96), levels: new Uint8Array(96), bars: new Uint8Array(48), linbars: new Uint8Array(48), spec: new Uint8Array(0), sampleRate: 48000, ctx: null, analyser: null};
         startPcmPoll();
       }
       return core;
@@ -156,8 +166,11 @@ const Spectrum = (() => {
     if (!canvas) return;
     const w = Math.max(120, Math.round(canvas.clientWidth || 300));
     const h = Math.max(60, Math.round(canvas.clientHeight || 120));
-    if (canvas.width !== w) canvas.width = w;
-    if (canvas.height !== h) canvas.height = h;
+    cssW = w; cssH = h;
+    // 位图按 devicePixelRatio 放大：放大面板时不再糊
+    const bw = Math.round(w * DPR), bh = Math.round(h * DPR);
+    if (canvas.width !== bw) canvas.width = bw;
+    if (canvas.height !== bh) canvas.height = bh;
     try { pushParams(); } catch (_) {}   // 面板变宽/变窄时柱数自动降档
   }
 
@@ -220,19 +233,21 @@ const Spectrum = (() => {
   }
 
   function resizeWf(w, h) {
-    if (wfW === w && wfH === h) return;
+    const bw = Math.max(1, Math.round(w * DPR));
+    const bh = Math.max(1, Math.round(h * DPR));
+    if (wfW === bw && wfH === bh) return;
     const old = document.createElement('canvas');
     old.width = Math.max(1, wfW); old.height = Math.max(1, wfH);
     const oldCtx = wfW > 0 && wfH > 0 ? old.getContext('2d') : null;
     if (oldCtx) { try { oldCtx.drawImage(wf, 0, 0); } catch (_) {} }
-    wf.width = w; wf.height = h;
+    wf.width = bw; wf.height = bh;
     try { wfCtx = wf.getContext('2d'); } catch (_) { wfCtx = null; }
-    wfW = w; wfH = h;
+    wfW = bw; wfH = bh;
     if (!wfCtx) return;
     wfCtx.fillStyle = '#000';
-    wfCtx.fillRect(0, 0, w, h);
+    wfCtx.fillRect(0, 0, bw, bh);
     if (oldCtx) {
-      try { wfCtx.drawImage(old, Math.max(0, w - old.width), Math.max(0, h - old.height)); } catch (_) {}
+      try { wfCtx.drawImage(old, Math.max(0, bw - old.width), Math.max(0, bh - old.height)); } catch (_) {}
     }
   }
 
@@ -243,75 +258,76 @@ const Spectrum = (() => {
     return y0 + gh * (1 - Math.pow(f, 1 / GAMMA));
   }
 
+  /* 纵向映射：cur=现有效果，lin=线性，log=对数（声谱画布与刻度共用） */
+  function hzToNorm(hz, top) {
+    const f = Math.max(0, Math.min(1, hz / top));
+    if (cfg.y === 'lin') return f;
+    if (cfg.y === 'log') {
+      const lo = 40;
+      if (hz <= lo) return 0;
+      return Math.max(0, Math.min(1, Math.log(hz / lo) / Math.log(top / lo)));
+    }
+    return Math.pow(f, 1 / GAMMA);
+  }
+  function normToHz(norm, top) {
+    const n = Math.max(0, Math.min(1, norm));
+    if (cfg.y === 'lin') return n * top;
+    if (cfg.y === 'log') {
+      const lo = 40;
+      return lo * Math.pow(top / lo, n);
+    }
+    return top * Math.pow(n, GAMMA);
+  }
+
   function drawWaterfall(area) {
     const W = Math.max(1, Math.round(area.gw));
     const H = Math.max(1, Math.round(area.gh));
-    resizeWf(W, H);
+    resizeWf(W, H);                     // 位图按 DPR 放大，放大面板也不糊
     if (!wfCtx) return;
-    // 左移一列（自身拷贝）；列速固定 ~60fps，避免高刷屏上滚动变快。
-    // 不支持 drawImage 的环境退化为清屏
+    const BW = wfW, BH = wfH;
+    // 左移一列（自身拷贝）；列速固定 ~60fps，避免高刷屏上滚动变快
     const now = performance.now();
     const advance = (wfLast === 0) || (now - wfLast >= 16.7);
     if (advance) wfLast = now;
     wfCtx.globalCompositeOperation = 'copy';
     try {
-      if (typeof wfCtx.drawImage === 'function' && advance) wfCtx.drawImage(wf, -1, 0);
-      else if (typeof wfCtx.drawImage !== 'function') wfCtx.fillRect(0, 0, W, H);
-    } catch (_) { wfCtx.fillRect(0, 0, W, H); }
-    if (typeof wfCtx.drawImage !== 'function') wfCtx.fillRect(0, 0, W, H);
+      if (typeof wfCtx.drawImage === 'function' && advance) wfCtx.drawImage(wf, -DPR, 0);
+    } catch (_) { wfCtx.fillRect(0, 0, BW, BH); }
     wfCtx.globalCompositeOperation = 'source-over';
 
-    const data = core.data;
     const nyq = nyquist();
-    const topHz = Math.min(cfg.top || 20000, nyq);      // 频段上限（默认 20k，保持原观感）
-    const spanBins = Math.max(2, Math.round(data.length * topHz / nyq));
+    const topHz = Math.min(cfg.top || 24000, nyq);
+    // 声谱优先用原生高分辨率线性谱（128/256/512），没有就退回 96 档线性 bands
+    const srcBins = (core.spec && core.spec.length) ? core.spec : core.data;
+    const nB = srcBins.length || 96;
     const pal = palette || (palette = buildPalette(cfg.pal));
     const br = BRIGHT[cfg.bright] || BRIGHT.std;
-    const useImage = typeof wfCtx.createImageData === 'function' &&
-                     typeof wfCtx.putImageData === 'function';
-    const img = useImage ? wfCtx.createImageData(1, H) : null;
-    const px = img ? img.data : null;
-    for (let y = 0; y < H; y++) {
-      const norm = (H - 1 - y) / Math.max(1, H - 1);          // 0=底部(低频) 1=顶部
-      const bin = Math.min(spanBins - 1, Math.floor(Math.pow(norm, GAMMA) * spanBins));
-      const v = data[bin] || 0;
+    let img = null, px = null;
+    try { img = wfCtx.createImageData(DPR, BH); px = img.data; } catch (_) {}
+    for (let y = 0; y < BH; y++) {
+      const rowNorm = (BH - 1 - y) / Math.max(1, BH - 1);   // 0=底(低频) 1=顶
+      const hz = normToHz(rowNorm, topHz);
+      const bin = Math.min(nB - 1, Math.max(0, Math.floor(hz / nyq * nB)));
+      const v = srcBins[bin] || 0;
       const ci = Math.max(0, Math.min(255, Math.round((v - br[0]) * 255 / (br[1] - br[0]))));
       if (px) {
-        const o = y * 4;
-        px[o] = pal[ci * 3];
-        px[o + 1] = pal[ci * 3 + 1];
-        px[o + 2] = pal[ci * 3 + 2];
-        px[o + 3] = 255;
+        for (let k = 0; k < DPR; k++) {
+          const o = (y * DPR + k) * 4;
+          px[o] = pal[ci * 3];
+          px[o + 1] = pal[ci * 3 + 1];
+          px[o + 2] = pal[ci * 3 + 2];
+          px[o + 3] = 255;
+        }
       } else {
         wfCtx.fillStyle = 'rgb(' + pal[ci * 3] + ',' + pal[ci * 3 + 1] + ',' + pal[ci * 3 + 2] + ')';
-        wfCtx.fillRect(W - 1, y, 1, 1);
+        wfCtx.fillRect(BW - DPR, y, DPR, 1);
       }
     }
-    if (px) { try { wfCtx.putImageData(img, W - 1, 0); } catch (_) {} }
+    if (px) { try { wfCtx.putImageData(img, BW - DPR, 0); } catch (_) {} }
 
-    if (typeof g.drawImage === 'function') g.drawImage(wf, area.x0, area.y0);
-    g.font = '9px ui-monospace, Menlo, monospace';
-    // Y 轴：频率（左侧，低频在下）
-    const step = topHz <= 3000 ? 500 : (topHz <= 8000 ? 1000 : (topHz <= 14000 ? 2000 : 4000));
-    const marks = [];
-    for (let hz = 0; hz <= topHz + 1; hz += step) marks.push(hz);
-    g.fillStyle = 'rgba(148,163,184,.8)';
-    g.textAlign = 'right';
-    g.textBaseline = 'middle';
-    marks.forEach(hz => {
-      const y = yOfHz(hz, topHz, area.gh, area.y0);
-      g.fillText(hz === 0 ? '0' : (hz / 1000) + 'k', area.x0 - 3, y);
-    });
-    g.strokeStyle = 'rgba(148,163,184,.45)';
-    g.beginPath();
-    g.moveTo(area.x0 + .5, area.y0);
-    g.lineTo(area.x0 + .5, area.y0 + area.gh + .5);
-    g.stroke();
-    g.fillStyle = 'rgba(148,163,184,.55)';
-    g.textAlign = 'left';
-    g.textBaseline = 'top';
-    g.fillText('Hz', 2, 1);
-    // 时间网格：右端=现在，每格约 1 秒（列速 60/s）
+    if (typeof g.drawImage === 'function') g.drawImage(wf, area.x0, area.y0, W, H);
+
+    // 时间网格：右端=现在，每格约 1 秒
     if (cfg.grid) {
       const secPx = Math.max(18, Math.round(1000 / 16.7));
       g.strokeStyle = 'rgba(148,163,184,.16)';
@@ -328,8 +344,34 @@ const Spectrum = (() => {
           g.fillText('1s', area.x0 + x + 2, area.y0 + area.gh - 2);
         }
       }
-      g.strokeStyle = 'rgba(148,163,184,.45)';
     }
+
+    // Y 轴：频率（左侧，低频在下）
+    let marks;
+    if (cfg.y === 'log') {
+      marks = [40, 100, 200, 500, 1000, 2000, 5000, 10000, 20000].filter(v => v <= topHz + 1);
+    } else {
+      const step = topHz <= 3000 ? 500 : (topHz <= 8000 ? 1000 : (topHz <= 14000 ? 2000 : 4000));
+      marks = [];
+      for (let hz = 0; hz <= topHz + 1; hz += step) marks.push(hz);
+    }
+    g.font = '9px ui-monospace, Menlo, monospace';
+    g.fillStyle = 'rgba(148,163,184,.8)';
+    g.textAlign = 'right';
+    g.textBaseline = 'middle';
+    marks.forEach(hz => {
+      const y = area.y0 + area.gh * (1 - hzToNorm(hz, topHz));
+      g.fillText(hz === 0 ? '0' : (hz >= 1000 ? (hz / 1000) + 'k' : String(hz)), area.x0 - 3, y);
+    });
+    g.strokeStyle = 'rgba(148,163,184,.45)';
+    g.beginPath();
+    g.moveTo(area.x0 + .5, area.y0);
+    g.lineTo(area.x0 + .5, area.y0 + area.gh + .5);
+    g.stroke();
+    g.fillStyle = 'rgba(148,163,184,.55)';
+    g.textAlign = 'left';
+    g.textBaseline = 'top';
+    g.fillText('Hz', 2, 1);
     // X 轴：时间（右端为现在，向左为过去）
     g.strokeStyle = 'rgba(148,163,184,.45)';
     g.beginPath();
@@ -346,7 +388,8 @@ const Spectrum = (() => {
     raf = 0;
     if (!open || !g) return;
     layoutCanvas();
-    const w = canvas.width, h = canvas.height;
+    const w = cssW, h = cssH;
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
     g.clearRect(0, 0, w, h);
     // 两种模式坐标系隔离：频谱 X=频率 / Y=dB；声谱 X=时间 / Y=频率
     const area = computeArea(w, h, 30, 14);
@@ -376,7 +419,12 @@ const Spectrum = (() => {
       core.analyser.getByteFrequencyData(core.data);
     } else if (delayMs > 0) {
       const f = pickDelayed();
-      if (f) { core.data = f.data; core.bars = f.bars; if (f.linbars) core.linbars = f.linbars; if (f.levels) core.levels = f.levels; }
+      if (f) {
+        core.data = f.data; core.bars = f.bars;
+        if (f.linbars) core.linbars = f.linbars;
+        if (f.spec) core.spec = f.spec;
+        if (f.levels) core.levels = f.levels;
+      }
     }
     if (mode === 'waterfall') {
       drawWaterfall(area);
@@ -457,9 +505,13 @@ const Spectrum = (() => {
     bars: Number(Store.get(K.spectrumBars, 48)),
     stop: Number(Store.get(K.spectrumStop, 5)),
     bright: Store.get(K.wfBright, 'std'),
-    top: Number(Store.get(K.wfTop, 20000)),
+    top: [24000, 12000, 6000, 2000].includes(Number(Store.get(K.wfTop, 24000)))
+      ? Number(Store.get(K.wfTop, 24000)) : 24000,
     grid: Number(Store.get(K.wfGrid, 1)),
-    pal: Store.get(K.wfPal, 'audition')
+    pal: Store.get(K.wfPal, 'audition'),
+    bands2: [128, 256, 512].includes(Number(Store.get(K.wfBands, 256)))
+      ? Number(Store.get(K.wfBands, 256)) : 256,
+    y: Store.get(K.wfY, 'cur')
   };
   xScale = cfg.x;
 
@@ -480,12 +532,16 @@ const Spectrum = (() => {
   const WF_CHIPS = [
     {k: 'bright', key: K.wfBright, opts: ['dark', 'std', 'bright'],
      label: v => ({dark: '亮度 暗', std: '亮度 标准', bright: '亮度 亮'})[v]},
-    {k: 'top', key: K.wfTop, opts: [20000, 12000, 6000, 2000],
+    {k: 'top', key: K.wfTop, opts: [24000, 12000, 6000, 2000],
      label: v => '频段 ' + (v >= 1000 ? (v / 1000) + 'k' : v)},
+    {k: 'bands2', key: K.wfBands, opts: [128, 256, 512],
+     label: v => '分辨率 ' + v},
+    {k: 'y', key: K.wfY, opts: ['cur', 'lin', 'log'],
+     label: v => ({cur: 'Y 轴 现效', lin: 'Y 轴 线性', log: 'Y 轴 对数'})[v]},
     {k: 'grid', key: K.wfGrid, opts: [1, 0],
      label: v => v ? '时间网格 开' : '时间网格 关'},
-    {k: 'pal', key: K.wfPal, opts: ['audition', 'inferno', 'gray'],
-     label: v => ({audition: '配色 Audition', inferno: '配色 Inferno', gray: '配色 灰度'})[v]}
+    {k: 'pal', key: K.wfPal, opts: ['audition', 'inferno', 'flame', 'gray'],
+     label: v => ({audition: '配色 Audition', inferno: '配色 Inferno', flame: '配色 火焰', gray: '配色 灰度'})[v]}
   ];
 
   /* 窄面板自动降档：96 → 64 → 48，按钮上标注实际值 */
@@ -507,7 +563,8 @@ const Spectrum = (() => {
     try {
       if (window.Ac2Native && typeof window.Ac2Native.setParams === 'function') {
         window.Ac2Native.setParams(JSON.stringify({
-          floorDb: cfg.db, release: REL_K[cfg.rel] || 0.12, bars: effBars()}));
+          floorDb: cfg.db, release: REL_K[cfg.rel] || 0.12, bars: effBars(),
+          spec: (mode === 'waterfall' ? (cfg.bands2 || 256) : 0)}));
       }
     } catch (_) {}
   }
@@ -525,7 +582,8 @@ const Spectrum = (() => {
       if (item.k === 'x') xScale = nv;
       if (item.k === 'pal') { palette = null; }
       b.textContent = item.label(nv);
-      if (item.k === 'db' || item.k === 'rel' || item.k === 'bars') pushParams();
+      if (item.k === 'db' || item.k === 'rel' || item.k === 'bars'
+          || item.k === 'bands2' || item.k === 'y') pushParams();
       armHide();
     });
     return b;
@@ -632,6 +690,7 @@ const Spectrum = (() => {
     Store.set(K.spectrumMode, mode);
     paintTabs();
     paintScene();
+    pushParams();
     if (mode === 'waterfall') { wfW = 0; wfH = 0; if (wfCtx) wfCtx = null; }
     setState('');
     if (open) { if (!raf) start(); }
@@ -642,7 +701,7 @@ const Spectrum = (() => {
     box.classList.toggle('hidden', !open);
     if (fab) fab.style.display = open ? 'none' : '';
     if (open) {
-      applySize(); applyPos(); layoutCanvas(); paintTrack(); paintTabs();
+      applySize(); applyPos(); layoutCanvas(); paintTrack(); paintTabs(); paintScene();
       stopped = false; pausedAt = 0;
       if (core && core.native) startPcmPoll();
       start();

@@ -30,6 +30,9 @@ public class SpectrumProcessor extends BaseAudioProcessor {
     private static volatile float[] bars = new float[barCount];
     /** 线性频段版（X 轴切线性时用），频段宽度按 Hz 等分。 */
     private static volatile float[] linBars = new float[barCount];
+    /** 声谱专用高分辨率线性频谱（0..nyquist），数量 0/128/256/512。 */
+    private static volatile int specCount = 0;
+    private static volatile float[] spec = new float[0];
     private static volatile int sampleRate = 48000;
     private static volatile boolean enabled = false;
     private static volatile int encoding = C.ENCODING_PCM_16BIT;
@@ -46,6 +49,7 @@ public class SpectrumProcessor extends BaseAudioProcessor {
     private final float[] prevLevels = new float[96];
     private float[] barPrev = new float[barCount];
     private float[] linPrev = new float[barCount];
+    private float[] specPrev = new float[0];
     private int fill = 0;
 
     public SpectrumProcessor() {
@@ -64,15 +68,21 @@ public class SpectrumProcessor extends BaseAudioProcessor {
         if (bars.length != barCount) bars = new float[barCount];
         return bars.clone();
     }
+    public static float[] getSpec() { return spec.clone(); }
     public static float[] getLinBars() {
         if (linBars.length != barCount) linBars = new float[barCount];
         return linBars.clone();
     }
     /** 调节条下发：dB 下限、回弹系数、柱数。 */
-    public static void setParams(float floorDb, float release, int bars) {
+    public static void setParams(float floorDb, float release, int bars, int specBands) {
         dbFloor = Math.max(-120f, Math.min(-20f, floorDb));
         releaseK = Math.max(0.04f, Math.min(0.5f, release));
         barCount = Math.max(32, Math.min(96, bars));
+        int sc = Math.max(0, Math.min(512, specBands));
+        if (sc != specCount) {
+            specCount = sc;
+            spec = new float[sc];
+        }
     }
     public static int getBarCount() { return barCount; }
     public static int getSampleRate() { return sampleRate; }
@@ -105,6 +115,8 @@ public class SpectrumProcessor extends BaseAudioProcessor {
         linBars = new float[barCount];
         barPrev = new float[barCount];
         linPrev = new float[barCount];
+        spec = new float[specCount];
+        specPrev = new float[specCount];
     }
 
     @Override
@@ -264,6 +276,32 @@ public class SpectrumProcessor extends BaseAudioProcessor {
             outLin[b] = linPrev[b];
         }
         linBars = outLin;
+
+        // ---- 声谱专用线性高分辨率频谱（只在声谱模式计算，数量可调 0/128/256/512） ----
+        int sc = specCount;
+        if (sc > 0) {
+            if (specPrev.length != sc) specPrev = new float[sc];
+            float[] outSpec = new float[sc];
+            for (int b = 0; b < sc; b++) {
+                int k0 = (int) ((long) b * half / sc);
+                int k1 = (int) ((long) (b + 1) * half / sc) - 1;
+                if (k1 < k0) k1 = k0;
+                float sum = 0f;
+                int cnt = 0;
+                for (int k = k0; k <= k1; k++) {
+                    sum += (float) Math.hypot(re[k], im[k]);
+                    cnt++;
+                }
+                double amp = (cnt > 0 ? sum / cnt : 0.0) / (double) FFT_N;
+                double db = 20.0 * Math.log10(Math.max(amp, 1e-7));
+                float v = (float) Math.max(0.0, Math.min(1.0, (db + 100.0) / 70.0));
+                specPrev[b] = specPrev[b] * 0.5f + v * 0.5f;
+                outSpec[b] = specPrev[b];
+            }
+            spec = outSpec;
+        } else if (spec.length != 0) {
+            spec = new float[0];
+        }
     }
 
     private static void fft(float[] re, float[] im) {
