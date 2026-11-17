@@ -6,7 +6,7 @@ const Logs = (() => {
   const buf = {workbench: []};
   let ns = 'process';
   let floatEl = null, bodyEl = null, tabsEl = null, fabEl = null;
-  let open = false;
+  let open = false, inited = false;
 
   function stamp() {
     const d = new Date();
@@ -95,11 +95,13 @@ const Logs = (() => {
   }
 
   function init() {
+    if (inited) return;
     floatEl = document.getElementById('log-float');
     bodyEl = document.getElementById('lf-body');
     tabsEl = document.getElementById('lf-tabs');
     fabEl = document.getElementById('log-fab');
     if (!floatEl || !fabEl) return;
+    inited = true;
     ns = pageNs();
     if (fabEl) fabEl.addEventListener('click', () => toggle());
     if (tabsEl) tabsEl.addEventListener('click', e => {

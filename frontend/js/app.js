@@ -760,5 +760,7 @@ const App = (() => {
 App.init().catch(e => {
   console.error(e);
   try { Utils.log('err', '初始化失败: ' + (e && (e.stack || e.message) || e), 'workbench'); } catch (_) {}
-  try { App.openModule('log'); } catch (_) {}
+  // 启动错误只进日志浮窗（不弹 toast）：失败时也能直接初始化日志并打开
+  try { Logs.init(); Logs.setNs('workbench'); Logs.toggle(true); }
+  catch (_) { try { App.openModule('log'); } catch (__) {} }
 });
