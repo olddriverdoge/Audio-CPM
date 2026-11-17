@@ -447,7 +447,7 @@ const Player = (() => {
     if (isFinite(t)) {
       if (hifi) {
         // 拖动进度条 = 一次 flush，按"已知重活场景"处理：频谱/声谱停链重置，播起来再接上
-        try { if (typeof Spectrum !== 'undefined') Spectrum.onSeek(); } catch (_) {}
+        try { if (typeof Spectrum !== 'undefined') Spectrum.onTrackChange(); } catch (_) {}
         Api.playbackSeek(Math.round(t * 1000)).catch(() => {});
         hifiPos = t * 1000;
       }
