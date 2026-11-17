@@ -300,16 +300,6 @@ public class AudioCpmBridge {
     private static volatile String cachedSpectrum = null;
     private static volatile int cachedSpectrumSeq = -1;
 
-    /** 只在帧序号变化时返回 JSON，否则返回空串（前端据此跳过 parse/绘制）。 */
-    public static String spectrumIfNew(int sinceSeq) {
-        try {
-            if (SpectrumProcessor.getSeq() == sinceSeq) return "";
-            return spectrum();
-        } catch (Throwable t) {
-            return "";
-        }
-    }
-
     public static String spectrum() {
         int sq = SpectrumProcessor.getSeq();
         String c = cachedSpectrum;

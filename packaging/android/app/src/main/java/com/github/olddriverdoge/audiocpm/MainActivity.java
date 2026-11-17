@@ -128,12 +128,6 @@ public class MainActivity extends Activity {
             }
 
             @android.webkit.JavascriptInterface
-            public String spectrumIfNew(int sinceSeq) {
-                // 没有新帧就返回空串：前端连 JSON.parse 都省掉（90Hz 下这是最大的一块固定开销）
-                try { return AudioCpmBridge.spectrumIfNew(sinceSeq); } catch (Throwable t) { return ""; }
-            }
-
-            @android.webkit.JavascriptInterface
             public String setParams(String json) {
                 try { return AudioCpmBridge.setParams(json); } catch (Throwable t) { return "{}"; }
             }

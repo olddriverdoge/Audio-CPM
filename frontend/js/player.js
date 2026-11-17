@@ -87,6 +87,11 @@ const Player = (() => {
           return;
         }
         hifiPlaying = !!s.playing;
+        // seek 后恢复由真实播放状态驱动（替代频谱模块里的定时盲试）
+        if (hifiPlaying && typeof Spectrum !== 'undefined' && Spectrum.isWaitingResume
+            && Spectrum.isWaitingResume()) {
+          try { Spectrum.resumeStream(); } catch (_) {}
+        }
         // 原生队列自动下一首后，前端要跟着换标题/封面/波形
         if (s.path) {
           const ref = 'local:' + s.path;

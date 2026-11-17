@@ -142,7 +142,8 @@ const Spectrum = (() => {
     return hist[0];
   }
   let lastHeal = 0, badFrames = 0, healLogAt = 0;
-  let seekGuardUntil = 0;              // 拖进度条后的保护期：期间不进 idle，避免长定位把 rAF 停掉卡在"缓冲中"
+  let seekGuardUntil = 0;
+  let waitResume = false, waitSince = 0;   // seek 后等待"真正播起来"再恢复取数（事件驱动）              // 拖进度条后的保护期：期间不进 idle，避免长定位把 rAF 停掉卡在"缓冲中"
   /* 取数自救：只要"缓冲中"持续超过 1.5s，就重开原生开关 + 重建取数链。
      seek/切歌/息屏任何一条路径把链子弄停（原生 enabled 被关、rAF 链断、tick 换代），这里都能拉回来。 */
   function healStream(reason) {
@@ -151,8 +152,7 @@ const Spectrum = (() => {
     lastHeal = now;
     try { Api.playbackSpectrum(true); } catch (_) {}
     stopPcmPoll();
-    startPcmPoll();
-    if (!raf) start();
+    startPcmPoll();                     // 只重建取数链；rAF 由 draw 自己的循环维持
     if (now - healLogAt > 8000) {
       healLogAt = now;
       try { Utils.log('warn', '频谱取数停摆(' + (reason || '') + ')，已自动重连'); } catch (_) {}
@@ -481,14 +481,19 @@ const Spectrum = (() => {
 
   function draw() {
     raf = 0;
-    if (suspended) return;               // 切歌窗口不重绘（等新数据）
-    if (!open || !g) return;
+    inDraw = true;
     try {
-    drawFrame();
-    } catch (e) {
-      try { console.warn('spectrum draw failed', e); } catch (_) {}
+      if (suspended) return;             // 切歌/定位窗口不重绘（等新数据）
+      if (!open || !g) return;
+      try {
+        drawFrame();
+      } catch (e) {
+        try { console.warn('spectrum draw failed', e); } catch (_) {}
+      }
+      if (stopped) return;               // enterIdle 停算后不再排帧
+    } finally {
+      inDraw = false;
     }
-    if (stopped) return;                 // enterIdle 停算后不再排帧
     raf = requestAnimationFrame(draw);
   }
 
@@ -644,8 +649,11 @@ const Spectrum = (() => {
     }, ms);
   }
 
+  let resolveTimer = 0;
   function resumeStream() {
     if (!open) return;
+    waitResume = false;
+    if (resolveTimer) { clearTimeout(resolveTimer); resolveTimer = 0; }
     suspended = false; stopped = false; pausedAt = 0;
     paramsSig = '';
     pushParams();
@@ -654,10 +662,13 @@ const Spectrum = (() => {
     start();
   }
 
+  let inDraw = false;
   function start() {
     ensureCore();
     if (!core) { setState('不可用'); return; }
-    if (!raf) raf = requestAnimationFrame(draw);
+    // 关键：draw 执行期间 raf 恒为 0，若此时再排一帧就会和 draw 末尾那帧并行成两条链，
+    // 之后每自愈一次多一条，90Hz 桥调用叠加直接把 UI 线程拖死（真机表现：界面卡死但音频还在放）。
+    if (!raf && !inDraw) raf = requestAnimationFrame(draw);
   }
   function stop() { if (raf) { cancelAnimationFrame(raf); raf = 0; } }
   /* 暂停一段时间后彻底停算（频谱/声谱都停），播放恢复时秒回 */
@@ -701,12 +712,14 @@ const Spectrum = (() => {
      以前走 suspendForSwitch 会因 3s 重试超时把频谱永久卡死。 */
   function onSeek() {
     if (!open) return;
-    seekGuardUntil = performance.now() + 12000;
-    // 按"切歌"同款整链重置：停取数 + 停 rAF + 关原生 FFT + 清全部前端状态，
-    // 区别只有一点：恢复不看播放状态（ExoPlayer 定位长短不可控），固定 900ms 后无条件重建，
-    // 期间没有新帧就显示"定位中…/缓冲中…"，出帧自然继续画。
+    seekGuardUntil = performance.now() + 15000;
+    // 与切歌完全同款：停前端取数 + 停 rAF + 关原生 FFT。
+    // 恢复不用定时器盲猜，而是等 Player 轮询发现"真的在播"再回来 —— 定位期间
+    // 一次 JS 桥调用都不做，避免 90Hz 同步调用和 ExoPlayer 的定位重活抢 UI 线程（界面卡死的主因）。
     ++switchTok;
     suspended = true;
+    waitResume = true;
+    waitSince = performance.now();
     stopPcmPoll();
     stop();
     try { Api.playbackSpectrum(false); } catch (_) {}
@@ -725,19 +738,17 @@ const Spectrum = (() => {
     }
     setState('定位中…');
     paintSwitchHint('定位中…');
+    armWaitResume();
+  }
 
-    const tok = switchTok;
-    setTimeout(() => {
-      if (tok !== switchTok || !open) return;
-      suspended = false; stopped = false; pausedAt = 0;
-      paramsSig = '';
-      core = null;                      // 强制重建 core / 取数链，杜绝旧状态残留
-      ensureCore();
-      pushParams();
-      try { Api.playbackSpectrum(true); } catch (_) {}
-      start();
-      try { Utils.log('warn', 'seek 后频谱整链已重置'); } catch (_) {}
-    }, 900);
+  /* 兜底：万一播放状态轮询也断了，15s 后无条件恢复，避免永久停在"定位中…" */
+  function armWaitResume() {
+    if (resolveTimer) clearTimeout(resolveTimer);
+    resolveTimer = setTimeout(() => {
+      resolveTimer = 0;
+      if (!waitResume || !open) return;
+      resumeStream();
+    }, 15000);
   }
 
   function onVisible() {
@@ -1074,5 +1085,6 @@ const Spectrum = (() => {
   }
 
   return {init, toggle, setMode, onTrackChange, onSeek, resumeStream, onHidden, onVisible,
+          isWaitingResume: () => waitResume,
           get open() { return open; }, get mode() { return mode; }};
 })();
