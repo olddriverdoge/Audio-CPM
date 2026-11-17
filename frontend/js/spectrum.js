@@ -702,10 +702,19 @@ const Spectrum = (() => {
   function onSeek() {
     if (!open) return;
     seekGuardUntil = performance.now() + 12000;
+    // 按"切歌"同款整链重置：停取数 + 停 rAF + 关原生 FFT + 清全部前端状态，
+    // 区别只有一点：恢复不看播放状态（ExoPlayer 定位长短不可控），固定 900ms 后无条件重建，
+    // 期间没有新帧就显示"定位中…/缓冲中…"，出帧自然继续画。
+    ++switchTok;
+    suspended = true;
+    stopPcmPoll();
+    stop();
+    try { Api.playbackSpectrum(false); } catch (_) {}
     hist = []; peakVals = []; peakAt = [];
     wfRowKey = ''; wfImgKey = '';
     dataSeq = 0; wfSeq = -1;
     lastDataAt = performance.now();
+    lastHeal = 0; badFrames = 0;
     try { if (wfCtx) { wfCtx.fillStyle = '#000'; wfCtx.fillRect(0, 0, wfW, wfH); } } catch (_) {}
     if (core && core.native) {
       if (core.data) core.data.fill(0);
@@ -714,6 +723,21 @@ const Spectrum = (() => {
       if (core.linbars) core.linbars.fill(0);
       if (core.spec && core.spec.length) core.spec.fill(0);
     }
+    setState('定位中…');
+    paintSwitchHint('定位中…');
+
+    const tok = switchTok;
+    setTimeout(() => {
+      if (tok !== switchTok || !open) return;
+      suspended = false; stopped = false; pausedAt = 0;
+      paramsSig = '';
+      core = null;                      // 强制重建 core / 取数链，杜绝旧状态残留
+      ensureCore();
+      pushParams();
+      try { Api.playbackSpectrum(true); } catch (_) {}
+      start();
+      try { Utils.log('warn', 'seek 后频谱整链已重置'); } catch (_) {}
+    }, 900);
   }
 
   function onVisible() {

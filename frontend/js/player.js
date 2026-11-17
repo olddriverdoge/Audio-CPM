@@ -448,6 +448,8 @@ const Player = (() => {
       if (hifi) {
         // 只清前端历史（不停链）：切歌那套 suspend/resume 用在 seek 上会因重试超时把频谱卡死
         try { if (typeof Spectrum !== 'undefined') Spectrum.onSeek(); } catch (_) {}
+        // 播放状态轮询也停半秒再起，让 hifiPlaying 这个缓存值在 seek 完成后重新同步
+        try { stopHifiPoll(); setTimeout(() => { if (hifi) startHifiPoll(); }, 500); } catch (_) {}
         Api.playbackSeek(Math.round(t * 1000)).catch(() => {});
         hifiPos = t * 1000;
       }
