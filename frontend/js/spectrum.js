@@ -7,9 +7,14 @@ const Spectrum = (() => {
   const canvas = document.getElementById('sf-canvas');
   const stateEl = document.getElementById('sf-state');
   const minBtn = document.getElementById('sf-min');
+  const delayEl = document.getElementById('sf-delay');
+  const delayVal = document.getElementById('sf-delay-val');
   const resize = document.getElementById('sf-resize');
   const g = canvas ? canvas.getContext('2d') : null;
   let open = false, core = null, raf = 0;
+  /* 延迟显示：蓝牙耳机有 100~300ms 传输延迟，画面会超前声音。
+     这里缓存最近若干帧，按 delayMs 回放历史帧来对齐。 */
+  let hist = [], delayMs = 0;
   let mode = 'spectrum';                 // spectrum | spectrogram（内部值仍用 waterfall，兼容旧配置）
   const pos = {side: 'right', top: null};
 
@@ -67,6 +72,18 @@ const Spectrum = (() => {
       core.bars = bs;
     }
     if (r.sampleRate) core.sampleRate = r.sampleRate;
+    hist.push({t: performance.now(), data: d, bars: core.bars, levels: core.levels});
+    if (hist.length > 260) hist.shift();
+  }
+
+  /* 取 delayMs 之前的那一帧；历史不够就用最早一帧 */
+  function pickDelayed() {
+    if (!delayMs || !hist.length) return null;
+    const target = performance.now() - delayMs;
+    for (let i = hist.length - 1; i >= 0; i--) {
+      if (hist[i].t <= target) return hist[i];
+    }
+    return hist[0];
   }
   function startPcmPoll() {
     if (pcmTimer) return;
@@ -142,8 +159,10 @@ const Spectrum = (() => {
     g.font = '9px ui-monospace, Menlo, monospace';
     g.textAlign = 'right';
     g.textBaseline = 'middle';
-    [0, -20, -40, -60, -80].forEach(db => {
-      const y = y0 + gh * (-db / 100);
+    // dB 刻度必须和柱高映射一致：柱高 v=1 对应 -30dB、v=0 对应 -100dB，
+    // 否则会出现“柱子看着超过 0dB 轴”的错觉。
+    [-30, -50, -70, -90, -100].forEach(db => {
+      const y = y0 + gh * ((db + 30) / -70);
       g.beginPath();
       g.moveTo(x0, Math.round(y) + .5);
       g.lineTo(x0 + gw, Math.round(y) + .5);
@@ -151,11 +170,11 @@ const Spectrum = (() => {
       g.fillText(String(db), x0 - 3, y);
     });
     // 对数刻度：与频谱条的对数频段一一对应（40Hz~20kHz）
-    const marks = [50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000].filter(v => v <= topHz + 1);
+    const marks = [40, 100, 200, 500, 1000, 2000, 5000, 10000, 20000].filter(v => v <= topHz + 1);
     g.textAlign = 'center';
     g.textBaseline = 'top';
     marks.forEach(hz => {
-      const x = x0 + gw * (Math.log(hz / 40) / Math.log(20000 / 40));
+      const x = Math.min(x0 + gw - 2, x0 + gw * (Math.log(hz / 40) / Math.log(20000 / 40)));
       g.beginPath();
       g.moveTo(Math.round(x) + .5, y0);
       g.lineTo(Math.round(x) + .5, y0 + gh);
@@ -304,6 +323,9 @@ const Spectrum = (() => {
     if (!core.native) {
       if (core.ctx.state === 'suspended') core.ctx.resume().catch(() => {});
       core.analyser.getByteFrequencyData(core.data);
+    } else if (delayMs > 0) {
+      const f = pickDelayed();
+      if (f) { core.data = f.data; core.bars = f.bars; if (f.levels) core.levels = f.levels; }
     }
     if (mode === 'waterfall') {
       drawWaterfall(area);
@@ -334,6 +356,18 @@ const Spectrum = (() => {
     if (!raf) raf = requestAnimationFrame(draw);
   }
   function stop() { if (raf) { cancelAnimationFrame(raf); raf = 0; } }
+
+  function setDelay(ms, save) {
+    delayMs = Math.max(0, Math.min(500, Math.round(ms) || 0));
+    if (delayEl) delayEl.value = String(delayMs);
+    if (delayVal) delayVal.textContent = delayMs + 'ms';
+    if (save) Store.set(K.spectrumDelay, delayMs);
+  }
+  if (delayEl) {
+    setDelay(Store.get(K.spectrumDelay, 0) || 0, false);
+    delayEl.addEventListener('input', () => setDelay(Number(delayEl.value), false));
+    delayEl.addEventListener('change', () => setDelay(Number(delayEl.value), true));
+  }
 
   function applySize() {
     const s = Store.get(K.spectrumSize, null);
