@@ -251,6 +251,8 @@ function createBrowseView(cfg) {
     if (suppressClick) { suppressClick = false; e.preventDefault(); e.stopPropagation(); return; }
     const t = e.target;
     if (t.tagName === 'INPUT') return;
+    const ce = t.closest('.col-edit');
+    if (ce) { e.preventDefault(); if (cfg.columns && cfg.columns.open) cfg.columns.open(); return; }
     const actEl = t.closest('[data-act]');
     if (actEl) {
       const act = actEl.dataset.act;
@@ -319,20 +321,31 @@ function createBrowseView(cfg) {
       grip: !!grip || nearEdge, key: cell.dataset.colkey,
       sortKey: cell.dataset.sortkey || cell.dataset.colkey, cell: cell,
       x0: e.clientX, y0: e.clientY, w0: cell.offsetWidth || cfg.columns.width(cell.dataset.colkey) || 92,
-      moved: false, dragging: false, t0: Date.now()
+      moved: false, dragging: false, armed: false, t0: Date.now()
     };
     if (hState.grip) {
       const g = grip || cell.querySelector('.col-grip');
       if (g) g.classList.add('active');
+      // 拖宽立即锁触控滚动；其余场景先不锁，保证表头起手右滑能横向滚动看完整列
+      cell.classList.add('touch-none');
+      try { cell.setPointerCapture(e.pointerId); } catch (_) {}
+    } else {
+      // 按住 300ms 不动 → 进入拖拽换列模式，再锁触控
+      hState.armTimer = setTimeout(() => {
+        if (!hState || hState.cell !== cell || hState.moved) return;
+        hState.armed = true;
+        cell.classList.add('touch-none');
+        try { cell.setPointerCapture(e.pointerId); } catch (_) {}
+      }, 300);
     }
-    try { cell.setPointerCapture(e.pointerId); } catch (_) {}
-    if (e.cancelable) e.preventDefault();
+    if (hState.grip && e.cancelable) e.preventDefault();
     if (e.stopPropagation) e.stopPropagation();
   });
   el.addEventListener('pointermove', e => {
     if (!hState) return;
     const dx = e.clientX - hState.x0, dy = e.clientY - hState.y0;
     if (!hState.moved && Math.abs(dx) + Math.abs(dy) > 6) hState.moved = true;
+    if (!hState.grip && !hState.armed) return;   // 未进入拖拽模式：交给浏览器横向滚动
     if (hState.grip) {
       const w = Math.max(44, Math.min(320, Math.round(hState.w0 + dx)));
       cfg.columns.setWidth(hState.key, w);
@@ -355,7 +368,9 @@ function createBrowseView(cfg) {
     if (!hState) return;
     const stt = hState;
     hState = null;
+    if (stt.armTimer) clearTimeout(stt.armTimer);
     el.querySelectorAll('.col-grip.active').forEach(n => n.classList.remove('active'));
+    if (stt.cell) stt.cell.classList.remove('touch-none');
     if (stt.grip) {
       cfg.columns.save();
       cfg.columns.refresh();
@@ -390,65 +405,32 @@ function createBrowseView(cfg) {
     try { if (navigator.vibrate) navigator.vibrate(20); } catch (_) {}
   }
 
-  /* ---- 行内长按菜单：删除（弹窗确认）/ 多选 ---- */
-  const rowMenu = document.getElementById('ctx-menu');
-  const rowOverlay = document.getElementById('menu-overlay');
-  const menuOwner = 'bv' + Math.random().toString(36).slice(2, 8);   // 两个列表共用同一个菜单节点，只让发起方处理
-  function hideRowMenu() {
-    if (rowOverlay) rowOverlay.classList.add('hidden');
-    if (rowMenu) rowMenu.innerHTML = '';
-  }
-  function showRowMenu(path, isDir, x, y) {
-    if (!rowMenu || !rowOverlay) return;
-    rowMenu.dataset.owner = menuOwner;
-    rowMenu.dataset.rowpath = path;
-    rowMenu.dataset.rowkind = isDir ? 'dir' : 'file';
-    rowMenu.innerHTML =
-      '<div class="ctx-item" data-cmd="row-select">多选</div>' +
-      '<div class="ctx-item danger" data-cmd="row-delete">删除' + (isDir ? '文件夹' : '文件') + '</div>';
-    rowMenu.style.left = Math.min(x, window.innerWidth - 190) + 'px';
-    rowMenu.style.top = Math.min(y, window.innerHeight - 120) + 'px';
-    rowOverlay.classList.remove('hidden');
-  }
-  async function deletePath(path, isDir) {
-    const name = Utils.basename(path);
-    const msg = isDir
-      ? '删除文件夹「' + name + '」？\n文件夹里的所有内容会一起删除，且无法恢复。'
-      : '删除文件「' + name + '」？\n此操作无法恢复。';
+  /* ---- 批量删除：由工具栏「删除」按钮触发（全选/清空旁），保留确认逻辑 ---- */
+  async function deleteSelected() {
+    const paths = Array.from(st.sel);
+    if (!paths.length) { Utils.toast('没有选中的文件', 'warn'); return; }
+    const dirCount = paths.filter(p => st.dirs.some(d => d.path === p)).length;
+    const msg = dirCount > 0
+      ? '删除选中的 ' + paths.length + ' 项（含 ' + dirCount + ' 个文件夹）？\n文件夹内容会一并删除，且无法恢复。'
+      : '删除选中的 ' + paths.length + ' 个文件？\n此操作无法恢复。';
     if (!confirm(msg)) return;
     try {
-      const r = await Api.remove([path]);
-      const one = (r.results || [])[0] || {};
-      if (one.status !== 'ok') {
-        Utils.toast('删除失败: ' + (one.reason || '未知错误'), 'err');
-        Utils.log('err', '删除失败: ' + name + ' ' + (one.reason || ''));
-        return;
+      const r = await Api.remove(paths);
+      let ok = 0, bad = 0;
+      for (const one of (r.results || [])) {
+        if (one.status === 'ok') { ok++; st.sel.delete(one.src || one.path || ''); }
+        else { bad++; Utils.log('err', '删除失败: ' + Utils.basename(one.src || one.path || '') + ' ' + (one.reason || '')); }
       }
-      st.sel.delete(path);
-      try { if (typeof Player !== 'undefined' && Player.current === path) Player.close(); } catch (_) {}
-      Utils.log('ok', '已删除: ' + path);
-      Utils.toast('已删除: ' + name);
-      if (cfg.onReload) cfg.onReload(); else render();
+      for (const p of paths) {
+        try { if (typeof Player !== 'undefined' && Player.current === p) Player.close(); } catch (_) {}
+      }
+      Utils.log(bad ? 'warn' : 'ok', '删除完成: 成功 ' + ok + ' / 失败 ' + bad);
+      Utils.toast(bad ? ('删除完成，' + bad + ' 项失败') : ('已删除 ' + ok + ' 项'));
+      if (cfg.onReload) await cfg.onReload(); else render();
     } catch (e) {
       Utils.toast('删除失败: ' + e.message, 'err');
     }
   }
-  if (rowOverlay) rowOverlay.addEventListener('click', e => {
-    if (e.target === rowOverlay) hideRowMenu();
-  });
-  if (rowMenu) rowMenu.addEventListener('click', async e => {
-    if (rowMenu.dataset.owner !== menuOwner) return;
-    const item = e.target.closest('[data-cmd]');
-    if (!item) return;
-    const cmd = item.dataset.cmd;
-    if (cmd !== 'row-select' && cmd !== 'row-delete') return;   // 其余菜单项归 TreeView
-    const path = rowMenu.dataset.rowpath;
-    const isDir = rowMenu.dataset.rowkind === 'dir';
-    hideRowMenu();
-    if (!path) return;
-    if (cmd === 'row-select') enterSelMode(path);
-    else await deletePath(path, isDir);
-  });
   el.addEventListener('pointerdown', e => {
     const row = e.target.closest('.item.file, .tile, .item.dir[data-dir-path]');
     if (!row) return;
@@ -465,7 +447,7 @@ function createBrowseView(cfg) {
       suppressClick = true;
       setTimeout(() => { suppressClick = false; }, 700);
       try { if (navigator.vibrate) navigator.vibrate(20); } catch (_) {}
-      showRowMenu(pressPath, pressIsDir, pressPt.x, pressPt.y);
+      enterSelMode(pressPath);
     }, 500);
   });
   el.addEventListener('pointermove', e => {
@@ -515,6 +497,7 @@ function createBrowseView(cfg) {
     selected() { return Array.from(st.sel); },
     count() { return st.sel.size; },
     clearSelection() { st.sel.clear(); st.selMode = false; render(); },
+    deleteSelected,
     setSelMode(v) { st.selMode = !!v; render(); },
     // 播放只触发重绘（补波形），绝不改动选择
     onExternalPlayed(path) {

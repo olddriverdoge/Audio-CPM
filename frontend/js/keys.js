@@ -18,6 +18,7 @@ const K = {
   playMode:'ac2_play_mode',
   s2ViewMode:'ac2_s2_view_mode', moveCollapsed:'ac2_movebar_collapsed',
   metaCollapsed:'ac2_meta_collapsed', meta1Collapsed:'ac2_meta1_collapsed', columns:'ac2_columns',
+  columns2:'ac2_columns_s2',
   treeRoots:'ac2_tree_roots', treeActive:'ac2_tree_active',
   treeCollapsed:'ac2_tree_collapsed',
   autoplay:'ac2_autoplay', spectrumSize:'ac2_spectrum_size', spectrumMode:'ac2_spectrum_mode',
@@ -25,5 +26,6 @@ const K = {
   spectrumDb:'ac2_spectrum_db', spectrumRel:'ac2_spectrum_rel', spectrumPeak:'ac2_spectrum_peak',
   spectrumBars:'ac2_spectrum_bars', spectrumStop:'ac2_spectrum_stop',
   wfBright:'ac2_wf_bright', wfTop:'ac2_wf_top', wfGrid:'ac2_wf_grid', wfPal:'ac2_wf_pal',
-  wfBands:'ac2_wf_bands', wfY:'ac2_wf_y'
+  wfBands:'ac2_wf_bands', wfY:'ac2_wf_y',
+  metaPos:'ac2_meta_pos', metaSize:'ac2_meta_size'
 };

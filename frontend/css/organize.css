@@ -1,47 +1,6 @@
   /* ---------- 模块 2 ---------- */
   .m2-row{flex:1 1 auto;display:flex;flex-direction:row;min-height:0}
   /* 左栏只负责“露出/遮挡”，内容宽度固定；拖动分隔条不触发内部重排 */
-  .m2-left{flex:0 0 30%;display:flex;flex-direction:column;min-width:110px;min-height:0;
-    overflow-x:auto;overflow-y:hidden;border-right:1px solid var(--border);
-    padding-right:6px;-webkit-overflow-scrolling:touch}
-  .m2-right{flex:1 1 auto;display:flex;flex-direction:column;min-width:0;min-height:0;
-    padding-left:6px}
-  .m2-src{flex:0 0 45%;display:flex;flex-direction:column;min-height:0}
-  .m2-tree{flex:1 1 auto;display:flex;flex-direction:column;min-height:0}
-  /* 目标目录默认收起：只留一行标题，点开才显示标签/路径/树 */
-  .tree-head{flex:0 0 auto;display:flex;align-items:center;gap:6px;font-size:11px;
-    color:var(--muted);padding:3px 6px;border:1px solid var(--border);border-radius:6px;
-    background:var(--panel2);cursor:pointer;user-select:none;min-width:0}
-  .tree-head:hover{border-color:var(--accent)}
-  .tree-head .pb-caret{flex:none;font-size:10px;opacity:.7}
-  .tree-head .pb-cur{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
-    white-space:nowrap;font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--accent)}
-  .tree-body{display:flex;flex-direction:column;min-height:0;flex:1 1 auto}
-  .m2-tree.collapsed{flex:0 0 auto}
-  .m2-tree.collapsed .tree-body{display:none}
-  .m2-right.tree-collapsed .m2-src{flex:1 1 auto !important}  /* 覆盖 Layout 写的 inline flex */
-  .m2-right.tree-collapsed #split3{display:none}
-  .pane-head{flex:0 0 auto;font-size:11px;color:var(--muted);text-transform:uppercase;
-    letter-spacing:.5px;font-weight:600;margin:1px 0 4px}
-  #m2-left .pane-head{width:var(--meta-w);min-width:var(--meta-w)}
-  #meta2{flex:1 1 auto;min-height:0;width:var(--meta-w);min-width:var(--meta-w);
-    max-width:var(--meta-w);overflow:auto;-webkit-overflow-scrolling:touch}
-  /* 元数据默认贴边收起：左侧留一条可点的竖排标签（38px，方便拇指点） */
-  .meta-head{cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px;
-    font-size:12px;padding:3px 0}
-  .meta-head .chev{display:inline-flex;align-items:center;justify-content:center;
-    width:24px;height:24px;font-size:12px;border:1px solid var(--border);border-radius:6px;
-    background:var(--panel2);opacity:.95;flex:none}
-  .meta-head:hover .chev{border-color:var(--accent);color:var(--accent)}
-  .m2-left.collapsed{flex:0 0 38px !important;min-width:38px !important;padding:0;
-    overflow:hidden;align-items:center;cursor:pointer;background:var(--panel2)}
-  .m2-left.collapsed #meta2{display:none}
-  .m2-left.collapsed .meta-head{width:auto !important;min-width:0 !important;
-    writing-mode:vertical-rl;text-orientation:mixed;letter-spacing:3px;margin:10px 0;
-    white-space:nowrap;display:block;text-align:center;font-size:12px}
-  .m2-left.collapsed .meta-head .chev{display:none}
-  .m2-left.collapsed:hover{background:var(--hl)}
-  .m2-row.meta-collapsed #split2{display:none}
   #view2{flex:1 1 auto;min-height:60px}
   .tree{flex:1 1 auto;min-height:80px;overflow:auto;border:1px solid var(--border);
     border-radius:6px;background:var(--panel2);padding:4px;

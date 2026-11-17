@@ -107,6 +107,29 @@
     cursor:nwse-resize;touch-action:none;
     background:linear-gradient(135deg,transparent 50%,rgba(148,163,184,.55) 50%)}
 
+  /* 元数据浮窗：与频谱浮窗同交互，独立入口 */
+  .meta-fab{bottom:132px}
+  body.has-player .meta-fab{bottom:176px}
+  .meta-float{position:fixed;right:10px;bottom:132px;z-index:331;width:320px;height:400px;
+    min-width:230px;min-height:160px;max-width:94vw;max-height:80vh;
+    display:flex;flex-direction:column;background:rgba(13,18,24,.97);
+    border:1px solid var(--border);border-radius:8px;
+    box-shadow:0 8px 28px rgba(0,0,0,.6);overflow:hidden}
+  body.has-player .meta-float{bottom:176px}
+  .meta-float.hidden{display:none}
+  .mf-head{display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:11px;
+    color:var(--muted);border-bottom:1px solid var(--border);flex:0 0 auto;
+    cursor:move;touch-action:none;user-select:none;-webkit-user-select:none}
+  .mf-title{font-weight:600;color:var(--accent);flex:none}
+  .mf-track{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-size:10.5px;color:var(--text)}
+  .mf-body{flex:1 1 auto;min-height:0;overflow:auto;padding:8px;background:#0a0e13;
+    -webkit-overflow-scrolling:touch}
+  .mf-body .detail-panel{border:none;background:none;padding:0;height:auto;overflow:visible}
+  .mf-resize{position:absolute;right:0;bottom:0;width:24px;height:24px;z-index:2;
+    cursor:nwse-resize;touch-action:none;
+    background:linear-gradient(135deg,transparent 50%,rgba(148,163,184,.55) 50%)}
+
   /* 频谱浮窗：模式切换 tab */
   .sf-tabs{display:flex;gap:2px;flex:none}
   .sf-tab{border:1px solid transparent;background:none;color:var(--muted);font-size:11px;

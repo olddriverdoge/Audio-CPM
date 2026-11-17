@@ -38,6 +38,7 @@ async def api_capabilities(request: Request):
     caps['encoders'] = encoders
     caps['hifi'] = native_bridge.playback_available()
     caps['notification'] = native_bridge.playback_available()
+    caps['android'] = ffbin.is_android()
     return J(caps)
 
 

@@ -148,8 +148,9 @@
   .item.file .icon .row-thumb{width:32px;height:32px;object-fit:cover;display:block}
   .item.file.playing .name{opacity:.55}
   /* 表头：排序箭头 / 拖宽手柄 / 拖动换序 */
-  .item.head .hcell{position:relative;cursor:pointer;user-select:none;touch-action:none;overflow:visible;
+  .item.head .hcell{position:relative;cursor:pointer;user-select:none;touch-action:auto;overflow:visible;
     text-align:left}
+  .item.head .hcell.touch-none{touch-action:none!important}
   .item.head .hcell .sarrow{font-style:normal;font-size:9px;color:var(--accent);margin-left:2px}
   /* 拖拽改列宽：热区 26px，向两侧各溢出 10px，触屏也好按 */
   .item.head .hcell .col-grip{position:absolute;right:-6px;top:0;bottom:0;width:22px;

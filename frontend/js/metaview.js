@@ -193,3 +193,127 @@ function createMetaView(container, opts) {
 
   return {load, setEmpty, get path() { return curPath; }};
 }
+
+/* ---------------- MetaFloat：元数据独立浮窗（与频谱浮窗同交互：拖动/缩放/记忆） ---------------- */
+function createMetaFloat() {
+  const box = document.getElementById('meta-float');
+  const fab = document.getElementById('meta-fab');
+  const head = document.getElementById('mf-head');
+  const trackEl = document.getElementById('mf-track');
+  const minBtn = document.getElementById('mf-min');
+  const resize = document.getElementById('mf-resize');
+  const view = createMetaView(document.getElementById('meta3'), {editable: true});
+  if (!box || !fab) return {load: () => {}, setEmpty: () => {}};
+  let open = false;
+
+  function clampX(x) {
+    const w = box.offsetWidth || 320;
+    return Math.max(4, Math.min(window.innerWidth - w - 4, x));
+  }
+  function clampY(y) {
+    const h = box.offsetHeight || 360;
+    return Math.max(4, Math.min(window.innerHeight - h - 4, y));
+  }
+  function applyPos() {
+    const saved = Store.get(K.metaPos, null);
+    if (saved && Number.isFinite(Number(saved.x)) && Number.isFinite(Number(saved.y))) {
+      box.style.left = clampX(Number(saved.x)) + 'px';
+      box.style.top = clampY(Number(saved.y)) + 'px';
+      box.style.right = 'auto';
+      box.style.bottom = 'auto';
+      return;
+    }
+    // 默认：右贴边，频谱浮窗上方
+    box.style.left = 'auto';
+    box.style.right = '10px';
+    box.style.top = 'auto';
+    box.style.bottom = '132px';
+  }
+  function applySize() {
+    const saved = Store.get(K.metaSize, null);
+    if (saved && Number(saved.w) >= 200 && Number(saved.h) >= 140) {
+      box.style.width = Math.min(window.innerWidth - 8, Number(saved.w)) + 'px';
+      box.style.height = Math.min(window.innerHeight - 8, Number(saved.h)) + 'px';
+    } else {
+      box.style.width = '320px';
+      box.style.height = '400px';
+    }
+  }
+  function savePos() {
+    const r = box.getBoundingClientRect();
+    Store.set(K.metaPos, {x: Math.round(r.left), y: Math.round(r.top)});
+  }
+
+  function toggle() {
+    open = !open;
+    if (open) {
+      applySize(); applyPos();
+      box.classList.remove('hidden');
+    } else {
+      box.classList.add('hidden');
+    }
+    if (fab) fab.classList.toggle('on', open);
+  }
+  if (fab) fab.addEventListener('click', toggle);
+  if (minBtn) minBtn.addEventListener('click', () => { if (open) toggle(); });
+
+  /* 拖动（头部） */
+  if (head) {
+    let st = null;
+    head.addEventListener('pointerdown', e => {
+      st = {x0: e.clientX, y0: e.clientY, l: box.offsetLeft, t: box.offsetTop};
+      try { head.setPointerCapture(e.pointerId); } catch (_) {}
+      if (e.cancelable) e.preventDefault();
+    });
+    head.addEventListener('pointermove', e => {
+      if (!st) return;
+      box.style.right = 'auto'; box.style.bottom = 'auto';
+      box.style.left = clampX(st.l + (e.clientX - st.x0)) + 'px';
+      box.style.top = clampY(st.t + (e.clientY - st.y0)) + 'px';
+      if (e.cancelable) e.preventDefault();
+    });
+    ['pointerup', 'pointercancel'].forEach(t => head.addEventListener(t, () => {
+      if (!st) return;
+      st = null;
+      savePos();
+    }));
+  }
+  /* 缩放（右下角） */
+  if (resize) {
+    let rs = null;
+    resize.addEventListener('pointerdown', e => {
+      rs = {x0: e.clientX, y0: e.clientY, w: box.offsetWidth, h: box.offsetHeight};
+      try { resize.setPointerCapture(e.pointerId); } catch (_) {}
+      if (e.cancelable) e.preventDefault();
+    });
+    resize.addEventListener('pointermove', e => {
+      if (!rs) return;
+      const w = Math.max(230, Math.min(window.innerWidth - 8, rs.w + (e.clientX - rs.x0)));
+      const h = Math.max(160, Math.min(window.innerHeight - 8, rs.h + (e.clientY - rs.y0)));
+      box.style.width = w + 'px';
+      box.style.height = h + 'px';
+      if (e.cancelable) e.preventDefault();
+    });
+    ['pointerup', 'pointercancel'].forEach(t => resize.addEventListener(t, () => {
+      if (!rs) return;
+      rs = null;
+      Store.set(K.metaSize, {w: box.offsetWidth, h: box.offsetHeight});
+    }));
+  }
+  window.addEventListener('resize', () => {
+    if (!open) return;
+    const r = box.getBoundingClientRect();
+    box.style.left = clampX(r.left) + 'px';
+    box.style.top = clampY(r.top) + 'px';
+  });
+
+  function load(path) {
+    if (trackEl) trackEl.textContent = path ? Utils.basename(path) : '点击文件查看详情';
+    if (trackEl) trackEl.title = path || '';
+    return view.load(path);
+  }
+  function setEmpty(msg) { view.setEmpty(msg); if (trackEl) trackEl.textContent = '点击文件查看详情'; }
+  return {toggle, load, setEmpty,
+          get open() { return open; },
+          get path() { return view.path; }};
+}

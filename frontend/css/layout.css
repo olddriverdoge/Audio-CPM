@@ -29,16 +29,3 @@
   .page-process{flex-direction:row;overflow:hidden}
   .p1-main{flex:1 1 auto;display:flex;flex-direction:column;min-width:0;min-height:0;
     overflow-y:auto;overflow-x:hidden}
-  .p1-side{flex:0 0 30%;max-width:340px;min-width:130px;display:flex;flex-direction:column;
-    min-height:0;padding-left:6px;border-left:1px solid var(--border);overflow:hidden}
-  .p1-side #meta1{flex:1 1 auto;min-height:0;width:100%;overflow:auto;
-    -webkit-overflow-scrolling:touch}
-  /* 收起：只留一条竖排标签贴边 */
-  .p1-side.collapsed{flex:0 0 34px;min-width:34px;padding:0;align-items:center;
-    cursor:pointer;background:var(--panel2)}
-  .p1-side.collapsed #meta1{display:none}
-  .p1-side.collapsed .meta-head{writing-mode:vertical-rl;text-orientation:mixed;
-    letter-spacing:3px;margin:10px 0;white-space:nowrap;display:block;text-align:center;
-    font-size:12px;width:auto!important;min-width:0!important}
-  .p1-side.collapsed .meta-head .chev{display:none}
-  .p1-side.collapsed:hover{background:var(--hl)}

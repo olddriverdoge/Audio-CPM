@@ -20,6 +20,8 @@ const Settings = (() => {
   function open() {
     const cs = document.getElementById('cols-sheet');
     if (cs) cs.classList.add('hidden');
+    const ps = document.getElementById('player-sheet');
+    if (ps) ps.classList.remove('hidden');   // 列编辑打开过后播放设置页可能还挂在 hidden 上，不显式还原就只剩灰屏
     document.getElementById('cfg-playmode').value = playMode();
     document.getElementById('cfg-player').value = playerPkg();
     document.getElementById('cfg-activity').value = playerActivity();

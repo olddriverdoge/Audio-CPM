@@ -1,6 +1,6 @@
 /* ---------------- App ---------------- */
 const App = (() => {
-  let bv1 = null, bv2 = null, meta1 = null, meta2 = null, tree = null;
+  let bv1 = null, bv2 = null, metaFloat = null, tree = null;
   let currentPath = '';
   let currentParent = '';
   let srcPath = '';
@@ -116,18 +116,6 @@ const App = (() => {
     bindCrumbEdit(box);
   }
 
-  function renderDirCover(url) {
-    const img = document.getElementById('dir-cover');
-    if (!img) return;
-    if (url) {
-      img.src = url;
-      img.classList.remove('hidden');
-      img.onerror = () => img.classList.add('hidden');
-    } else {
-      img.classList.add('hidden');
-      img.removeAttribute('src');
-    }
-  }
   function pushRecent(p) {
     try {
       let arr = Store.get(K.recent, []);
@@ -161,7 +149,6 @@ const App = (() => {
         Store.set(K.s2LastPath, d.path);
         renderCrumbs('pb2-crumbs', d.path, p => loadDir('src', p));
         bv2.setData(d);
-        meta2.setEmpty('点击右侧文件名查看详情');
         if (!opts || opts.clearUndo !== false) MoveMgr.clearUndo();
         updateSelInfo2();
       } else {
@@ -171,7 +158,6 @@ const App = (() => {
         renderCrumbs('pb1-crumbs', d.path, p => loadDir('main', p));
         pushRecent(d.path);
         bv1.setData(d);
-        renderDirCover(d.cover);
         updateSelInfo();
         if (typeof Sources !== 'undefined') Sources.rememberPath(d.path);
       }
@@ -296,9 +282,8 @@ const App = (() => {
     // 播放（含点击/自动播放）不改动选择；选择只由长按进入选择模式后发生
     if (bv1) bv1.onExternalPlayed(path);
     if (bv2) bv2.onExternalPlayed(path);
-    // 播放联动：两个页面的元数据面板都跟当前列表联动
-    if (meta1 && bv1 && bv1.files.some(f => f.path === path)) meta1.load(path);
-    if (meta2 && bv2 && bv2.files.some(f => f.path === path)) meta2.load(path);
+    // 播放联动：全局元数据浮窗跟随当前播放/点击
+    if (metaFloat) metaFloat.load(path);
     updateSelInfo();
     updateSelInfo2();
   }
@@ -351,6 +336,8 @@ const App = (() => {
     let caps = null;
     try { caps = await Api.caps(); } catch (_) { return; }
     window.AUDIOCPM_CAPS = caps;
+    // app 壳内隐藏顶部 logo（仅 web 版保留品牌头）
+    try { document.body.classList.toggle('app-mode', !!caps.android); } catch (_) {}
     const sel = document.getElementById('fmt-select');
     if (!sel) return;
     const allowed = new Set(caps.formats || []);
@@ -418,7 +405,9 @@ const App = (() => {
     }
     Layout.init();
     Settings.init();
-    Columns.init();
+    Columns.bindSheet();
+    const columns1 = Columns.create(K.columns);
+    const columns2 = Columns.create(K.columns2);
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') Settings.close();
     });
@@ -512,7 +501,7 @@ const App = (() => {
       folderOrder: 'first',
       onOpenDir: p => browse(p),
       onReload: () => browse(currentPath),
-      columns: Columns,
+      columns: columns1,
       clickPlays: true,
       selectDirs: true,
       onRowClick: (path, e, rowEl) => playRowClick(path, e, rowEl),
@@ -527,7 +516,7 @@ const App = (() => {
       folderOrder: 'first',
       onOpenDir: p => srcBrowse(p),
       onReload: () => srcBrowse(srcPath),
-      columns: Columns,
+      columns: columns2,
       clickPlays: true,
       selectDirs: true,
       onRowClick: (path, e, rowEl) => playRowClick(path, e, rowEl),
@@ -535,30 +524,10 @@ const App = (() => {
       onSelectionChange: updateSelInfo2,
       onRender: () => Player.paintRows()
     });
-    /* 元数据 / 频谱：同一模块在两个页面各挂一份实例，位置由 HTML 决定 */
-    meta1 = createMetaView(document.getElementById('meta1'), {editable: true});
-    meta2 = createMetaView(document.getElementById('meta2'), {editable: true});
-    // 实时频谱是全局悬浮模块（贴边按钮 + 可调大小浮窗），两页共用
+    /* 元数据 = 全局独立浮窗（两页共用，可拖动/缩放），频谱同样是全局浮窗 */
+    if (typeof createMetaFloat === 'function') metaFloat = createMetaFloat();
     if (typeof Spectrum !== 'undefined') Spectrum.init();
 
-    /* 处理页右侧栏（元数据 + 频谱）：默认收起贴边，点击展开 */
-    const p1side = document.getElementById('p1-side');
-    const meta1Head = document.getElementById('meta1-head');
-    let p1Collapsed = Store.get(K.meta1Collapsed, true) !== false;
-    function applyP1Side() {
-      if (!p1side) return;
-      p1side.classList.toggle('collapsed', p1Collapsed);
-      const chev = document.getElementById('meta1-chev');
-      if (chev) chev.textContent = p1Collapsed ? '▸' : '◂';
-    }
-    if (meta1Head) {
-      meta1Head.addEventListener('click', () => {
-        p1Collapsed = !p1Collapsed;
-        Store.set(K.meta1Collapsed, p1Collapsed);
-        applyP1Side();
-      });
-    }
-    applyP1Side();
     tree = createTreeView({
       container: document.getElementById('tree'),
       onSelect: () => MoveMgr.update(),
@@ -575,17 +544,13 @@ const App = (() => {
       }
     });
 
-    /* 模块 1 路径：面包屑点段跳转，长按编辑（逻辑在 renderCrumbs 内） */
-    document.getElementById('dir-cover').onclick = function() {
-      if (this.src) Utils.openModal(this.src);
-    };
-
     /* 模块 1 搜索 / 选择（排序改到表头） */
     document.getElementById('search-input').addEventListener('input', Utils.debounce(e => {
       bv1.setSearch(e.target.value);
     }, 140));
     document.getElementById('btn-selall').onclick = () => bv1.selectAllVisible(true);
     document.getElementById('btn-selclear').onclick = () => bv1.clearSelection();
+    document.getElementById('btn-del').onclick = () => bv1.deleteSelected();
 
     /* 任务 + 预设 */
     document.querySelectorAll('input[name="task"]').forEach(r => {
@@ -612,6 +577,7 @@ const App = (() => {
     }, 140));
     document.getElementById('s2-selall').onclick = () => bv2.selectAllVisible(true);
     document.getElementById('s2-clear').onclick = () => bv2.clearSelection();
+    document.getElementById('s2-del').onclick = () => bv2.deleteSelected();
 
     /* 目录树：路径走面包屑，刷新按钮单独绑定 */
     /* 目标目录多标签：点切换、＋新增、长按移除 */
@@ -716,7 +682,7 @@ const App = (() => {
     const startBtn = document.getElementById('start-btn');
     if (startBtn) {
       startBtn.disabled = dav;
-      startBtn.title = dav ? '转码/检查/标签整理只支持本地文件，请先把数据源切回本机' : '';
+      startBtn.title = dav ? '转码/重命名/封面只支持本地文件，请先把数据源切回本机' : '';
     }
     const ext = document.getElementById('pb-ext');
     if (ext) ext.style.display = dav ? 'none' : '';

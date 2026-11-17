@@ -13,7 +13,8 @@ const TaskRunner = (() => {
     document.getElementById('ui-convert').classList.toggle('hidden', t !== 'convert');
     document.getElementById('ui-tags').classList.toggle('hidden', t !== 'tags');
     document.getElementById('ui-cover').classList.toggle('hidden', t !== 'cover');
-    document.getElementById('ui-check').classList.toggle('hidden', t !== 'check');
+    const prow = document.getElementById('preset-row');
+    if (prow) prow.classList.toggle('hidden', t !== 'convert');
   }
 
   async function loadPresets() {
@@ -45,8 +46,6 @@ const TaskRunner = (() => {
       if (p.name_pattern !== undefined) document.getElementById('name-pattern').value = p.name_pattern;
     } else if (p.task === 'cover') {
       if (p.format) document.getElementById('cover-format').value = p.format;
-    } else if (p.task === 'check') {
-      if (p.format) document.getElementById('check-format').value = p.format;
     }
   }
   function collectConfig() {
@@ -63,8 +62,6 @@ const TaskRunner = (() => {
       cfg.name_pattern = document.getElementById('name-pattern').value;
     } else if (task === 'cover') {
       cfg.format = document.getElementById('cover-format').value;
-    } else if (task === 'check') {
-      cfg.format = document.getElementById('check-format').value;
     }
     const sel = App.selection();
     if (sel.length) cfg.only_files = sel;
@@ -193,7 +190,7 @@ const TaskRunner = (() => {
           bar.style.width = Math.min(99, overall).toFixed(1) + '%';
         }
         document.getElementById('progress-status').textContent =
-          '转换 ' + ev.index + '/' + totalFiles + ' · ' + bname(ev.file) + ' · ' + ev.percent + '%';
+          '处理 ' + ev.index + '/' + totalFiles + ' · ' + bname(ev.file) + ' · ' + ev.percent + '%';
         break;
       case 'file_done':
         doneFiles = ev.index;

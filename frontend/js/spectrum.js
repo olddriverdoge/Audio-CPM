@@ -491,7 +491,7 @@ const Spectrum = (() => {
           g.fillRect(Math.round(x + 1), Math.round(py), Math.max(1, Math.round(bw - 2)), 1);
         }
       }
-      setState('实时');
+      setState('');
     }
   }
 
@@ -566,7 +566,7 @@ const Spectrum = (() => {
     {k: 'bands2', key: K.wfBands, opts: [128, 256, 512],
      label: v => '分辨率 ' + v},
     {k: 'y', key: K.wfY, opts: ['cur', 'lin', 'log'],
-     label: v => ({cur: 'Y 轴 现效', lin: 'Y 轴 线性', log: 'Y 轴 对数'})[v]},
+     label: v => ({cur: 'Y 轴 默认', lin: 'Y 轴 线性', log: 'Y 轴 对数'})[v]},
     {k: 'grid', key: K.wfGrid, opts: [1, 0],
      label: v => v ? '时间网格 开' : '时间网格 关'},
     {k: 'pal', key: K.wfPal, opts: ['audition', 'inferno', 'flame', 'gray'],
