@@ -12,6 +12,7 @@ import android.provider.Settings;
 import android.util.Log;
 
 import androidx.media3.common.MediaItem;
+import androidx.media3.common.Player;
 import androidx.media3.exoplayer.ExoPlayer;
 
 import java.io.File;
@@ -164,6 +165,36 @@ public class AudioCpmBridge {
         return simpleVoid(() -> {
             ExoPlayer p = PlaybackService.getPlayer();
             if (p != null) p.seekTo(ms);
+        });
+    }
+
+    /** 音量（0~1）：网页播放条与播放管理面板共用；HiFi 走 ExoPlayer.setVolume */
+    public static String setVolume(final double v) {
+        final float f = (float) Math.max(0, Math.min(1, v));
+        return simpleVoid(() -> {
+            ExoPlayer p = PlaybackService.getPlayer();
+            if (p != null) p.setVolume(f);
+        });
+    }
+
+    /** 播放模式：repeat 0=off 1=all 2=one；shuffle 随机。对应 ExoPlayer 原生，通知栏/后台同样生效 */
+    public static String setMode(final int repeat, final boolean shuffle) {
+        final int mode = (repeat == 2) ? Player.REPEAT_MODE_ONE
+                : (repeat == 1 ? Player.REPEAT_MODE_ALL : Player.REPEAT_MODE_OFF);
+        return simpleVoid(() -> {
+            ExoPlayer p = PlaybackService.getPlayer();
+            if (p == null) return;
+            p.setRepeatMode(mode);
+            p.setShuffleModeEnabled(shuffle);
+        });
+    }
+
+    /** 上一首 / 下一首（走队列，兼容随机顺序） */
+    public static String skip(final int dir) {
+        return simpleVoid(() -> {
+            ExoPlayer p = PlaybackService.getPlayer();
+            if (p == null) return;
+            if (dir > 0) p.seekToNextMediaItem(); else p.seekToPreviousMediaItem();
         });
     }
 

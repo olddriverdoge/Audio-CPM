@@ -69,6 +69,9 @@ const Sources = (() => {
     if (saved && list.some(r => r.id === saved)) sel.value = saved;
     else if (list[0]) sel.value = list[0].id;
     current = sel.value;
+    /* 存储切换：只有配置过 WebDAV 源才显示，纯本地源时默认隐藏 */
+    const hasDav = list.some(r => r.kind === 'dav');
+    sel.style.display = hasDav ? '' : 'none';
   }
 
   function renderList() {

@@ -137,5 +137,8 @@ routes = [
     Route('/api/playback/state', playback_state, methods=['GET']),
     Route('/api/playback/spectrum', playback_spectrum, methods=['GET']),
     Route('/api/playback/queue', playback_queue, methods=['POST']),
+    Route('/api/playback/volume', playback_volume, methods=['POST']),
+    Route('/api/playback/mode', playback_mode, methods=['POST']),
+    Route('/api/playback/skip', playback_skip, methods=['POST']),
     Route('/api/playback/diag', playback_diag, methods=['GET']),
 ]

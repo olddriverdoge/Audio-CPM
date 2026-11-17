@@ -58,6 +58,9 @@ const Api = (() => {
     playbackPause: () => jpost('/api/playback/pause', {}),
     playbackResume: () => jpost('/api/playback/resume', {}),
     playbackStop: () => jpost('/api/playback/stop', {}),
-    playbackSeek: ms => jpost('/api/playback/seek', {positionMs: ms})
+    playbackSeek: ms => jpost('/api/playback/seek', {positionMs: ms}),
+    playbackVolume: v => jpost('/api/playback/volume', {volume: v}),
+    playbackMode: (repeat, shuffle) => jpost('/api/playback/mode', {repeat, shuffle}),
+    playbackSkip: dir => jpost('/api/playback/skip', {dir})
   };
 })();

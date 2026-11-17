@@ -1,7 +1,7 @@
 /* ---------------- App：单工作台 + 模块浮窗 ---------------- */
 const App = (() => {
   let bv = null;            // 唯一的文件浏览视图（原两页合并）
-  let metaFloat = null, tree = null;
+  let metaFloat = null, tree = null, playPanel = null;
   let currentPath = '';
   let currentParent = '';
   let fwBrowse = null, fwTask = null, fwTree = null;
@@ -234,8 +234,9 @@ const App = (() => {
     updateSelInfo();
   }
 
-  /* ---- 顺序自动播放 ---- */
+  /* ---- 播放模式（顺序 / 列表循环 / 单曲循环 / 随机） ---- */
   const AUDIO_EXT = /\.(flac|wav|aif|aiff|mp3|m4a|aac|ogg|opus|ape|wv|dsf|dff)$/i;
+  const PLAY_MODES = ['order', 'all', 'one', 'shuffle'];
   function isAudioPath(p) { return AUDIO_EXT.test(String(p || '')); }
   function playbackList() {
     const arr = bv ? bv.visible() : [];
@@ -245,26 +246,66 @@ const App = (() => {
     const list = playbackList().filter(f => f.path && f.path.indexOf('dav:') !== 0);
     const i = list.findIndex(f => f.path === path);
     if (i < 0) return null;
-    const from = Math.max(0, i - 20), to = Math.min(list.length, i + 80);
+    // 队列给得比可见列表更宽：随机/循环时原生队列要能接得住
+    const from = Math.max(0, i - 40), to = Math.min(list.length, i + 120);
     const paths = list.slice(from, to).map(f => f.path);
     return {paths, index: i - from};
   }
-  function autoplayOn() { return Store.get(K.autoplay, false) === true; }
-  function paintAutoplay() {
-    const b = document.getElementById('btn-autoplay');
-    if (b) b.classList.toggle('on', autoplayOn());
+  function playMode() {
+    const m = Store.get(K.playMode, 'order');
+    return PLAY_MODES.indexOf(m) >= 0 ? m : 'order';
   }
-  function playNext() {
+  function applyPlayMode() {
+    if (!(typeof Api !== 'undefined' && Api.playbackMode)) return;
+    const m = playMode();
+    // ExoPlayer: 0=OFF 1=ALL 2=ONE
+    const repeat = (m === 'one') ? 2 : ((m === 'all' || m === 'shuffle') ? 1 : 0);
+    Api.playbackMode(repeat, m === 'shuffle').catch(() => {});
+  }
+  function cyclePlayMode() {
+    const i = PLAY_MODES.indexOf(playMode());
+    const m = PLAY_MODES[(i + 1) % PLAY_MODES.length];
+    Store.set(K.playMode, m);
+    applyPlayMode();
+    Utils.toast('播放模式：' + ({order: '顺序', all: '列表循环', one: '单曲循环', shuffle: '随机'})[m]);
+    return m;
+  }
+  function autoplayOn() { return playMode() !== 'order'; }
+  function paintAutoplay() { /* 顶部按钮已下架，状态看播放管理浮窗 */ }
+  function playNext(wrap) {
     const list = playbackList().filter(f => f && f.path);
     if (!list.length) return false;
     let i = list.findIndex(f => f.path === Player.current);
     if (i < 0) i = -1;
-    const next = list[i + 1];
+    const next = list[i + 1] || ((wrap || playMode() === 'all') ? list[0] : null);
     if (!next) { Utils.toast('已播放到列表末尾', 'warn'); return false; }
-    PlayMgr.play(next.path);
+    PlayMgr.play(next.path, 0);
     return true;
   }
-  function autoplayNext() { return autoplayOn() ? playNext() : false; }
+  function playPrev() {
+    const list = playbackList().filter(f => f && f.path);
+    if (!list.length) return false;
+    let i = list.findIndex(f => f.path === Player.current);
+    if (i <= 0) i = list.length;
+    PlayMgr.play(list[i - 1].path, 0);
+    return true;
+  }
+  function playRandom() {
+    const list = playbackList().filter(f => f && f.path);
+    if (!list.length) return false;
+    if (list.length === 1) { PlayMgr.play(list[0].path, 0); return true; }
+    let n = 0, pick = null;
+    do { pick = list[Math.floor(Math.random() * list.length)]; n++; }
+    while (pick.path === Player.current && n < 8);
+    PlayMgr.play(pick.path, 0);
+    return true;
+  }
+  function autoplayNext() {
+    const m = playMode();
+    if (m === 'one') { Player.replay(); return true; }
+    if (m === 'shuffle') return playRandom();
+    return playNext(m === 'all');
+  }
 
   /* 输出格式按后端能力裁剪 */
   const FMT_CODEC = v => {
@@ -370,6 +411,8 @@ const App = (() => {
     MODS.browse = {win: 'fw-browse', fw: fwBrowse};
     MODS.task = {win: 'fw-task', fw: fwTask};
     MODS.tree = {win: 'fw-tree', fw: fwTree};
+    if (typeof createPlayPanel === 'function') playPanel = createPlayPanel();
+    MODS.play = {win: 'play-float', fw: playPanel};
     MODS.move = {win: 'movebar', fab: 'mv-fab', min: 'mv-min'};
     MODS.meta = {win: 'meta-float', fab: 'meta-fab', min: 'mf-min'};
     MODS.spectrum = {win: 'spectrum-float', fab: 'sf-fab', min: 'sf-min'};
@@ -464,17 +507,6 @@ const App = (() => {
       }
     }
 
-    /* 顺序自动播放 */
-    const apBtn = document.getElementById('btn-autoplay');
-    if (apBtn) {
-      apBtn.addEventListener('click', () => {
-        const on = !autoplayOn();
-        Store.set(K.autoplay, on);
-        paintAutoplay();
-        Utils.toast(on ? '顺序播放已开启：当前曲目播完自动下一首' : '顺序播放已关闭');
-      });
-      paintAutoplay();
-    }
     paintViewButtons();
 
     /* 移动浮窗：位置/尺寸/置顶由 WinMgr 统一管理（宽度按内容自适应） */
@@ -619,6 +651,7 @@ const App = (() => {
     TaskRunner.init();
 
     initMods();
+    applyPlayMode();
 
     /* 先加载浏览目录，目标目录树放后台（WebDAV 下不再拖住播放/元数据） */
     const last = Store.get(K.lastPath, '') || (await defaultRoot());
@@ -684,7 +717,8 @@ const App = (() => {
 
   return {
     init, browse, onPlayed, updateMoveBar: () => MoveMgr.update(), isGridView, refreshColumns,
-    playNext, autoplayNext, autoplayOn, hifiQueue, toggleMod,
+    playNext, playPrev, autoplayNext, autoplayOn, applyPlayMode, playMode, cyclePlayMode,
+    playbackQueueList: () => playbackList().slice(), hifiQueue, toggleMod,
     get path() { return currentPath; },
     selection: () => (bv ? bv.selected() : []),
     currentParent: () => currentParent

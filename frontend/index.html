@@ -24,7 +24,6 @@
             style="max-width:150px"></select>
     <span class="spacer"></span>
     <button type="button" class="small" id="btn-fullscreen" title="全屏">⛶</button>
-    <button type="button" class="small hdr-btn" id="btn-autoplay" title="顺序播放：播完自动播放列表下一首"><span class="b-ico">⏭</span><span class="b-lbl">顺序</span></button>
     <button type="button" class="small hdr-btn" id="btn-player-cfg" title="设置（播放 + 界面配置）"><span class="b-ico">⚙</span><span class="b-lbl">设置</span></button>
   </header>
 
@@ -33,6 +32,7 @@
     <button type="button" class="mod-btn" data-mod="browse"><i class="dot"></i>文件浏览</button>
     <button type="button" class="mod-btn" data-mod="task"><i class="dot"></i>批处理</button>
     <button type="button" class="mod-btn" data-mod="tree"><i class="dot"></i>目标目录</button>
+    <button type="button" class="mod-btn" data-mod="play">播放管理</button>
     <button type="button" class="mod-btn" data-mod="move"><i class="dot"></i>移动</button>
     <button type="button" class="mod-btn" data-mod="meta"><i class="dot"></i>元数据</button>
     <button type="button" class="mod-btn" data-mod="spectrum"><i class="dot"></i>频谱/声谱</button>
@@ -241,6 +241,42 @@
 <!-- 全局悬浮频谱：默认贴边按钮，点开浮窗，右下角可拖动调整大小 -->
 <button type="button" class="sf-fab meta-fab" id="meta-fab" title="元数据（独立浮窗）">🎵<span>元数据</span></button>
 <button type="button" class="sf-fab" id="sf-fab" title="频谱 / 声谱">▤<span>频谱/声谱</span></button>
+<div class="play-float hidden" id="play-float">
+  <div class="mf-head" id="pf-head" title="拖动可移动 / 双指可缩放">
+    <span class="mf-title">播放管理</span>
+    <span class="mf-track" id="pf-track">未在播放</span>
+    <button type="button" class="sf-btn" id="pf-min" title="收起">—</button>
+  </div>
+  <div class="pf-body">
+    <div class="pf-now">
+      <div class="pf-cover" id="pf-cover"><img id="pf-cover-img" alt=""></div>
+      <div class="pf-info">
+        <div class="pf-title" id="pf-title">未在播放</div>
+        <div class="pf-sub" id="pf-sub">从文件浏览里点一首开始</div>
+      </div>
+    </div>
+    <div class="pf-seekrow">
+      <span class="pf-time" id="pf-cur">0:00</span>
+      <input type="range" class="pf-range" id="pf-seek" min="0" max="1000" value="0">
+      <span class="pf-time" id="pf-dur">0:00</span>
+    </div>
+    <div class="pf-transport">
+      <button type="button" class="pf-btn" id="pf-prev" title="上一首">⏮</button>
+      <button type="button" class="pf-btn pf-main" id="pf-play" title="播放 / 暂停">▶</button>
+      <button type="button" class="pf-btn" id="pf-next" title="下一首">⏭</button>
+      <button type="button" class="pf-btn" id="pf-stop" title="停止">⏹</button>
+      <button type="button" class="pf-btn pf-mode" id="pf-mode" title="播放模式：顺序 / 列表循环 / 单曲循环 / 随机">顺序</button>
+    </div>
+    <div class="pf-volrow">
+      <span class="pf-ico" id="pf-vol-ico">🔊</span>
+      <input type="range" class="pf-range" id="pf-vol" min="0" max="1" step="0.01" value="1">
+      <span class="pf-time" id="pf-vol-val">100%</span>
+    </div>
+    <div class="pf-qhead"><span>当前目录</span><span id="pf-qcount">0 首</span></div>
+    <div class="pf-queue" id="pf-queue"><div class="detail-empty">当前目录没有音频文件</div></div>
+  </div>
+  <b class="fw-resize" id="pf-resize" title="拖动调整大小（或双指捏合）"></b>
+</div>
 <div class="meta-float hidden" id="meta-float">
   <div class="mf-head" id="mf-head" title="拖动可移动">
     <span class="mf-title">元数据</span>
@@ -392,6 +428,7 @@
 <script src="/js/floatwin.js"></script>
 <script src="/js/filepicker.js"></script>
 <script src="/js/player.js"></script>
+<script src="/js/playpanel.js"></script>
 <script src="/js/playmgr.js"></script>
 <script src="/js/thumbmgr.js"></script>
 <script src="/js/columns.js"></script>

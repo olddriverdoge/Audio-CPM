@@ -284,6 +284,7 @@ const Player = (() => {
           : await Api.playbackOpen(path, startMs, 0, 0, 0);
         if (r && r.ok) {
           hifi = true; hifiPlaying = true; hifiPos = 0; hifiDur = 0;
+          try { if (typeof App !== 'undefined' && App.applyPlayMode) App.applyPlayMode(); } catch (_) {}
           setWave(path); paintRows(); show(); startHifiPoll(); setToggle(true);
           return;
         }
@@ -473,6 +474,7 @@ const Player = (() => {
   // 行内点击（含播放行按横向比例跳转）统一由 BrowseView.onRowClick → App.playRowClick 处理
 
   return {open, toggle, close, external, syncBar, paintRows, pct, seekRatio, onMeta,
+          position: positionSec, duration: durationSec, isPlaying, setVolume, seekSec, replay,
           hifiActive: () => hifi, hifiPlaying: () => hifiPlaying,
           get current() { return cur; },
           get meta() { return curInfo ? Object.assign({}, curInfo) : null; },

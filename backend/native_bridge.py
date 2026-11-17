@@ -63,6 +63,9 @@ def register() -> bool:
             'spectrum': lambda: _call('spectrum'),
             'queue': lambda paths, idx, ms: _call('setQueue', list(paths), int(idx or 0), int(ms or 0)),
             'spectrum_enabled': lambda b: Bridge.setSpectrumEnabled(bool(b)),
+            'volume': lambda v: _call('setVolume', float(v)),
+            'mode': lambda rep, sh: _call('setMode', int(rep), bool(sh)),
+            'skip': lambda d: _call('skip', int(d)),
         }
     except Exception:
         _playback = None
@@ -120,6 +123,12 @@ def playback_control(action, value=None):
     try:
         if action == 'seek':
             return _playback['seek'](value or 0)
+        if action == 'volume':
+            return _playback['volume'](value or 0)
+        if action == 'skip':
+            return _playback['skip'](value or 1)
+        if action == 'mode':
+            return _playback['mode'](int((value or {}).get('repeat', 0)), bool((value or {}).get('shuffle', False)))
         return _playback[action]()
     except Exception as e:
         return {'ok': False, 'error': str(e)[:300]}
