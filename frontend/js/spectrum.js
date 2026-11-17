@@ -607,7 +607,10 @@ const Spectrum = (() => {
       switchTimer = 0;
       if (tok !== switchTok || !open || !suspended) return;
       const playing = (typeof Player.hifiPlaying === 'function') ? !!Player.hifiPlaying() : true;
-      if (!playing && tries < 10) { scheduleResume(tok, 300, tries + 1); return; }
+      // 以前 10×300ms(≈3s) 就放弃：往后拖进度时 ExoPlayer 定位+续读常超过 3s，
+      // 一旦放弃频谱就永久停在"切换中…"，只能收起重开。改成持续等待（≈20s 上限）。
+      if (!playing && tries < 50) { scheduleResume(tok, 400, tries + 1); return; }
+      if (!playing) { resumeStream(); return; }
       resumeStream();
     }, ms);
   }
@@ -661,6 +664,25 @@ const Spectrum = (() => {
     stop();
     try { Api.playbackSpectrum(false); } catch (_) {}
     setState('暂停·已停算');
+  }
+
+  /* 拖进度条：只清前端历史/瀑布，不停取数链、不 toggle 原生 FFT。
+     ExoPlayer 定位期间没有新帧，drawFrame 会自然显示"缓冲中…"，出帧后自动恢复；
+     以前走 suspendForSwitch 会因 3s 重试超时把频谱永久卡死。 */
+  function onSeek() {
+    if (!open) return;
+    hist = []; peakVals = []; peakAt = [];
+    wfRowKey = ''; wfImgKey = '';
+    dataSeq = 0; wfSeq = -1;
+    lastDataAt = performance.now();
+    try { if (wfCtx) { wfCtx.fillStyle = '#000'; wfCtx.fillRect(0, 0, wfW, wfH); } } catch (_) {}
+    if (core && core.native) {
+      if (core.data) core.data.fill(0);
+      if (core.levels) core.levels.fill(0);
+      if (core.bars) core.bars.fill(0);
+      if (core.linbars) core.linbars.fill(0);
+      if (core.spec && core.spec.length) core.spec.fill(0);
+    }
   }
 
   function onVisible() {
@@ -996,6 +1018,6 @@ const Spectrum = (() => {
     });
   }
 
-  return {init, toggle, setMode, onTrackChange, resumeStream, onHidden, onVisible,
+  return {init, toggle, setMode, onTrackChange, onSeek, resumeStream, onHidden, onVisible,
           get open() { return open; }, get mode() { return mode; }};
 })();

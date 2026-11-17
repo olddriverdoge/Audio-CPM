@@ -159,13 +159,11 @@ public class AudioCpmBridge {
     public static String resume() { return simpleVoid(() -> { ExoPlayer p = PlaybackService.getPlayer(); if (p != null) p.play(); }); }
     public static String stop() { return simpleVoid(() -> { ExoPlayer p = PlaybackService.getPlayer(); if (p != null) { p.stop(); p.clearMediaItems(); } }); }
     public static String seek(int ms) {
+        // 清零放到主线程外（纯赋值），主线程 runnable 只留 seekTo，尽量缩短 UI 线程占用
+        try { SpectrumProcessor.clear(); } catch (Throwable ignored) {}
         return simpleVoid(() -> {
             ExoPlayer p = PlaybackService.getPlayer();
-            if (p != null) {
-                // seek 会让 audio sink flush，旧谱系作废：先清零，前端取到的是干净的 0
-                SpectrumProcessor.clear();
-                p.seekTo(ms);
-            }
+            if (p != null) p.seekTo(ms);
         });
     }
 
@@ -179,13 +177,31 @@ public class AudioCpmBridge {
         try {
             ExoPlayer p = PlaybackService.getPlayer();
             if (p == null) return "{\"ok\":false,\"error\":\"not playing\"}";
-            long pos = onMain(() -> p.getCurrentPosition(), 0L);
-            long rawDur = onMain(() -> p.getDuration(), 0L);
+            // 一次 onMain 取回全部字段：以前每个字段各 post 一次（7 次 Handler.post + 7 次锁等待），
+            // 250ms 轮询叠加 90Hz 频谱桥调用时，主线程消息队列会被这些碎片任务塞满 —— seek 卡顿的主因之一。
+            final Object[] snap = onMain(() -> {
+                String path = "";
+                try {
+                    MediaItem mi = p.getCurrentMediaItem();
+                    if (mi != null && mi.localConfiguration != null && mi.localConfiguration.uri != null) {
+                        path = mi.localConfiguration.uri.getPath();
+                    }
+                } catch (Throwable ignored) {
+                }
+                return new Object[]{
+                        p.getCurrentPosition(), p.getDuration(), p.isPlaying(),
+                        p.getCurrentMediaItemIndex(), p.getPlaybackState(), p.getVolume(), path
+                };
+            }, null);
+            if (snap == null || snap.length < 7) return "{\"ok\":false,\"error\":\"state timeout\"}";
+            long pos = ((Long) snap[0]);
+            long rawDur = ((Long) snap[1]);
             long dur = (rawDur <= 0 || rawDur == androidx.media3.common.C.TIME_UNSET) ? 0 : rawDur;
-            boolean playing = onMain(() -> p.isPlaying(), false);
-            int idx = onMain(() -> p.getCurrentMediaItemIndex(), -1);
-            int pbState = onMain(() -> p.getPlaybackState(), 1);
-            float vol = onMain(() -> p.getVolume(), 1f);
+            boolean playing = ((Boolean) snap[2]);
+            int idx = ((Integer) snap[3]);
+            int pbState = ((Integer) snap[4]);
+            float vol = ((Float) snap[5]);
+            String cur = ((String) snap[6]);
             boolean notif = true;
             try {
                 Context ctx0 = AudioCpmApp.get();
@@ -194,11 +210,6 @@ public class AudioCpmBridge {
                 if (nm != null) notif = nm.areNotificationsEnabled();
             } catch (Throwable ignored) {
             }
-            String cur = onMain(() -> {
-                MediaItem mi = p.getCurrentMediaItem();
-                if (mi == null || mi.localConfiguration == null || mi.localConfiguration.uri == null) return "";
-                return mi.localConfiguration.uri.getPath();
-            }, "");
             return "{\"ok\":true,\"positionMs\":" + pos + ",\"durationMs\":" + dur
                     + ",\"playing\":" + playing + ",\"index\":" + idx
                     + ",\"path\":\"" + esc(cur) + "\""
