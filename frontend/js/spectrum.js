@@ -24,6 +24,7 @@ const Spectrum = (() => {
   let hist = [], delayMs = 0;
   let mode = 'spectrum';                 // spectrum | spectrogram（内部值仍用 waterfall，兼容旧配置）
   const pos = {side: 'right', top: null};
+  let winCtl = null;
 
   // 声谱缓冲（时间轴横向、频率纵向；新数据从右侧进入，向左滚动）
   const wf = document.createElement('canvas');
@@ -781,14 +782,18 @@ const Spectrum = (() => {
   }
 
   function applyPos() {
+    const st = Store.get(K.winSpectrum, null);
+    if (st && Number.isFinite(Number(st.x)) && Number.isFinite(Number(st.y))) {
+      box.style.left = Math.max(2, Math.min(window.innerWidth - 60, Number(st.x))) + 'px';
+      box.style.top = Math.max(2, Math.min(window.innerHeight - 40, Number(st.y))) + 'px';
+      box.style.right = 'auto'; box.style.bottom = 'auto';
+      return;
+    }
+    // 旧版只记了停靠边 + 顶部高度：沿用
     if (pos.side === 'left') { box.style.left = '10px'; box.style.right = 'auto'; }
     else { box.style.right = '10px'; box.style.left = 'auto'; }
     if (pos.top != null) { box.style.top = Math.round(pos.top) + 'px'; box.style.bottom = 'auto'; }
     else { box.style.top = 'auto'; box.style.bottom = '96px'; }
-    if (fab) {
-      fab.style.left = pos.side === 'left' ? '10px' : 'auto';
-      fab.style.right = pos.side === 'right' ? '10px' : 'auto';
-    }
   }
 
   function paintTabs() {
@@ -813,7 +818,7 @@ const Spectrum = (() => {
     box.classList.toggle('hidden', !open);
     if (fab) fab.style.display = open ? 'none' : '';
     if (open) {
-      applySize(); applyPos(); layoutCanvas(); paintTrack(); paintTabs(); paintScene();
+      applySize(); applyPos(); if (winCtl) winCtl.apply(); layoutCanvas(); paintTrack(); paintTabs(); paintScene();
       stopped = false; pausedAt = 0;
       if (core && core.native) startPcmPoll();
       start();
@@ -855,36 +860,6 @@ const Spectrum = (() => {
     open = !open;
     apply();
     try { if (navigator.vibrate) navigator.vibrate(8); } catch (_) {}
-  }
-
-  // 拖动标题栏移动；松手吸附到左 / 右边缘（记住停靠边与高度）
-  let drag = null;
-  function onHeadDown(e) {
-    if (!box || e.target.closest('button')) return;
-    const r = box.getBoundingClientRect();
-    drag = {x: e.clientX, y: e.clientY, l: r.left, t: r.top};
-    box.style.left = Math.round(r.left) + 'px';
-    box.style.top = Math.round(r.top) + 'px';
-    box.style.right = 'auto';
-    box.style.bottom = 'auto';
-    try { head.setPointerCapture(e.pointerId); } catch (_) {}
-    e.preventDefault();
-  }
-  function onHeadMove(e) {
-    if (!drag || !box) return;
-    const l = Math.max(4, Math.min(window.innerWidth - box.offsetWidth - 4, drag.l + e.clientX - drag.x));
-    const t = Math.max(4, Math.min(window.innerHeight - box.offsetHeight - 4, drag.t + e.clientY - drag.y));
-    box.style.left = Math.round(l) + 'px';
-    box.style.top = Math.round(t) + 'px';
-  }
-  function onHeadUp() {
-    if (!drag) return;
-    drag = null;
-    const r = box.getBoundingClientRect();
-    pos.side = (r.left + r.width / 2) < window.innerWidth / 2 ? 'left' : 'right';
-    pos.top = Math.max(4, Math.min(window.innerHeight - r.height - 4, r.top));
-    Store.set(K.spectrumPos, {side: pos.side, top: pos.top});
-    applyPos();
   }
 
   // 右下角拖动缩放（记住尺寸）
@@ -929,13 +904,13 @@ const Spectrum = (() => {
     document.querySelectorAll('.sf-tab').forEach(b => {
       b.addEventListener('click', e => { e.stopPropagation(); setMode(b.dataset.mode); });
     });
-    if (head) {
-      head.addEventListener('pointerdown', onHeadDown);
-      head.addEventListener('pointermove', onHeadMove);
-      ['pointerup', 'pointercancel'].forEach(t => head.addEventListener(t, onHeadUp));
+    if (typeof Dock !== 'undefined') {
+      Dock.bindFab(fab, K.fabSpectrum, 'right');
+      winCtl = Dock.bindWin(box, head, K.winSpectrum);
     }
     applySize();
     applyPos();
+    if (winCtl) winCtl.apply();
     paintTabs();
     apply();
     paintTrack();

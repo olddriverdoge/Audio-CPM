@@ -84,6 +84,7 @@
     background:rgba(20,26,34,.95);color:var(--muted);cursor:pointer;
     box-shadow:0 4px 14px rgba(0,0,0,.45);font-family:inherit}
   .sf-fab:hover,.sf-fab.on{color:var(--accent);border-color:var(--accent)}
+  .sf-fab.snapping{transition:left .16s ease,right .16s ease}
   body.has-player .sf-fab{bottom:140px}
   /* 移动模块：与元数据/频谱同一列贴边按钮，浮窗宽度按内容自适应 */
   .sf-fab.move-fab{bottom:168px}

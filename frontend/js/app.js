@@ -358,8 +358,12 @@ const App = (() => {
     let caps = null;
     try { caps = await Api.caps(); } catch (_) { return; }
     window.AUDIOCPM_CAPS = caps;
-    // app 壳内隐藏顶部 logo（仅 web 版保留品牌头）
+    // app 壳内隐藏顶部 logo、剔除全屏按钮（仅 web 版保留）
     try { document.body.classList.toggle('app-mode', !!caps.android); } catch (_) {}
+    if (caps.android) {
+      const fs = document.getElementById('btn-fullscreen');
+      if (fs) fs.remove();
+    }
     const sel = document.getElementById('fmt-select');
     if (!sel) return;
     const allowed = new Set(caps.formats || []);
@@ -514,6 +518,7 @@ const App = (() => {
       if (mvOpen) mvApplyPos();
     }
     if (mvFab) mvFab.addEventListener('click', mvToggleOpen);
+    try { if (typeof Dock !== 'undefined') Dock.bindFab(mvFab, K.fabMove, 'right'); } catch (_) {}
     if (mvMin) mvMin.addEventListener('click', () => { if (mvOpen) mvToggleOpen(); });
     if (mvHead && mvBar) {
       let st = null;
@@ -573,6 +578,7 @@ const App = (() => {
     });
     /* 元数据 = 全局独立浮窗（两页共用，可拖动/缩放），频谱同样是全局浮窗 */
     if (typeof createMetaFloat === 'function') metaFloat = createMetaFloat();
+    try { if (typeof Dock !== 'undefined') Dock.bindFab(document.getElementById('meta-fab'), K.fabMeta, 'right'); } catch (_) {}
     if (typeof Spectrum !== 'undefined') Spectrum.init();
 
     tree = createTreeView({

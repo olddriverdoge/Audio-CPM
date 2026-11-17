@@ -27,5 +27,7 @@ const K = {
   spectrumBars:'ac2_spectrum_bars', spectrumStop:'ac2_spectrum_stop',
   wfBright:'ac2_wf_bright', wfTop:'ac2_wf_top', wfGrid:'ac2_wf_grid', wfPal:'ac2_wf_pal',
   wfBands:'ac2_wf_bands', wfY:'ac2_wf_y',
-  metaPos:'ac2_meta_pos', metaSize:'ac2_meta_size', movePos:'ac2_move_pos'
+  metaPos:'ac2_meta_pos', metaSize:'ac2_meta_size', movePos:'ac2_move_pos',
+  fabSpectrum:'ac2_fab_spectrum', fabMeta:'ac2_fab_meta', fabMove:'ac2_fab_move',
+  winSpectrum:'ac2_win_spectrum'
 };
