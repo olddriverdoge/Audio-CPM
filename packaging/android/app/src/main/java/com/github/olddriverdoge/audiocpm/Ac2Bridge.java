@@ -246,6 +246,7 @@ public class Ac2Bridge {
             float[] b = SpectrumProcessor.getBands();
             float[] lv = SpectrumProcessor.getLevels();
             float[] bs = SpectrumProcessor.getBars();
+            float[] lb = SpectrumProcessor.getLinBars();
             StringBuilder sb = new StringBuilder(2048);
             sb.append("{\"ok\":true,\"service\":").append(PlaybackService.getPlayer() != null)
               .append(",\"format\":").append(SpectrumProcessor.describe())
@@ -255,6 +256,8 @@ public class Ac2Bridge {
             appendFloats(sb, lv);
             sb.append("],\"bars\":[");
             appendFloats(sb, bs);
+            sb.append("],\"linbars\":[");
+            appendFloats(sb, lb);
             sb.append("]}");
             return sb.toString();
         } catch (Throwable t) {

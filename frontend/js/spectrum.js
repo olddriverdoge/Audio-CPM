@@ -10,6 +10,9 @@ const Spectrum = (() => {
   const delayEl = document.getElementById('sf-delay');
   const delayVal = document.getElementById('sf-delay-val');
   const subEl = document.querySelector('#spectrum-float .sf-sub');
+  const xBtn = document.getElementById('sf-xscale');
+  let xScale = 'log';                  // log | lin（频谱 X 轴与柱数据同时切换）
+  let hideTimer = 0;
   const resize = document.getElementById('sf-resize');
   const g = canvas ? canvas.getContext('2d') : null;
   let open = false, core = null, raf = 0;
@@ -72,8 +75,13 @@ const Spectrum = (() => {
       for (let i = 0; i < r.bars.length; i++) bs[i] = Math.max(0, Math.min(255, Math.round((r.bars[i] || 0) * 255)));
       core.bars = bs;
     }
+    if (r.linbars && r.linbars.length) {
+      const lb = new Uint8Array(r.linbars.length);
+      for (let i = 0; i < r.linbars.length; i++) lb[i] = Math.max(0, Math.min(255, Math.round((r.linbars[i] || 0) * 255)));
+      core.linbars = lb;
+    }
     if (r.sampleRate) core.sampleRate = r.sampleRate;
-    hist.push({t: performance.now(), data: d, bars: core.bars, levels: core.levels});
+    hist.push({t: performance.now(), data: d, bars: core.bars, linbars: core.linbars, levels: core.levels});
     if (hist.length > 260) hist.shift();
   }
 
@@ -115,7 +123,7 @@ const Spectrum = (() => {
     const hifi = !!(typeof Player !== 'undefined' && Player.hifiActive && Player.hifiActive());
     if (hifi) {
       if (!core || !core.native) {
-        core = {native: true, data: new Uint8Array(96), levels: new Uint8Array(96), bars: new Uint8Array(48), sampleRate: 48000, ctx: null, analyser: null};
+        core = {native: true, data: new Uint8Array(96), levels: new Uint8Array(96), bars: new Uint8Array(48), linbars: new Uint8Array(48), sampleRate: 48000, ctx: null, analyser: null};
         startPcmPoll();
       }
       return core;
@@ -169,12 +177,17 @@ const Spectrum = (() => {
       g.stroke();
       g.fillText(String(db), x0 - 3, y);
     });
-    // 对数刻度：与频谱条的对数频段一一对应（40Hz~20kHz）
-    const marks = [40, 100, 200, 500, 1000, 2000, 5000, 10000, 20000].filter(v => v <= topHz + 1);
+    // 刻度随分档方式切换：线性柱=Hz 等距（40Hz~20kHz），对数柱=对数位置
+    const lin = (xScale === 'lin');
+    const marks = (lin
+      ? [40, 2000, 5000, 10000, 15000, 20000]
+      : [40, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]).filter(v => v <= topHz + 1);
     g.textAlign = 'center';
     g.textBaseline = 'top';
     marks.forEach(hz => {
-      const x = Math.min(x0 + gw - 2, x0 + gw * (Math.log(hz / 40) / Math.log(20000 / 40)));
+      const x = Math.min(x0 + gw - 2, x0 + gw * (lin
+        ? ((hz - 40) / (20000 - 40))
+        : (Math.log(hz / 40) / Math.log(20000 / 40))));
       g.beginPath();
       g.moveTo(Math.round(x) + .5, y0);
       g.lineTo(Math.round(x) + .5, y0 + gh);
@@ -325,13 +338,13 @@ const Spectrum = (() => {
       core.analyser.getByteFrequencyData(core.data);
     } else if (delayMs > 0) {
       const f = pickDelayed();
-      if (f) { core.data = f.data; core.bars = f.bars; if (f.levels) core.levels = f.levels; }
+      if (f) { core.data = f.data; core.bars = f.bars; if (f.linbars) core.linbars = f.linbars; if (f.levels) core.levels = f.levels; }
     }
     if (mode === 'waterfall') {
       drawWaterfall(area);
       setState('声谱');
     } else {
-      const src = core.bars || core.data;
+      const src = (xScale === 'lin' ? (core.linbars || core.bars) : core.bars) || core.data;
       const bars = src.length || 48;
       const bw = area.gw / bars;
       for (let i = 0; i < bars; i++) {
@@ -365,8 +378,48 @@ const Spectrum = (() => {
   }
   if (delayEl) {
     setDelay(Store.get(K.spectrumDelay, 0) || 0, false);
-    delayEl.addEventListener('input', () => setDelay(Number(delayEl.value), false));
+    delayEl.addEventListener('input', () => { setDelay(Number(delayEl.value), false); armHide(); });
     delayEl.addEventListener('change', () => setDelay(Number(delayEl.value), true));
+  }
+
+  /* 顶部调节条：默认收起，长按模块展开，5 秒无操作自动缩回。
+     目前有“延迟”和“X 轴 对数/线性”两项，后续配置也往这里加。 */
+  function armHide() {
+    if (hideTimer) clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => {
+      hideTimer = 0;
+      hideSub();
+    }, 5000);
+  }
+  function showSub() {
+    if (!subEl) return;
+    subEl.classList.add('show');
+    armHide();
+  }
+  function hideSub() {
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = 0; }
+    if (subEl) subEl.classList.remove('show');
+  }
+  function setXScale(m, save) {
+    xScale = (m === 'lin') ? 'lin' : 'log';
+    if (xBtn) {
+      xBtn.textContent = xScale === 'lin' ? 'X 线性' : 'X 对数';
+      xBtn.classList.toggle('on', xScale === 'lin');
+    }
+    if (save) Store.set(K.spectrumX, xScale);
+  }
+  if (xBtn) {
+    setXScale(Store.get(K.spectrumX, 'log'), false);
+    xBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      setXScale(xScale === 'lin' ? 'log' : 'lin', true);
+      armHide();
+    });
+  }
+  if (subEl) {
+    subEl.addEventListener('pointerdown', e => e.stopPropagation());
+    subEl.addEventListener('input', armHide);
+    subEl.addEventListener('change', armHide);
   }
 
   function applySize() {
@@ -423,7 +476,10 @@ const Spectrum = (() => {
     box.addEventListener('pointerdown', e => {
       if (e.target.closest('.sf-head, .sf-resize, .sf-sub, button')) return;
       if (lpTimer) clearTimeout(lpTimer);
-      lpTimer = setTimeout(() => { lpTimer = 0; subEl.classList.toggle('show'); }, 550);
+      lpTimer = setTimeout(() => {
+        lpTimer = 0;
+        if (subEl.classList.contains('show')) hideSub(); else showSub();
+      }, 550);
       const cancel = () => {
         if (lpTimer) { clearTimeout(lpTimer); lpTimer = 0; }
         box.removeEventListener('pointerup', cancel);

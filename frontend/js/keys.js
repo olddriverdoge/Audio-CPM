@@ -21,5 +21,5 @@ const K = {
   treeRoots:'ac2_tree_roots', treeActive:'ac2_tree_active',
   treeCollapsed:'ac2_tree_collapsed',
   autoplay:'ac2_autoplay', spectrumSize:'ac2_spectrum_size', spectrumMode:'ac2_spectrum_mode',
-  spectrumPos:'ac2_spectrum_pos', spectrumDelay:'ac2_spectrum_delay'
+  spectrumPos:'ac2_spectrum_pos', spectrumDelay:'ac2_spectrum_delay', spectrumX:'ac2_spectrum_x'
 };

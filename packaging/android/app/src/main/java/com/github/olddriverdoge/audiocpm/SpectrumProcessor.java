@@ -28,6 +28,8 @@ public class SpectrumProcessor extends BaseAudioProcessor {
     private static final int BARS = 48;
     private static final double BAR_F0 = 40.0, BAR_F1 = 20000.0;
     private static volatile float[] bars = new float[BARS];
+    /** 线性频段版（X 轴切线性时用），频段宽度按 Hz 等分。 */
+    private static volatile float[] linBars = new float[BARS];
     private static volatile int sampleRate = 48000;
     private static volatile boolean enabled = false;
     private static volatile int encoding = C.ENCODING_PCM_16BIT;
@@ -40,6 +42,7 @@ public class SpectrumProcessor extends BaseAudioProcessor {
     private final float[] prev = new float[96];
     private final float[] prevLevels = new float[96];
     private final float[] barPrev = new float[BARS];
+    private final float[] linPrev = new float[BARS];
     private int fill = 0;
 
     public SpectrumProcessor() {
@@ -55,6 +58,7 @@ public class SpectrumProcessor extends BaseAudioProcessor {
     public static float[] getBands() { return bands.clone(); }
     public static float[] getLevels() { return levels.clone(); }
     public static float[] getBars() { return bars.clone(); }
+    public static float[] getLinBars() { return linBars.clone(); }
     public static int getSampleRate() { return sampleRate; }
     /** 排查用：当前输入格式。 */
     public static String describe() {
@@ -82,6 +86,7 @@ public class SpectrumProcessor extends BaseAudioProcessor {
         bands = new float[96];
         levels = new float[96];
         bars = new float[BARS];
+        linBars = new float[BARS];
     }
 
     @Override
@@ -215,6 +220,29 @@ public class SpectrumProcessor extends BaseAudioProcessor {
             outBars[b] = barPrev[b];
         }
         bars = outBars;
+
+        // ---- 同一份 FFT 的线性分档（Hz 等宽），供 X 轴切“线性”时使用 ----
+        float[] outLin = new float[BARS];
+        double spanHz = BAR_F1 - BAR_F0;
+        for (int b = 0; b < BARS; b++) {
+            double f0 = BAR_F0 + spanHz * b / BARS;
+            double f1 = BAR_F0 + spanHz * (b + 1) / BARS;
+            int k0 = Math.max(1, (int) Math.floor(f0 / binHz));
+            int k1 = Math.max(k0, (int) Math.ceil(f1 / binHz));
+            k1 = Math.min(FFT_N / 2 - 1, k1);
+            float peak = 0f;
+            for (int k = k0; k <= k1; k++) {
+                float m = (float) Math.hypot(re[k], im[k]);
+                if (m > peak) peak = m;
+            }
+            double amp = 2.0 * peak / cg;
+            double db = 20.0 * Math.log10(Math.max(amp, 1e-7));
+            float v = (float) Math.max(0.0, Math.min(1.0, (db + 80.0) / 80.0));
+            if (v > linPrev[b]) linPrev[b] += (v - linPrev[b]) * 0.55f;
+            else linPrev[b] += (v - linPrev[b]) * 0.12f;
+            outLin[b] = linPrev[b];
+        }
+        linBars = outLin;
     }
 
     private static void fft(float[] re, float[] im) {

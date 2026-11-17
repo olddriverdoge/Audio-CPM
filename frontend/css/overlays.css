@@ -117,6 +117,10 @@
   .sf-sub{display:none;align-items:center;gap:6px;padding:0 8px 4px;font-size:10px;
     color:var(--muted);flex:none}
   /* 默认收起：长按模块才展开延迟调节 */
-  .sf-sub.show{display:flex}
+  .sf-sub.show{display:flex;justify-content:flex-start}
+  .sf-x{flex:none;padding:2px 7px;font-size:10px;line-height:1.4;border-radius:6px;
+    border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08);
+    color:var(--fg);cursor:pointer;white-space:nowrap}
+  .sf-x:active{background:rgba(255,255,255,.18)}
   .sf-sub input[type=range]{flex:1;min-width:0;height:14px;accent-color:var(--accent)}
   .sf-sub span{min-width:38px;text-align:right;font-variant-numeric:tabular-nums}
