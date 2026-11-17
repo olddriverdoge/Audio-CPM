@@ -200,8 +200,10 @@ function createBrowseView(cfg) {
   }
   function applyMarquee() {
     mqTimer = 0;
-    el.querySelectorAll('.item:not(.head) .name, .item:not(.head) .col, .tile-name').forEach(n => {
-      // 文本包到单元格内部的 .cell-in，滚动时只在列宽内平移，不会飘到相邻列
+    const nodes = el.querySelectorAll('.item:not(.head) .name, .item:not(.head) .col, .tile-name');
+    // 三遍走：①补齐 .cell-in 包装（写） ②一次读完所有宽度（只读，浏览器只排一次版） ③统一写样式
+    const list = [];
+    nodes.forEach(n => {
       let inner = n.querySelector(':scope > .cell-in');
       if (!inner) {
         inner = document.createElement('span');
@@ -209,19 +211,23 @@ function createBrowseView(cfg) {
         while (n.firstChild) inner.appendChild(n.firstChild);
         n.appendChild(inner);
       }
-      const over = inner.offsetWidth - n.clientWidth;
-      if (over < 6) {
+      list.push({n, inner});
+    });
+    const measures = list.map(it => ({n: it.n, over: it.inner.offsetWidth - it.n.clientWidth}));
+    for (const m of measures) {
+      const n = m.n;
+      if (m.over < 6) {
         if (n.classList.contains('mq')) {
           n.classList.remove('mq');
           n.style.removeProperty('--mq-shift');
           n.style.removeProperty('--mq-dur');
         }
-        return;
+        continue;
       }
       n.classList.add('mq');
-      n.style.setProperty('--mq-shift', (-over - 4) + 'px');
-      n.style.setProperty('--mq-dur', Math.max(6, Math.round(over / 26)) + 's');
-    });
+      n.style.setProperty('--mq-shift', (-m.over - 4) + 'px');
+      n.style.setProperty('--mq-dur', Math.max(6, Math.round(m.over / 26)) + 's');
+    }
   }
 
   function notifySel() {
@@ -502,7 +508,20 @@ function createBrowseView(cfg) {
     // 播放只触发重绘（补波形），绝不改动选择
     onExternalPlayed(path) {
       if (!st.files.some(f => f.path === path)) return;
-      render();
+      // 只切换播放高亮，绝不重建整表：切歌时 el.innerHTML 全量重建 + 逐格量宽会让整个 app 卡死
+      el.querySelectorAll('.item.file.playing').forEach(n => {
+        if (n.dataset.path !== path) {
+          n.classList.remove('playing');
+          const w = n.querySelector('.row-wave');
+          if (w) w.remove();
+        }
+      });
+      el.querySelectorAll('.item.file[data-path]').forEach(n => {
+        if (n.dataset.path === path) n.classList.add('playing');
+      });
+      el.querySelectorAll('.tile').forEach(n => {
+        n.classList.toggle('playing', n.dataset.path === path);
+      });
     },
     selectAllVisible(sel) { selectAll(sel); },
     visible() { return visibleFiles(); }

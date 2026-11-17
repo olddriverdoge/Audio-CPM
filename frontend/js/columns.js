@@ -97,8 +97,12 @@ const Columns = (() => {
 
     function styleFor(c) {
       const w = width(c.id);
-      if (c.id === 'name') return w ? ' style="width:' + w + 'px;flex:0 0 ' + w + 'px"' : '';
-      return w ? ' style="width:' + w + 'px"' : '';
+      // 列宽必须不可压缩（flex:0 0 auto）：否则总宽超过面板时各列被挤扁，
+      // 内容看起来"超出框架"却又滑不到。name 留 200px 基准并可 grow，填满剩余空间。
+      if (c.id === 'name') {
+        return ' style="width:' + (w || 200) + 'px;flex:1 0 auto"';
+      }
+      return w ? ' style="width:' + w + 'px;flex:0 0 auto"' : ' style="flex:0 0 auto"';
     }
     function sortMark(key, sorts) {
       const s = (sorts || []).find(x => x.key === key);

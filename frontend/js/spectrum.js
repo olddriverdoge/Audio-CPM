@@ -30,6 +30,12 @@ const Spectrum = (() => {
   const wfTmp = document.createElement('canvas');      // 滚动位移用的中转画布（不自绘自）
   let wfCtx = null, wfTmpCtx = null, wfW = 0, wfH = 0, wfLast = 0;
   let palette = null;
+  const WFDPR = Math.min(2, DPR);        // 瀑布位图不必按 3x 放大：2x 已足够清晰，省一半以上像素拷贝
+  let dataSeq = 0, wfSeq = -1, lastDataAt = 0;           // 原生数据帧序号 / 瀑布已消费到的序号（没新数据就不滚动）
+  let lastMeasure = 0;                   // 画布尺寸测量节流（每帧读 clientWidth 会强制同步排版）
+  let paramsSig = '';                    // 已下发的参数签名（避免每帧 JSON + 桥调用）
+  let wfImg = null, wfImgKey = '';       // 复用 ImageData
+  let wfRowBin = null, wfRowKey = '';     // 频率→行号映射缓存（避免每帧 BH 次 pow/log）
 
   function setState(t) { if (stateEl) stateEl.textContent = t || ''; }
 
@@ -73,35 +79,52 @@ const Spectrum = (() => {
   }
 
   let pcmTimer = 0;
+  function packInto(src, dst) {
+    if (!src || !src.length) return dst;
+    const n = src.length;
+    if (!dst || dst.length !== n) dst = new Uint8Array(n);
+    for (let i = 0; i < n; i++) {
+      const v = Math.round((src[i] || 0) * 255);
+      dst[i] = v < 0 ? 0 : (v > 255 ? 255 : v);
+    }
+    return dst;
+  }
+  let live = {data: null, bars: null, linbars: null, spec: null, levels: null};
+
   function applySpectrum(r) {
     if (!r || !r.ok || !r.bands) return;
-    const d = new Uint8Array(96);
-    for (let i = 0; i < 96; i++) d[i] = Math.max(0, Math.min(255, Math.round((r.bands[i] || 0) * 255)));
-    core.data = d;
-    if (r.levels && r.levels.length) {
+    dataSeq++;
+    lastDataAt = performance.now();
+    // delay=0 时复用同一批缓冲（避免每秒 ~90×5 次 Uint8Array 分配，GC 抖动会让切歌时更卡）
+    const useLive = delayMs === 0;
+    if (useLive) {
+      live.data = packInto(r.bands, live.data);
+      if (r.levels && r.levels.length) live.levels = packInto(r.levels, live.levels);
+      if (r.bars && r.bars.length) live.bars = packInto(r.bars, live.bars);
+      if (r.linbars && r.linbars.length) live.linbars = packInto(r.linbars, live.linbars);
+      if (r.spec && r.spec.length) live.spec = packInto(r.spec, live.spec);
+      core.data = live.data; core.levels = live.levels;
+      core.bars = live.bars; core.linbars = live.linbars; core.spec = live.spec;
+    } else {
+      const d = new Uint8Array(96);
+      for (let i = 0; i < 96; i++) d[i] = Math.max(0, Math.min(255, Math.round((r.bands[i] || 0) * 255)));
       const lv = new Uint8Array(96);
       for (let i = 0; i < 96; i++) lv[i] = Math.max(0, Math.min(255, Math.round((r.levels[i] || 0) * 255)));
-      core.levels = lv;
-    }
-    if (r.bars && r.bars.length) {
-      const bs = new Uint8Array(r.bars.length);
-      for (let i = 0; i < r.bars.length; i++) bs[i] = Math.max(0, Math.min(255, Math.round((r.bars[i] || 0) * 255)));
-      core.bars = bs;
-    }
-    if (r.linbars && r.linbars.length) {
-      const lb = new Uint8Array(r.linbars.length);
-      for (let i = 0; i < r.linbars.length; i++) lb[i] = Math.max(0, Math.min(255, Math.round((r.linbars[i] || 0) * 255)));
-      core.linbars = lb;
-    }
-    if (r.spec && r.spec.length) {
-      const sp = new Uint8Array(r.spec.length);
-      for (let i = 0; i < r.spec.length; i++) sp[i] = Math.max(0, Math.min(255, Math.round((r.spec[i] || 0) * 255)));
-      core.spec = sp;
+      const bs = r.bars && r.bars.length ? packInto(r.bars) : null;
+      const lb = r.linbars && r.linbars.length ? packInto(r.linbars) : null;
+      const sp = r.spec && r.spec.length ? packInto(r.spec) : null;
+      core.data = d; core.levels = lv;
+      if (bs) core.bars = bs;
+      if (lb) core.linbars = lb;
+      if (sp) core.spec = sp;
+      // 历史帧只在"有延迟"时才留（默认 0 时不 push，省掉每秒几十帧的整帧引用与内存增长）
+      const now = performance.now();
+      hist.push({t: now, data: d, bars: core.bars, linbars: core.linbars,
+                 spec: core.spec, levels: core.levels});
+      const cap = Math.max(8, Math.min(120, Math.ceil(delayMs / 16.7) + 3));
+      while (hist.length > cap) hist.shift();
     }
     if (r.sampleRate) core.sampleRate = r.sampleRate;
-    hist.push({t: performance.now(), data: d, bars: core.bars, linbars: core.linbars,
-               spec: core.spec, levels: core.levels});
-    if (hist.length > 260) hist.shift();
   }
 
   /* 取 delayMs 之前的那一帧；历史不够就用最早一帧 */
@@ -165,9 +188,14 @@ const Spectrum = (() => {
 
   function layoutCanvas() {
     if (!canvas) return;
-    const w = Math.max(120, Math.round(canvas.clientWidth || 300));
-    const h = Math.max(60, Math.round(canvas.clientHeight || 120));
-    cssW = w; cssH = h;
+    // 每帧读 clientWidth/clientHeight 会强制同步排版；面板尺寸不会每帧变，200ms 量一次足够
+    const now = performance.now();
+    if (!cssW || !cssH || now - lastMeasure > 200) {
+      lastMeasure = now;
+      cssW = Math.max(120, Math.round(canvas.clientWidth || 300));
+      cssH = Math.max(60, Math.round(canvas.clientHeight || 120));
+    }
+    const w = cssW, h = cssH;
     // 位图按 devicePixelRatio 放大：放大面板时不再糊
     const bw = Math.round(w * DPR), bh = Math.round(h * DPR);
     if (canvas.width !== bw) canvas.width = bw;
@@ -234,8 +262,8 @@ const Spectrum = (() => {
   }
 
   function resizeWf(w, h) {
-    const bw = Math.max(1, Math.round(w * DPR));
-    const bh = Math.max(1, Math.round(h * DPR));
+    const bw = Math.max(1, Math.round(w * WFDPR));
+    const bh = Math.max(1, Math.round(h * WFDPR));
     if (wfW === bw && wfH === bh) return;
     const old = document.createElement('canvas');
     old.width = Math.max(1, wfW); old.height = Math.max(1, wfH);
@@ -288,12 +316,58 @@ const Spectrum = (() => {
     resizeWf(W, H);                     // 位图按 DPR 放大，放大面板也不糊
     if (!wfCtx) return;
     const BW = wfW, BH = wfH;
-    // 左移一列（自身拷贝）；列速固定 ~60fps，避免高刷屏上滚动变快
+    // 只有真的来了新数据才滚动/写列：切歌瞬间原生还没出帧时，不为一个空帧白白拷贝整块位图
     const now = performance.now();
-    const advance = (wfLast === 0) || (now - wfLast >= 16.7);
-    if (advance) wfLast = now;
-    const colW = Math.max(1, Math.round(DPR));   // 新列宽（设备像素）
+    const newData = wfSeq !== dataSeq;
+    const advance = newData && ((wfLast === 0) || (now - wfLast >= 16.0));
+    if (advance) { wfLast = now; wfSeq = dataSeq; }
+    const colW = Math.max(1, Math.round(WFDPR));   // 新列宽（设备像素）
+
+    const nyq = nyquist();
+    const topHz = Math.min(cfg.top || 24000, nyq);
+    // 声谱优先用原生高分辨率线性谱（128/256/512），没有就退回 96 档线性 bands
+    let srcBins = (core.spec && core.spec.length) ? core.spec : core.data;
+    if (!srcBins || !srcBins.length) srcBins = core.data || new Uint8Array(96);
+    if (srcBins === core.spec) {
+      let mx = 0;
+      for (let i = 0; i < srcBins.length; i += 4) { if (srcBins[i] > mx) mx = srcBins[i]; }
+      if (mx < 3) srcBins = core.data || srcBins;   // 全零谱 = 还没算，退回可用数据
+    }
+    const nB = srcBins.length || 96;
+
     if (advance) {
+      const pal = palette || (palette = buildPalette(cfg.pal));
+      const br = BRIGHT[cfg.bright] || BRIGHT.std;
+      // 频率→行号映射缓存：BH 每帧最多 ~1800 行，逐行 pow/log 在低端机上很贵
+      const rowKey = BH + '|' + topHz + '|' + cfg.y + '|' + nB + '|' + nyq;
+      if (rowKey !== wfRowKey) {
+        wfRowKey = rowKey;
+        wfRowBin = new Int32Array(BH);
+        for (let y = 0; y < BH; y++) {
+          const rowNorm = (BH - 1 - y) / Math.max(1, BH - 1);
+          const hz = normToHz(rowNorm, topHz);
+          wfRowBin[y] = Math.min(nB - 1, Math.max(0, Math.floor(hz / nyq * nB)));
+        }
+      }
+      const imgKey = colW + 'x' + BH;
+      if (imgKey !== wfImgKey) {
+        wfImgKey = imgKey;
+        try { wfImg = wfCtx.createImageData(colW, BH); } catch (_) { wfImg = null; }
+      }
+      const px = wfImg ? wfImg.data : null;
+      for (let y = 0; y < BH; y++) {
+        const v = srcBins[wfRowBin[y]] || 0;
+        const ci = Math.max(0, Math.min(255, Math.round((v - br[0]) * 255 / (br[1] - br[0]))));
+        if (px) {
+          const o = (y * colW) * 4;
+          const r = pal[ci * 3], gg = pal[ci * 3 + 1], bb = pal[ci * 3 + 2];
+          for (let k = 0; k < colW; k++) {
+            const q = o + k * 4;
+            px[q] = r; px[q + 1] = gg; px[q + 2] = bb; px[q + 3] = 255;
+          }
+        }
+      }
+      // 左移一列（用中转画布，避免"自绘自"在某些 WebView 上被清屏）
       try {
         if (wfTmpCtx) {
           wfTmpCtx.globalCompositeOperation = 'copy';
@@ -306,44 +380,8 @@ const Spectrum = (() => {
       } catch (_) {
         try { wfCtx.globalCompositeOperation = 'source-over'; } catch (__) {}
       }
+      if (px) { try { wfCtx.putImageData(wfImg, BW - colW, 0); } catch (_) {} }
     }
-
-    const nyq = nyquist();
-    const topHz = Math.min(cfg.top || 24000, nyq);
-    // 声谱优先用原生高分辨率线性谱（128/256/512），没有就退回 96 档线性 bands
-    let srcBins = (core.spec && core.spec.length) ? core.spec : core.data;
-    if (!srcBins || !srcBins.length) srcBins = core.data || new Uint8Array(96);
-    if (srcBins === core.spec) {
-      // 高分辨率谱可能是"已分配但还没算"的全零数组，此时不能用，否则整屏全黑
-      let mx = 0;
-      for (let i = 0; i < srcBins.length; i += 4) { if (srcBins[i] > mx) mx = srcBins[i]; }
-      if (mx < 3) srcBins = core.data || srcBins;
-    }
-    const nB = srcBins.length || 96;
-    const pal = palette || (palette = buildPalette(cfg.pal));
-    const br = BRIGHT[cfg.bright] || BRIGHT.std;
-    let img = null, px = null;
-    try { img = wfCtx.createImageData(colW, BH); px = img.data; } catch (_) {}
-    for (let y = 0; y < BH; y++) {
-      const rowNorm = (BH - 1 - y) / Math.max(1, BH - 1);   // 0=底(低频) 1=顶
-      const hz = normToHz(rowNorm, topHz);
-      const bin = Math.min(nB - 1, Math.max(0, Math.floor(hz / nyq * nB)));
-      const v = srcBins[bin] || 0;
-      const ci = Math.max(0, Math.min(255, Math.round((v - br[0]) * 255 / (br[1] - br[0]))));
-      if (px) {
-        for (let k = 0; k < colW; k++) {
-          const o = (y * colW + k) * 4;
-          px[o] = pal[ci * 3];
-          px[o + 1] = pal[ci * 3 + 1];
-          px[o + 2] = pal[ci * 3 + 2];
-          px[o + 3] = 255;
-        }
-      } else {
-        wfCtx.fillStyle = 'rgb(' + pal[ci * 3] + ',' + pal[ci * 3 + 1] + ',' + pal[ci * 3 + 2] + ')';
-        wfCtx.fillRect(BW - colW, y, colW, 1);
-      }
-    }
-    if (px) { try { wfCtx.putImageData(img, BW - colW, 0); } catch (_) {} }
 
     if (typeof g.drawImage === 'function') g.drawImage(wf, area.x0, area.y0, W, H);
 
@@ -444,6 +482,17 @@ const Spectrum = (() => {
       return;
     }
     pausedAt = 0;
+    // 切歌/缓冲的空窗：原生还没产出新帧时不要空转重绘（此前会把 rAF 全花在画旧数据/空帧上）
+    if (core.native && performance.now() - lastDataAt > 450
+        && (typeof Player.hifiPlaying !== 'function' || Player.hifiPlaying())) {
+      g.fillStyle = 'rgba(148,163,184,.5)';
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.font = '12px ui-monospace, Menlo, monospace';
+      g.fillText('缓冲中…', w / 2, h / 2);
+      setState('缓冲');
+      raf = requestAnimationFrame(draw);
+      return;
+    }
     if (!core.native) {
       if (core.ctx.state === 'suspended') core.ctx.resume().catch(() => {});
       core.analyser.getByteFrequencyData(core.data);
@@ -588,12 +637,16 @@ const Spectrum = (() => {
     b.textContent = '柱数 ' + eff + (eff !== cfg.bars ? '（自动）' : '');
   }
   function pushParams() {
+    const eff = effBars();
+    const specN = (mode === 'waterfall' ? (cfg.bands2 || 256) : 0);
+    const sig = cfg.db + '|' + (REL_K[cfg.rel] || 0.12) + '|' + eff + '|' + specN;
+    if (sig === paramsSig) return;      // 参数没变就不下发（draw 每帧都会走到这里）
+    paramsSig = sig;
     paintBarsChip();
     try {
       if (window.AudioCpmNative && typeof window.AudioCpmNative.setParams === 'function') {
         window.AudioCpmNative.setParams(JSON.stringify({
-          floorDb: cfg.db, release: REL_K[cfg.rel] || 0.12, bars: effBars(),
-          spec: (mode === 'waterfall' ? (cfg.bands2 || 256) : 0)}));
+          floorDb: cfg.db, release: REL_K[cfg.rel] || 0.12, bars: eff, spec: specN}));
       }
     } catch (_) {}
   }

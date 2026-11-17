@@ -7,7 +7,10 @@
   .sortbar select{font-size:12px;padding:2px 5px}
   .sortbar input[type=search]{font-size:12px;padding:2px 8px;width:150px}
   .view-wrap{border:1px solid var(--border);border-radius:7px;background:var(--panel2);
-    overflow:auto;min-height:0}
+    overflow:auto;min-height:0;-webkit-overflow-scrolling:touch}
+  /* 列被拖宽后整表按内容撑开、由容器横向滚动；否则列宽被面板框限死，右滑也看不到被裁掉的内容 */
+  .view-wrap .item{width:max-content;min-width:100%}
+  .view-wrap::-webkit-scrollbar{height:8px;width:8px}
   #view1{height:46vh;min-height:180px;max-height:64vh}
   .empty{padding:16px;color:var(--muted);font-size:12.5px}
 
