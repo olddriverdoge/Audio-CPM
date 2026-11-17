@@ -161,7 +161,11 @@ public class AudioCpmBridge {
     public static String seek(int ms) {
         return simpleVoid(() -> {
             ExoPlayer p = PlaybackService.getPlayer();
-            if (p != null) { p.seekTo(ms); }
+            if (p != null) {
+                // seek 会让 audio sink flush，旧谱系作废：先清零，前端取到的是干净的 0
+                SpectrumProcessor.clear();
+                p.seekTo(ms);
+            }
         });
     }
 
@@ -285,6 +289,16 @@ public class AudioCpmBridge {
     private static volatile String cachedSpectrum = null;
     private static volatile int cachedSpectrumSeq = -1;
 
+    /** 只在帧序号变化时返回 JSON，否则返回空串（前端据此跳过 parse/绘制）。 */
+    public static String spectrumIfNew(int sinceSeq) {
+        try {
+            if (SpectrumProcessor.getSeq() == sinceSeq) return "";
+            return spectrum();
+        } catch (Throwable t) {
+            return "";
+        }
+    }
+
     public static String spectrum() {
         int sq = SpectrumProcessor.getSeq();
         String c = cachedSpectrum;
@@ -296,7 +310,8 @@ public class AudioCpmBridge {
             float[] lb = SpectrumProcessor.getLinBars();
             float[] sp = SpectrumProcessor.getSpec();
             StringBuilder sb = new StringBuilder(2048);
-            sb.append("{\"ok\":true,\"service\":").append(PlaybackService.getPlayer() != null)
+            sb.append("{\"ok\":true,\"seq\":").append(sq)
+              .append(",\"service\":").append(PlaybackService.getPlayer() != null)
               .append(",\"format\":").append(SpectrumProcessor.describe())
               .append(",\"sampleRate\":").append(SpectrumProcessor.getSampleRate()).append(",\"bands\":[");
             appendFloats(sb, b);

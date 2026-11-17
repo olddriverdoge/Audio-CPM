@@ -32,7 +32,9 @@ const Spectrum = (() => {
   let wfCtx = null, wfTmpCtx = null, wfW = 0, wfH = 0, wfLast = 0;
   let palette = null;
   const WFDPR = Math.min(2, DPR);        // 瀑布位图不必按 3x 放大：2x 已足够清晰，省一半以上像素拷贝
-  let dataSeq = 0, wfSeq = -1, lastDataAt = 0;           // 原生数据帧序号 / 瀑布已消费到的序号（没新数据就不滚动）
+  let dataSeq = 0, wfSeq = -1, lastDataAt = 0;
+  let lastSeq = -1;                      // 已消费的原生帧序号（没变就不解析 JSON）
+  let barGrad = null, barGradKey = '';   // 频谱柱状渐变缓存（按绘图区尺寸）
   let lastMeasure = 0;                   // 画布尺寸测量节流（每帧读 clientWidth 会强制同步排版）
   let paramsSig = '';                    // 已下发的参数签名（避免每帧 JSON + 桥调用）
   let wfImg = null, wfImgKey = '';       // 复用 ImageData
@@ -151,10 +153,22 @@ const Spectrum = (() => {
                  && typeof window.AudioCpmNative.spectrum === 'function');
     if (nat) {
       const myId = ++pcmTickId;
+      lastSeq = -1;
       const tick = () => {
         if (!pcmTimer || myId !== pcmTickId) return;
         if (core && core.native) {
-          try { const s = window.AudioCpmNative.spectrum(); if (s) applySpectrum(JSON.parse(s)); } catch (_) {}
+          try {
+            // spectrumIfNew：没有新帧直接返回空串 → 不产生 4KB 字符串、不 JSON.parse、不重绘
+            const fn = window.AudioCpmNative.spectrumIfNew;
+            const str = (typeof fn === 'function')
+              ? fn(lastSeq)                             // 无新帧 → ""，直接跳过
+              : window.AudioCpmNative.spectrum();
+            if (str) {
+              const r = JSON.parse(str);
+              if (typeof r.seq === 'number') lastSeq = r.seq;
+              applySpectrum(r);
+            }
+          } catch (_) {}
         }
         requestAnimationFrame(tick);
       };
@@ -338,12 +352,16 @@ const Spectrum = (() => {
     // 声谱优先用原生高分辨率线性谱（128/256/512），没有就退回 96 档线性 bands
     let srcBins = (core.spec && core.spec.length) ? core.spec : core.data;
     if (!srcBins || !srcBins.length) srcBins = core.data || new Uint8Array(96);
-    if (srcBins === core.spec) {
-      let mx = 0;
-      for (let i = 0; i < srcBins.length; i += 4) { if (srcBins[i] > mx) mx = srcBins[i]; }
-      if (mx < 3) srcBins = core.data || srcBins;   // 全零谱 = 还没算，退回可用数据
+    const nB0 = srcBins.length || 96;
+
+    if (advance) {
+      if (srcBins === core.spec) {
+        let mx = 0;
+        for (let i = 0; i < srcBins.length; i += 4) { if (srcBins[i] > mx) mx = srcBins[i]; }
+        if (mx < 3) srcBins = core.data || srcBins;   // 全零谱 = 还没算，退回可用数据
+      }
     }
-    const nB = srcBins.length || 96;
+    const nB = srcBins.length || nB0;
 
     if (advance) {
       const pal = palette || (palette = buildPalette(cfg.pal));
@@ -525,6 +543,15 @@ const Spectrum = (() => {
       const bw = area.gw / bars;
       const now = performance.now();
       const holdMs = (cfg.peak || 0) * 1000;
+      // 渐变色按整块绘图区缓存：以前每根柱子每帧都 createLinearGradient（48~96 个/帧），
+      // 是频谱模式下最贵的一次固定开销。
+      const gKey = Math.round(area.y0) + '|' + Math.round(area.gh);
+      if (barGradKey !== gKey) {
+        barGradKey = gKey;
+        barGrad = g.createLinearGradient(0, area.y0 + area.gh, 0, area.y0);
+        barGrad.addColorStop(0, '#38bdf8');
+        barGrad.addColorStop(1, '#fb923c');
+      }
       if (peakVals.length !== bars) {
         peakVals = new Array(bars).fill(0);
         peakAt = new Array(bars).fill(0);
@@ -539,10 +566,7 @@ const Spectrum = (() => {
         }
         const bh = Math.max(1, v * area.gh);
         const x = area.x0 + i * bw;
-        const grad = g.createLinearGradient(0, area.y0 + area.gh, 0, area.y0 + area.gh - bh);
-        grad.addColorStop(0, '#38bdf8');
-        grad.addColorStop(1, '#fb923c');
-        g.fillStyle = grad;
+        g.fillStyle = barGrad;
         g.fillRect(Math.round(x + 1), Math.round(area.y0 + area.gh - bh),
           Math.max(1, Math.round(bw - 2)), Math.round(bh));
         if (holdMs > 0 && peakVals[i] > 0.03) {
@@ -572,12 +596,13 @@ const Spectrum = (() => {
       core.spec = new Uint8Array(0);
     }
     try { if (wfCtx) { wfCtx.fillStyle = '#000'; wfCtx.fillRect(0, 0, wfW, wfH); } } catch (_) {}
+    lastSeq = -1;
     paramsSig = '';                      // 新 processor 是默认参数，必须重新下发
     if (!open) return;                   // 收起时不重启任何计算
     suspendForSwitch();
   }
 
-  function paintSwitchHint() {
+  function paintSwitchHint(label) {
     if (!g) return;
     try {
       g.setTransform(1, 0, 0, 1, 0, 0);
@@ -586,18 +611,18 @@ const Spectrum = (() => {
       g.fillStyle = 'rgba(148,163,184,.75)';
       g.textAlign = 'center'; g.textBaseline = 'middle';
       g.font = Math.round(12 * DPR) + 'px ui-monospace, Menlo, monospace';
-      g.fillText('切换中…', canvas.width / 2, canvas.height / 2);
+      g.fillText(label || '切换中…', canvas.width / 2, canvas.height / 2);
     } catch (_) {}
   }
 
-  function suspendForSwitch() {
+  function suspendForSwitch(label) {
     ++switchTok;
     suspended = true;
     stopPcmPoll();                        // 前端取数链停掉（pcmTickId 递增）
     stop();                               // rAF 也停掉，切歌时不重绘
     try { Api.playbackSpectrum(false); } catch (_) {}   // 原生 FFT 立刻停算
-    setState('切换中…');
-    paintSwitchHint();
+    setState(label || '切换中…');
+    paintSwitchHint(label);
     scheduleResume(switchTok, 700, 0);
   }
 
@@ -657,10 +682,20 @@ const Spectrum = (() => {
     if (!open) return;
     ++switchTok;
     suspended = true;
+    hist = []; peakVals = []; peakAt = []; lastSeq = -1;
     stopPcmPoll();
     stop();
     try { Api.playbackSpectrum(false); } catch (_) {}
     setState('暂停·已停算');
+  }
+
+  /* 拖动进度条：ExoPlayer 会 flush audio sink（重建 processor 的缓冲），
+     和切歌同源的高频取数会撞上主线程重活 → 直接走一次"停链-恢复"。 */
+  function onSeek() {
+    if (!open) return;
+    hist = []; peakVals = []; peakAt = []; lastSeq = -1;
+    dataSeq = 0; wfSeq = -1; lastDataAt = performance.now();
+    suspendForSwitch('定位中…');
   }
 
   function onVisible() {
@@ -996,6 +1031,6 @@ const Spectrum = (() => {
     });
   }
 
-  return {init, toggle, setMode, onTrackChange, resumeStream, onHidden, onVisible,
+  return {init, toggle, setMode, onTrackChange, onSeek, resumeStream, onHidden, onVisible,
           get open() { return open; }, get mode() { return mode; }};
 })();

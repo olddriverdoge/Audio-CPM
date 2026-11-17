@@ -445,7 +445,12 @@ const Player = (() => {
     if (!seeking) return;
     const t = Number(seek.value);
     if (isFinite(t)) {
-      if (hifi) { Api.playbackSeek(Math.round(t * 1000)).catch(() => {}); hifiPos = t * 1000; }
+      if (hifi) {
+        // 拖动进度条 = 一次 flush，按"已知重活场景"处理：频谱/声谱停链重置，播起来再接上
+        try { if (typeof Spectrum !== 'undefined') Spectrum.onSeek(); } catch (_) {}
+        Api.playbackSeek(Math.round(t * 1000)).catch(() => {});
+        hifiPos = t * 1000;
+      }
       else audio.currentTime = t;
     }
     seeking = false;
