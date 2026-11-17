@@ -18,6 +18,9 @@ function createPlayPanel() {
   const vol = document.getElementById('pf-vol');
   const volVal = document.getElementById('pf-vol-val');
   const volIco = document.getElementById('pf-vol-ico');
+  const waveBox = document.getElementById('pf-wave');
+  const waveBase = document.getElementById('pf-wave-base');
+  const waveHi = document.getElementById('pf-wave-hi');
   const qEl = document.getElementById('pf-queue');
   const qCount = document.getElementById('pf-qcount');
   if (!win) return fw;
@@ -64,10 +67,31 @@ function createPlayPanel() {
     }).join('');
   }
 
+  let wavePath = '';
+
+  async function setWave(path) {
+    wavePath = path || '';
+    waveBase.style.backgroundImage = '';
+    waveHi.style.backgroundImage = '';
+    if (!path) { waveBox.classList.add('time-only'); return; }
+    if (path.indexOf('dav:') === 0) { waveBox.classList.add('time-only'); return; }
+    waveBox.classList.remove('time-only');
+    let url = '';
+    try { url = await Wave.get(path); } catch (_) { url = ''; }
+    if (!url || wavePath !== path) return;
+    const css = 'url("' + url + '")';
+    waveBase.style.backgroundImage = css;
+    waveHi.style.backgroundImage = css;
+  }
+
   function renderState() {
     const d = Player.duration(), p = Player.position();
+    const curPath = Player.current || '';
+    if (curPath !== wavePath) setWave(curPath);
     if (d > 0) { durEl.textContent = fmt(d); seek.max = String(d); }
     if (!seeking) { seek.value = String(Math.min(p, d || p)); curEl.textContent = fmt(p); }
+    const pct = d > 0 ? Math.max(0, Math.min(100, p / d * 100)) : 0;
+    waveHi.style.clipPath = 'inset(0 ' + (100 - pct) + '% 0 0)';
     playBtn.textContent = Player.isPlaying() ? '⏸' : '▶';
     modeBtn.textContent = MODE_LABEL[(App.playMode && App.playMode()) || 'order'] || '顺序';
     const v = Number(vol.value);

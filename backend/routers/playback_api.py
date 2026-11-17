@@ -128,6 +128,25 @@ async def playback_spectrum(request):
     return JSONResponse(r)
 
 
+async def playback_volume(request):
+    d = await _body(request)
+    return JSONResponse(await run_in_threadpool(native_bridge.playback_control, 'volume',
+                                                float(d.get('volume') or 0)))
+
+
+async def playback_mode(request):
+    d = await _body(request)
+    return JSONResponse(await run_in_threadpool(native_bridge.playback_control, 'mode',
+                                                {'repeat': int(d.get('repeat') or 0),
+                                                 'shuffle': bool(d.get('shuffle'))}))
+
+
+async def playback_skip(request):
+    d = await _body(request)
+    return JSONResponse(await run_in_threadpool(native_bridge.playback_control, 'skip',
+                                                int(d.get('dir') or 1)))
+
+
 routes = [
     Route('/api/playback/open', playback_open, methods=['POST']),
     Route('/api/playback/pause', playback_pause, methods=['POST']),

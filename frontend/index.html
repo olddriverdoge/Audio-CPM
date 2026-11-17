@@ -257,7 +257,11 @@
     </div>
     <div class="pf-seekrow">
       <span class="pf-time" id="pf-cur">0:00</span>
-      <input type="range" class="pf-range" id="pf-seek" min="0" max="1000" value="0">
+      <div class="pf-wavebox" id="pf-wave">
+        <div class="pf-wave-base" id="pf-wave-base"></div>
+        <div class="pf-wave-hi" id="pf-wave-hi"></div>
+        <input type="range" class="pf-range pf-seek" id="pf-seek" min="0" max="1000" value="0">
+      </div>
       <span class="pf-time" id="pf-dur">0:00</span>
     </div>
     <div class="pf-transport">

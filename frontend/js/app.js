@@ -232,6 +232,16 @@ const App = (() => {
     if (bv) bv.onExternalPlayed(path);
     if (metaFloat) metaFloat.load(path);
     updateSelInfo();
+    /* 内置播放器起播：自动展开声谱；网格视图再自动调出播放管理 */
+    if (Player.current && Player.current === path) {
+      const spWin = document.getElementById('spectrum-float');
+      const wasClosed = spWin ? spWin.classList.contains('hidden') : false;
+      openMod('spectrum');
+      if (wasClosed && typeof Spectrum !== 'undefined' && Spectrum.setMode) {
+        try { Spectrum.setMode('waterfall'); } catch (_) {}
+      }
+      if (isGridView()) openMod('play');
+    }
   }
 
   /* ---- 播放模式（顺序 / 列表循环 / 单曲循环 / 随机） ---- */
@@ -367,6 +377,14 @@ const App = (() => {
       });
       hint.style.display = any ? 'none' : '';
     }
+  }
+  function openMod(name) {
+    const m = MODS[name];
+    if (!m) return;
+    const win = document.getElementById(m.win);
+    if (!win) return;
+    if (win.classList.contains('hidden')) toggleMod(name);
+    try { WinMgr.raise(win); } catch (_) {}
   }
   function toggleMod(name) {
     const m = MODS[name];
@@ -586,7 +604,7 @@ const App = (() => {
     document.getElementById('preset-select').addEventListener('change', () => TaskRunner.applyPreset());
     document.getElementById('btn-save-preset').onclick = () => TaskRunner.saveAsPreset();
     document.getElementById('btn-del-preset').onclick = () => TaskRunner.deletePreset();
-    document.getElementById('start-btn').onclick = () => TaskRunner.start();
+    document.getElementById('start-btn').onclick = () => { openMod('log'); TaskRunner.start(); };
     const pickCoverBtn = document.getElementById('btn-pick-cover');
     if (pickCoverBtn) {
       pickCoverBtn.onclick = async () => {
@@ -717,7 +735,7 @@ const App = (() => {
 
   return {
     init, browse, onPlayed, updateMoveBar: () => MoveMgr.update(), isGridView, refreshColumns,
-    playNext, playPrev, autoplayNext, autoplayOn, applyPlayMode, playMode, cyclePlayMode,
+    playNext, playPrev, autoplayNext, autoplayOn, applyPlayMode, playMode, cyclePlayMode, openMod,
     playbackQueueList: () => playbackList().slice(), hifiQueue, toggleMod,
     get path() { return currentPath; },
     selection: () => (bv ? bv.selected() : []),

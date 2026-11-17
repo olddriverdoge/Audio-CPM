@@ -104,3 +104,13 @@
   .pf-q.on{color:var(--accent);background:rgba(56,189,248,.1)}
   .pf-q-ico{width:14px;flex:0 0 auto;text-align:center}
   .pf-q-name{flex:1 1 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* 播放管理进度条：与底部播放条同款波形背景 */
+  .pf-wavebox{position:relative;flex:1 1 auto;height:26px;border-radius:6px;overflow:hidden;
+    background:#111820;border:1px solid var(--border)}
+  .pf-wave-base,.pf-wave-hi{position:absolute;left:0;right:0;top:0;bottom:0;
+    background-repeat:no-repeat;background-size:100% 100%}
+  .pf-wave-base{filter:saturate(.55) brightness(.8)}
+  .pf-wave-hi{filter:saturate(1.15) brightness(1.15)}
+  .pf-seek{position:absolute;left:0;right:0;top:0;bottom:0;width:100%;height:100%;margin:0;
+    opacity:.9;background:transparent}
+  .pf-wavebox.time-only .pf-wave-base,.pf-wavebox.time-only .pf-wave-hi{display:none}
