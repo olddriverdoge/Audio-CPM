@@ -3,7 +3,7 @@ package com.github.olddriverdoge.audiocpm;
 import androidx.media3.common.C;
 import androidx.media3.common.audio.AudioProcessor.AudioFormat;
 import androidx.media3.common.audio.BaseAudioProcessor;
-import androidx.media3.common.audio.AudioProcessor.UnhandledAudioFormatException;
+
 
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
@@ -39,6 +39,7 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
     private double[] a1 = new double[BANDS], a2 = new double[BANDS];
     private float[][] z1, z2;
     private long appliedRev = -1;
+    private boolean bypass = false;
 
     /* ---------------- 外部调参 ---------------- */
     public static void setEnabled(boolean on) { enabled = on; rev++; }
@@ -85,13 +86,10 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
     /* ---------------- AudioProcessor ---------------- */
     @Override
     protected AudioFormat onConfigure(AudioFormat inputFormat) {
-        if (inputFormat.encoding != C.ENCODING_PCM_16BIT
-                && inputFormat.encoding != C.ENCODING_PCM_FLOAT) {
-            throw new UnhandledAudioFormatException(inputFormat);
-        }
         channels = Math.max(1, inputFormat.channelCount);
         sampleRate = inputFormat.sampleRate;
         encoding = inputFormat.encoding;
+        bypass = (encoding != C.ENCODING_PCM_16BIT && encoding != C.ENCODING_PCM_FLOAT);
         z1 = new float[channels][BANDS];
         z2 = new float[channels][BANDS];
         appliedRev = -1;
@@ -154,6 +152,13 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
     public void queueInput(ByteBuffer inputBuffer) {
         if (inputBuffer == null || !inputBuffer.hasRemaining()) return;
         if (z1 == null) return;                    // 还没 configure
+        if (bypass) {                              // 不支持的 PCM 格式：原样透传
+            ByteBuffer out = replaceOutputBuffer(inputBuffer.remaining());
+            out.put(inputBuffer.duplicate());
+            inputBuffer.position(inputBuffer.limit());
+            out.flip();
+            return;
+        }
         applyParams();
         int bytesPerSample = encoding == C.ENCODING_PCM_FLOAT ? 4 : 2;
         int frameSize = bytesPerSample * channels;

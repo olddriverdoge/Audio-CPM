@@ -96,34 +96,14 @@ async def api_stream(request: Request):
     path = qs(request, 'path')
     ref = parse_ref(path)
     if ref.kind == 'dav':
+        # 落盘缓存后由本地静态服务提供，Range/Content-Length 稳定，避免 WebDAV 端实现差异导致无法播放
+        from ..davstream import cached_path, DavStreamError
         try:
-            resp = get_dav_client(ref.source).open_range(ref.path, request.headers.get('range'))
-        except Exception as e:
-            raise HTTPException(400, f"WebDAV 读取失败: {e}")
-        if resp.status_code not in (200, 206):
-            raise HTTPException(resp.status_code, "not found")
-        mt = (resp.headers.get('content-type') or
-              mimetypes.guess_type(ref.path)[0] or 'application/octet-stream')
-        headers = {}
-        for h, name in (('content-range', 'Content-Range'),
-                        ('content-length', 'Content-Length'),
-                        ('accept-ranges', 'Accept-Ranges')):
-            if resp.headers.get(h):
-                headers[name] = resp.headers[h]
-        headers.setdefault('Accept-Ranges', 'bytes')
-        if request.headers.get('range') and 'Content-Range' not in headers:
-            headers['X-Audio-CPM-Range'] = 'unsupported'
-        def gen():
-            try:
-                for chunk in resp.iter_bytes():
-                    yield chunk
-            finally:
-                try:
-                    resp.close()
-                except Exception:
-                    pass
-        return StreamingResponse(gen(), status_code=resp.status_code,
-                                 media_type=mt, headers=headers)
+            local = await run_in_threadpool(cached_path, ref.source, ref.path)
+        except DavStreamError as e:
+            raise HTTPException(400, str(e))
+        mt = (mimetypes.guess_type(ref.path)[0] or 'application/octet-stream')
+        return FileResponse(local, media_type=mt)
     if not os.path.isfile(ref.path):
         # 区分“文件不存在”和“有文件但没权限”：安卓上未授权时 stat 同样返回 False，
         # 直接报 404 会让人误以为文件丢了。

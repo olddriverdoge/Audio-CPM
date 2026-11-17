@@ -302,6 +302,10 @@ const Player = (() => {
     }
     hifi = false;
     pendingRatio = 0;          // 回退网页播放：比例由 audio.currentTime 处理
+    if (String(path).indexOf('dav:') === 0) {
+      // 远端文件走本机流代理：顺手停掉原生播放器，避免上一首的 ExoPlayer 报错/叠音
+      try { if (typeof Api !== 'undefined' && Api.playbackStop) Api.playbackStop().catch(() => {}); } catch (_) {}
+    }
     setWave(path);
     paintRows();
     audio.src = '/api/stream?path=' + encodeURIComponent(path);

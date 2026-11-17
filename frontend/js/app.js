@@ -216,6 +216,23 @@ const App = (() => {
     }
   }
 
+  /* 一键把当前浏览目录加进目标目录（与现有标签去重，直接切过去） */
+  async function addTargetCurrent() {
+    const uri = currentPath;
+    if (!uri) { Utils.toast('先打开一个目录', 'warn'); return; }
+    let i = treeRoots.indexOf(uri);
+    if (i < 0) {
+      treeRoots.push(uri);
+      treeActive = treeRoots.length - 1;
+      saveTreeRoots();
+      renderTreeTabs();
+      i = treeActive;
+    }
+    await activateTreeRoot(i);
+    openMod('tree');
+    Utils.toast('目标目录已指向当前路径');
+  }
+
   /* 一次点击：开始播放并落到点击位置 */
   function playRowClick(path, e, rowEl) {
     if (!path) return;
@@ -511,6 +528,8 @@ const App = (() => {
     if (s1v) s1v.addEventListener('click', cycleViewMode);
     const s1sz = document.getElementById('s1-size-btn');
     if (s1sz) s1sz.addEventListener('click', cycleGridSize);
+    const s1tg = document.getElementById('s1-target-btn');
+    if (s1tg) s1tg.addEventListener('click', () => { addTargetCurrent().catch(e => Utils.toast('设置目标目录失败: ' + (e && e.message || e), 'err')); });
 
     /* 全屏（仅网页版；app 内已被剔除） */
     const fsBtn = document.getElementById('btn-fullscreen');
@@ -749,7 +768,7 @@ const App = (() => {
   return {
     init, browse, onPlayed, updateMoveBar: () => MoveMgr.update(), isGridView, refreshColumns,
     playNext, playPrev, autoplayNext, autoplayOn, applyPlayMode, playMode, cyclePlayMode, openMod,
-    openMods, closeAllMods,
+    openMods, closeAllMods, addTargetCurrent,
     playbackQueueList: () => playbackList().slice(), hifiQueue, toggleMod,
     get path() { return currentPath; },
     selection: () => (bv ? bv.selected() : []),
