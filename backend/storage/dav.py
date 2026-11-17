@@ -54,7 +54,7 @@ class DavClient:
             limits=httpx.Limits(max_connections=8, max_keepalive_connections=4),
             follow_redirects=True,
             verify=bool(cfg.get('verify', True)),
-            headers={'User-Agent': 'AC2-WebDAV/1.0'},
+            headers={'User-Agent': 'Audio-CPM-WebDAV/1.0'},
         )
         self._base_path = urlsplit(self.base).path.rstrip('/')
 

@@ -21,11 +21,11 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 /**
- * AC2 原生桥（Gradle/Chaquopy 壳）。所有方法不抛异常，统一返回 JSON 字符串。
+ * Audio-CPM 原生桥（Gradle/Chaquopy 壳）。所有方法不抛异常，统一返回 JSON 字符串。
  * 由 Python 侧的 backend/native_bridge.py 通过 Chaquopy 的 jclass 调用。
  */
-public class Ac2Bridge {
-    private static final String TAG = "AC2";
+public class AudioCpmBridge {
+    private static final String TAG = "Audio-CPM";
 
     private static volatile int sSampleRate = 0;
     private static volatile int sBitDepth = 0;
@@ -103,7 +103,7 @@ public class Ac2Bridge {
             if (!f.isFile()) {
                 return "{\"status\":\"error\",\"message\":\"file not found\"}";
             }
-            Context ctx = Ac2App.get();
+            Context ctx = AudioCpmApp.get();
             if (ctx == null) {
                 return "{\"status\":\"error\",\"message\":\"no context\"}";
             }
@@ -128,7 +128,7 @@ public class Ac2Bridge {
     /** 本地 HiFi：交给 PlaybackService 的 ExoPlayer（通知栏/锁屏由 MediaSession 负责） */
     public static String play(String path, int startMs, int sampleRate, int bitDepth, int channels) {
         try {
-            Context ctx = Ac2App.get();
+            Context ctx = AudioCpmApp.get();
             if (ctx == null) { Log.w(TAG, "play: no context"); return "{\"ok\":false,\"error\":\"no context\"}"; }
             if (!ensureService(ctx)) {
                 Log.w(TAG, "play: service unavailable");
@@ -184,7 +184,7 @@ public class Ac2Bridge {
             float vol = onMain(() -> p.getVolume(), 1f);
             boolean notif = true;
             try {
-                Context ctx0 = Ac2App.get();
+                Context ctx0 = AudioCpmApp.get();
                 android.app.NotificationManager nm = ctx0 == null ? null
                         : (android.app.NotificationManager) ctx0.getSystemService(Context.NOTIFICATION_SERVICE);
                 if (nm != null) notif = nm.areNotificationsEnabled();
@@ -212,7 +212,7 @@ public class Ac2Bridge {
     /** 原生队列：交给 ExoPlayer 的 playlist，切后台也能按顺序自动下一首。 */
     public static String setQueue(String[] paths, int startIndex, int startMs) {
         try {
-            Context ctx = Ac2App.get();
+            Context ctx = AudioCpmApp.get();
             if (ctx == null) return "{\"ok\":false,\"error\":\"no context\"}";
             if (!ensureService(ctx)) return "{\"ok\":false,\"error\":\"playback service unavailable\"}";
             final List<MediaItem> items = new ArrayList<>();
@@ -315,7 +315,7 @@ public class Ac2Bridge {
         }
     }
 
-    /** 波形峰值由 Python 侧 ffmpeg 计算（native 解码兜底在 Ac2Wave 中，未接这条桥）。 */
+    /** 波形峰值由 Python 侧 ffmpeg 计算（native 解码兜底在 AudioCpmWave 中，未接这条桥）。 */
     public static String peaks(String path, int buckets) {
         return "{\"ok\":false,\"error\":\"peaks not implemented\"}";
     }
@@ -333,7 +333,7 @@ public class Ac2Bridge {
 
     public static void openAllFilesSettings() {
         try {
-            Context ctx = Ac2App.get();
+            Context ctx = AudioCpmApp.get();
             Intent i = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
             i.setData(Uri.parse("package:" + ctx.getPackageName()));
             i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);

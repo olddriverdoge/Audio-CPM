@@ -23,7 +23,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
-        android:name=".Ac2App"
+        android:name=".AudioCpmApp"
         android:label="Audio-CPM"
         android:usesCleartextTraffic="true"
         android:extractNativeLibs="true"
@@ -41,7 +41,7 @@
 
         <!-- 外部播放器用的只读 content:// 提供者 -->
         <provider
-            android:name=".Ac2FileProvider"
+            android:name=".AudioCpmFileProvider"
             android:authorities="${applicationId}.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true" />

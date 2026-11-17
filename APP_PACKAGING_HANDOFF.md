@@ -1,4 +1,4 @@
-# AC2 Web · App 打包交接清单（p4a + FFmpeg 转码）
+# Audio-CPM · App 打包交接清单（p4a + FFmpeg 转码）
 
 > 面向：后续负责打包的 agent/人。
 > 基线：2026-11-15 的 Termux 版（Starlette + mutagen + 本地/WebDAV 双源 + 纯 Python AIFF），功能已人工验收通过。
@@ -49,7 +49,7 @@
 
 ```ini
 [app]
-title = AC2
+title = Audio-CPM
 package.name = ac2
 package.domain = com.example
 source.dir = ../..
@@ -69,7 +69,7 @@ permissions = READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,INTERNET
 
 - `requirements` 里的 `ffmpeg` 是 **recipe 名**，产出 `libffmpegbin.so` + `libav*.so`（无 ffprobe，本项目已不需要）。
 - 若需要自定义 Java 源：`android.add_src = packaging/android/java`（buildozer 写法；p4a CLI 对应 `--add-java-src`，以实际版本为准）。
-- Java 源用 **Java**（不用 Kotlin），避免 p4a 的 Kotlin 编译链；一个 `Ac2Bridge` 类承载所有桥方法即可。
+- Java 源用 **Java**（不用 Kotlin），避免 p4a 的 Kotlin 编译链；一个 `AudioCpmBridge` 类承载所有桥方法即可。
 
 ### 2.2 启动器 `packaging/p4a/main.py`（骨架）
 
@@ -136,9 +136,9 @@ if __name__ == "__main__":
 |---|---|---|---|---|---|
 | P0-1 | 打包空壳 | 骨架已建（`packaging/`），剩：首次构建/端口验证/启动错误页 | WebView 打开首页、无白屏 | 2~4 | 中 |
 | P0-2 | 权限与存储 | targetSdk 28 + 存储权限 + `/sdcard` 浏览 | 能浏览/播放 `/sdcard` | 1~2 | 中 |
-| P0-3 | MediaCodec 波形桥 | `Ac2Bridge.peaks(path,buckets)` → JSON；Python 注册 `waveform.native_provider` | FLAC/MP3/AAC/OGG/OPUS 波形与 Termux ±5% | 2~4 | **高** |
+| P0-3 | MediaCodec 波形桥 | `AudioCpmBridge.peaks(path,buckets)` → JSON；Python 注册 `waveform.native_provider` | FLAC/MP3/AAC/OGG/OPUS 波形与 Termux ±5% | 2~4 | **高** |
 | P0-4 | 标签写入验证 | 已改 mutagen，app 内直接可用 | 写 FLAC/MP3 后其他播放器可见 | 0.5 | 低 |
-| P1-1 | 外部播放器 | Java `Ac2Bridge.open(path,pkg,act)` + FileProvider | 系统播放器能打开 FLAC | 1~2 | 中 |
+| P1-1 | 外部播放器 | Java `AudioCpmBridge.open(path,pkg,act)` + FileProvider | 系统播放器能打开 FLAC | 1~2 | 中 |
 | P1-2 | AIFF 播放 | 纯 Python 已实现，app 内确认缓存目录可写 | AIFF 16/24 播放 | 0.5 | 低 |
 | ~~P1-3~~ | ~~转码执行模型~~ | **已完成**（Termux 侧）：取消/并发/持久化/`.part` 清理 | 见 §5 | 0 | — |
 | ~~P1-4~~ | ~~转码 UI~~ | **已完成**：取消按钮 + `cancelled` 事件 + 未完成提示 | 能取消、能看到进度 | 0 | — |
@@ -166,10 +166,10 @@ if __name__ == "__main__":
 
 ## 6. 原生桥规范（Java，p4a）
 
-包名建议 `com.example.ac2`，一个类 `Ac2Bridge`：
+包名建议 `com.example.ac2`，一个类 `AudioCpmBridge`：
 
 ```java
-public class Ac2Bridge {
+public class AudioCpmBridge {
     // 波形：返回 {"ok":true,"peaks":[...]} 或 {"ok":false,"error":"..."}
     public static String peaks(String path, int buckets) { ... }
 
@@ -187,7 +187,7 @@ public class Ac2Bridge {
   ```python
   from jnius import autoclass
   from backend import waveform
-  _B = autoclass('com.example.ac2.Ac2Bridge')
+  _B = autoclass('com.example.ac2.AudioCpmBridge')
   waveform.native_provider = lambda path, buckets: json.loads(_B.peaks(path, buckets))['peaks']
   ```
 - 外部播放器需要 FileProvider：AndroidX 依赖可 `android.gradle_dependencies = androidx.core:core:1.12.0`；若加依赖困难，可用自定义 `ContentProvider`（约 40 行）替代 AndroidX。

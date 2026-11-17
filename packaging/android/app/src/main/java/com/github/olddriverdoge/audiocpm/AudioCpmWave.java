@@ -22,13 +22,13 @@ import java.util.ArrayList;
  *
  * 目的：APK 里不打包 ffmpeg 也能给 FLAC/MP3/AAC/OGG/Opus 生成波形。
  */
-public final class Ac2Wave {
+public final class AudioCpmWave {
     private static final int WINDOW_MS = 100;
     private static final int TIMEOUT_US = 8000;
     /** 解码卡死保护：单次调用最多这么多次主循环 */
     private static final int MAX_LOOPS = 8_000_000;
 
-    private Ac2Wave() {}
+    private AudioCpmWave() {}
 
     public static boolean peaks(String srcPath, int buckets, String outPath) {
         if (buckets < 8) buckets = 8;
@@ -42,7 +42,7 @@ public final class Ac2Wave {
     private static boolean ffmpegPeaks(String srcPath, int buckets, String outPath) {
         Process proc = null;
         try {
-            Context ctx = Ac2App.get();
+            Context ctx = AudioCpmApp.get();
             if (ctx == null) return false;
             File bin = new File(ctx.getApplicationInfo().nativeLibraryDir, "libffmpegbin.so");
             if (!bin.isFile()) return false;

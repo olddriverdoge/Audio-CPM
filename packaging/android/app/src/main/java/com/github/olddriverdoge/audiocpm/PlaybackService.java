@@ -31,8 +31,8 @@ import androidx.media3.session.MediaStyleNotificationHelper;
 
 /** 本地 HiFi 播放服务：ExoPlayer + MediaSession（通知栏/锁屏/后台播放由 Media3 负责）。 */
 public class PlaybackService extends MediaSessionService {
-    private static final String TAG = "AC2";
-    private static final String CHANNEL_ID = "ac2_playback";
+    private static final String TAG = "Audio-CPM";
+    private static final String CHANNEL_ID = "audio_cpm_playback";
     private static final int NOTIF_ID = 1001;
     private static volatile ExoPlayer player;
     private static volatile MediaSession session;
@@ -144,7 +144,7 @@ public class PlaybackService extends MediaSessionService {
 
     private Notification buildNotification(MediaSession session) {
         Player p = session.getPlayer();
-        String title = "AC2";
+        String title = "Audio-CPM";
         try {
             MediaItem mi = p.getCurrentMediaItem();
             if (mi != null && mi.localConfiguration != null && mi.localConfiguration.uri != null) {
@@ -157,13 +157,13 @@ public class PlaybackService extends MediaSessionService {
         Intent open = new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent content = PendingIntent.getActivity(this, 0, open,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        PendingIntent toggle = serviceAction("AC2_TOGGLE", 11);
-        PendingIntent prev = serviceAction("AC2_PREV", 12);
-        PendingIntent next = serviceAction("AC2_NEXT", 13);
+        PendingIntent toggle = serviceAction("AUDIO_CPM_TOGGLE", 11);
+        PendingIntent prev = serviceAction("AUDIO_CPM_PREV", 12);
+        PendingIntent next = serviceAction("AUDIO_CPM_NEXT", 13);
         NotificationCompat.Builder b = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_media_play)
                 .setContentTitle(title)
-                .setContentText("AC2 · HiFi")
+                .setContentText("Audio-CPM · HiFi")
                 .setContentIntent(content)
                 .setOngoing(playing)
                 .setOnlyAlertOnce(true)
@@ -188,15 +188,15 @@ public class PlaybackService extends MediaSessionService {
     public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent == null ? null : intent.getAction();
         if (action != null && player != null) {
-            if ("AC2_TOGGLE".equals(action)) {
+            if ("AUDIO_CPM_TOGGLE".equals(action)) {
                 if (player.isPlaying()) player.pause(); else player.play();
                 return START_STICKY;
             }
-            if ("AC2_NEXT".equals(action)) {
+            if ("AUDIO_CPM_NEXT".equals(action)) {
                 if (player.hasNextMediaItem()) player.seekToNextMediaItem();
                 return START_STICKY;
             }
-            if ("AC2_PREV".equals(action)) {
+            if ("AUDIO_CPM_PREV".equals(action)) {
                 if (player.hasPreviousMediaItem()) player.seekToPreviousMediaItem();
                 else player.seekTo(0);
                 return START_STICKY;

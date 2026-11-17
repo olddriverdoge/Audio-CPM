@@ -1,4 +1,4 @@
-# AC2 Web：封装 App 与 WebDAV 演进方案
+# Audio-CPM：封装 App 与 WebDAV 演进方案
 
 > **状态说明（2026-11-15 修订）**：本文的“独立 APK”方案假设“FFmpeg 必须进 app”。按最新决策（离线独立 + 砍掉转换 + 本地/WebDAV 双栈），已改为“app 首版不带 FFmpeg”，最新方案见 [OFFLINE_APP_PLAN_V2.md](OFFLINE_APP_PLAN_V2.md)。本文保留：技术架构体检、Android exec/ABI 限制、ffmpeg-kit 桥接、CI 打包流程，作为“以后要恢复转换功能”的备选参考。
 

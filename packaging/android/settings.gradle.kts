@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "AC2"
+rootProject.name = "Audio-CPM"
 include(":app")

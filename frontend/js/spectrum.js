@@ -27,7 +27,8 @@ const Spectrum = (() => {
 
   // 声谱缓冲（时间轴横向、频率纵向；新数据从右侧进入，向左滚动）
   const wf = document.createElement('canvas');
-  let wfCtx = null, wfW = 0, wfH = 0, wfLast = 0;
+  const wfTmp = document.createElement('canvas');      // 滚动位移用的中转画布（不自绘自）
+  let wfCtx = null, wfTmpCtx = null, wfW = 0, wfH = 0, wfLast = 0;
   let palette = null;
 
   function setState(t) { if (stateEl) stateEl.textContent = t || ''; }
@@ -117,13 +118,13 @@ const Spectrum = (() => {
     try { Api.playbackSpectrum(true); } catch (_) {}
     // 高刷路径：直接同步调用 Java（WebView JS 桥），跟 requestAnimationFrame 走，
     // 帧率由屏幕刷新率决定（60/90/120Hz），绕开 HTTP 轮询的延迟。
-    const nat = (typeof window.Ac2Native === 'object' && window.Ac2Native
-                 && typeof window.Ac2Native.spectrum === 'function');
+    const nat = (typeof window.AudioCpmNative === 'object' && window.AudioCpmNative
+                 && typeof window.AudioCpmNative.spectrum === 'function');
     if (nat) {
       const tick = () => {
         if (!pcmTimer) return;
         if (core && core.native) {
-          try { const s = window.Ac2Native.spectrum(); if (s) applySpectrum(JSON.parse(s)); } catch (_) {}
+          try { const s = window.AudioCpmNative.spectrum(); if (s) applySpectrum(JSON.parse(s)); } catch (_) {}
         }
         requestAnimationFrame(tick);
       };
@@ -241,7 +242,9 @@ const Spectrum = (() => {
     const oldCtx = wfW > 0 && wfH > 0 ? old.getContext('2d') : null;
     if (oldCtx) { try { oldCtx.drawImage(wf, 0, 0); } catch (_) {} }
     wf.width = bw; wf.height = bh;
+    wfTmp.width = bw; wfTmp.height = bh;
     try { wfCtx = wf.getContext('2d'); } catch (_) { wfCtx = null; }
+    try { wfTmpCtx = wfTmp.getContext('2d'); } catch (_) { wfTmpCtx = null; }
     wfW = bw; wfH = bh;
     if (!wfCtx) return;
     wfCtx.fillStyle = '#000';
@@ -289,21 +292,38 @@ const Spectrum = (() => {
     const now = performance.now();
     const advance = (wfLast === 0) || (now - wfLast >= 16.7);
     if (advance) wfLast = now;
-    wfCtx.globalCompositeOperation = 'copy';
-    try {
-      if (typeof wfCtx.drawImage === 'function' && advance) wfCtx.drawImage(wf, -DPR, 0);
-    } catch (_) { wfCtx.fillRect(0, 0, BW, BH); }
-    wfCtx.globalCompositeOperation = 'source-over';
+    const colW = Math.max(1, Math.round(DPR));   // 新列宽（设备像素）
+    if (advance) {
+      try {
+        if (wfTmpCtx) {
+          wfTmpCtx.globalCompositeOperation = 'copy';
+          wfTmpCtx.drawImage(wf, 0, 0);
+          wfTmpCtx.globalCompositeOperation = 'source-over';
+          wfCtx.globalCompositeOperation = 'copy';
+          wfCtx.drawImage(wfTmp, -colW, 0);
+          wfCtx.globalCompositeOperation = 'source-over';
+        }
+      } catch (_) {
+        try { wfCtx.globalCompositeOperation = 'source-over'; } catch (__) {}
+      }
+    }
 
     const nyq = nyquist();
     const topHz = Math.min(cfg.top || 24000, nyq);
     // 声谱优先用原生高分辨率线性谱（128/256/512），没有就退回 96 档线性 bands
-    const srcBins = (core.spec && core.spec.length) ? core.spec : core.data;
+    let srcBins = (core.spec && core.spec.length) ? core.spec : core.data;
+    if (!srcBins || !srcBins.length) srcBins = core.data || new Uint8Array(96);
+    if (srcBins === core.spec) {
+      // 高分辨率谱可能是"已分配但还没算"的全零数组，此时不能用，否则整屏全黑
+      let mx = 0;
+      for (let i = 0; i < srcBins.length; i += 4) { if (srcBins[i] > mx) mx = srcBins[i]; }
+      if (mx < 3) srcBins = core.data || srcBins;
+    }
     const nB = srcBins.length || 96;
     const pal = palette || (palette = buildPalette(cfg.pal));
     const br = BRIGHT[cfg.bright] || BRIGHT.std;
     let img = null, px = null;
-    try { img = wfCtx.createImageData(DPR, BH); px = img.data; } catch (_) {}
+    try { img = wfCtx.createImageData(colW, BH); px = img.data; } catch (_) {}
     for (let y = 0; y < BH; y++) {
       const rowNorm = (BH - 1 - y) / Math.max(1, BH - 1);   // 0=底(低频) 1=顶
       const hz = normToHz(rowNorm, topHz);
@@ -311,8 +331,8 @@ const Spectrum = (() => {
       const v = srcBins[bin] || 0;
       const ci = Math.max(0, Math.min(255, Math.round((v - br[0]) * 255 / (br[1] - br[0]))));
       if (px) {
-        for (let k = 0; k < DPR; k++) {
-          const o = (y * DPR + k) * 4;
+        for (let k = 0; k < colW; k++) {
+          const o = (y * colW + k) * 4;
           px[o] = pal[ci * 3];
           px[o + 1] = pal[ci * 3 + 1];
           px[o + 2] = pal[ci * 3 + 2];
@@ -320,10 +340,10 @@ const Spectrum = (() => {
         }
       } else {
         wfCtx.fillStyle = 'rgb(' + pal[ci * 3] + ',' + pal[ci * 3 + 1] + ',' + pal[ci * 3 + 2] + ')';
-        wfCtx.fillRect(BW - DPR, y, DPR, 1);
+        wfCtx.fillRect(BW - colW, y, colW, 1);
       }
     }
-    if (px) { try { wfCtx.putImageData(img, BW - DPR, 0); } catch (_) {} }
+    if (px) { try { wfCtx.putImageData(img, BW - colW, 0); } catch (_) {} }
 
     if (typeof g.drawImage === 'function') g.drawImage(wf, area.x0, area.y0, W, H);
 
@@ -387,9 +407,19 @@ const Spectrum = (() => {
   function draw() {
     raf = 0;
     if (!open || !g) return;
+    try {
+    drawFrame();
+    } catch (e) {
+      try { console.warn('spectrum draw failed', e); } catch (_) {}
+    }
+    if (stopped) return;                 // enterIdle 停算后不再排帧
+    raf = requestAnimationFrame(draw);
+  }
+
+  function drawFrame() {
     layoutCanvas();
     const w = cssW, h = cssH;
-    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    g.setTransform(canvas.width / w, 0, 0, canvas.height / h, 0, 0);
     g.clearRect(0, 0, w, h);
     // 两种模式坐标系隔离：频谱 X=频率 / Y=dB；声谱 X=时间 / Y=频率
     const area = computeArea(w, h, 30, 14);
@@ -463,7 +493,6 @@ const Spectrum = (() => {
       }
       setState('实时');
     }
-    raf = requestAnimationFrame(draw);
   }
 
   function start() {
@@ -561,8 +590,8 @@ const Spectrum = (() => {
   function pushParams() {
     paintBarsChip();
     try {
-      if (window.Ac2Native && typeof window.Ac2Native.setParams === 'function') {
-        window.Ac2Native.setParams(JSON.stringify({
+      if (window.AudioCpmNative && typeof window.AudioCpmNative.setParams === 'function') {
+        window.AudioCpmNative.setParams(JSON.stringify({
           floorDb: cfg.db, release: REL_K[cfg.rel] || 0.12, bars: effBars(),
           spec: (mode === 'waterfall' ? (cfg.bands2 || 256) : 0)}));
       }

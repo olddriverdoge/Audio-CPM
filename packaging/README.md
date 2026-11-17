@@ -12,7 +12,7 @@ packaging/
 │   ├── buildozer.spec     构建配置（ffmpeg recipe、targetSdk 28、arm64）
 │   └── README.md
 ├── android/
-│   ├── java/com/example/ac2/Ac2Bridge.java   原生桥（波形/Intent/权限；目前是骨架）
+│   ├── java/com/example/ac2/AudioCpmBridge.java   原生桥（波形/Intent/权限；目前是骨架）
 │   └── AndroidManifest.append.md             FileProvider / queries / 权限片段
 ├── ci/build-apk.yml       GitHub Actions 构建（复制到仓库根 .github/workflows/）
 ├── preflight.sh           打包前自检（编译/服务/端口/回归）
@@ -62,7 +62,7 @@ bash packaging/preflight.sh     # py_compile + 服务 200 + 端口一致 + 12 �
 
 ## 已知缺口
 
-- `Ac2Bridge.java` 仍是骨架：`peaks()` 返回 not implemented → 波形会回退到 ffmpeg（p4a 的 `libffmpegbin.so`，需 ffbin 定位成功）；`open()` 返回 not implemented → app 内系统播放器暂不可用。首版可先验证「浏览/播放/元数据/波形(ffmpeg)/转码」。
+- `AudioCpmBridge.java` 仍是骨架：`peaks()` 返回 not implemented → 波形会回退到 ffmpeg（p4a 的 `libffmpegbin.so`，需 ffbin 定位成功）；`open()` 返回 not implemented → app 内系统播放器暂不可用。首版可先验证「浏览/播放/元数据/波形(ffmpeg)/转码」。
 - `fullscreen = 1`：WebView 的全屏按钮（`requestFullscreen`）依赖 p4a 的 PythonActivity 是否实现 `WebChromeClient.onShowCustomView`，未验证；前端 CSS 布局本身可用。
 - targetSdk 28：侧载可用、`/sdcard` 走旧权限模型；不能上 Google Play。
 - `p4a.branch = develop`：首次构建成功后建议锁 commit，保证可复现。

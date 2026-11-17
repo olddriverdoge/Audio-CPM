@@ -1,5 +1,5 @@
     <provider
-        android:name="com.github.olddriverdoge.audiocpm.Ac2FileProvider"
+        android:name="com.github.olddriverdoge.audiocpm.AudioCpmFileProvider"
         android:authorities="com.github.olddriverdoge.audiocpm.fileprovider"
         android:exported="false"
         android:grantUriPermissions="true" />

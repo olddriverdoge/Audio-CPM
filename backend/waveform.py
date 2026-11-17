@@ -134,7 +134,7 @@ def _peaks_ffmpeg(path: str, buckets: int) -> List[float]:
 
 
 def _peaks_native(path: str, buckets: int) -> Optional[List[float]]:
-    """app 内走 Java Ac2Wave（MediaExtractor + MediaCodec），无需 ffmpeg。
+    """app 内走 Java AudioCpmWave（MediaExtractor + MediaCodec），无需 ffmpeg。
 
     Chaquopy 把 Java 结果写成临时 JSON 再读回，避免数组类型转换差异。
     """
@@ -142,7 +142,7 @@ def _peaks_native(path: str, buckets: int) -> Optional[List[float]]:
         return None
     try:
         from java import jclass  # type: ignore  # Chaquopy 提供
-        Cls = jclass('com.github.olddriverdoge.audiocpm.Ac2Wave')
+        Cls = jclass('com.github.olddriverdoge.audiocpm.AudioCpmWave')
     except Exception:
         return None
     tmp = None

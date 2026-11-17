@@ -37,7 +37,7 @@ public class SpectrumProcessor extends BaseAudioProcessor {
     private static volatile boolean enabled = false;
     private static volatile int encoding = C.ENCODING_PCM_16BIT;
     private static volatile int channels = 2;
-    /* 显示参数（前端调节条通过 Ac2Bridge 下发） */
+    /* 显示参数（前端调节条通过 AudioCpmBridge 下发） */
     private static volatile float dbFloor = -80.0f;   // Y 轴下限：-60 / -80 / -100
     private static volatile float releaseK = 0.12f;   // 回弹（下降）系数：快 .20 / 中 .12 / 慢 .07
 

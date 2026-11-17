@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Android 原生桥注册（app 内使用；Termux 下全部 no-op）。
 
-Java: com.github.olddriverdoge.audiocpm.Ac2Bridge
+Java: com.github.olddriverdoge.audiocpm.AudioCpmBridge
   playback: play/pause/resume/seek/stop/state/spectrum
   open: 外部播放器 Intent + content://
 """
@@ -25,12 +25,12 @@ def _bridge_class():
     """拿到原生桥 Class：Chaquopy 的 jclass 或 Termux/p4a 的 jnius autoclass。"""
     try:
         from java import jclass  # type: ignore  （Chaquopy）
-        return jclass('com.github.olddriverdoge.audiocpm.Ac2Bridge'), 'chaquopy'
+        return jclass('com.github.olddriverdoge.audiocpm.AudioCpmBridge'), 'chaquopy'
     except Exception:
         pass
     try:
         from jnius import autoclass  # type: ignore  （python-for-android / Termux）
-        return autoclass('com.github.olddriverdoge.audiocpm.Ac2Bridge'), 'jnius'
+        return autoclass('com.github.olddriverdoge.audiocpm.AudioCpmBridge'), 'jnius'
     except Exception:
         return None, ''
 
@@ -67,7 +67,7 @@ def register() -> bool:
     except Exception:
         _playback = None
     # 波形沿用旧 p4a 的 ffmpeg 子进程路径（waveform._peaks_ffmpeg）。
-    # 不再注册 Ac2Wave（MediaCodec）为 native_provider：它在 24bit FLAC 上实测 3.5~5.7s、
+    # 不再注册 AudioCpmWave（MediaCodec）为 native_provider：它在 24bit FLAC 上实测 3.5~5.7s、
     # 且峰值质量差（“大量方块”）；而打包的静态 ffmpeg 解 4kHz 单声道只要零点几秒，
     # 这才是旧版“秒出波形”的真正实现。
     try:

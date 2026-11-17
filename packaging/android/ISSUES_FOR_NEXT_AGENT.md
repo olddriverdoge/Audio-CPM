@@ -61,7 +61,7 @@
 # 产物 artifact ac2-gradle-apk
 adb install -r -d app-debug.apk
 adb shell am start -n com.github.olddriverdoge.audiocpm/.MainActivity
-adb logcat -d | grep -iE 'AC2|python|chaquopy|AndroidRuntime'
+adb logcat -d | grep -iE 'Audio-CPM|python|chaquopy|AndroidRuntime'
 adb shell run-as com.github.olddriverdoge.audiocpm ls files
 ```
 

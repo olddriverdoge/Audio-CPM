@@ -57,7 +57,7 @@ Python(Chaquopy)
 
 - `PlaybackService`（`MediaSessionService` + `ExoPlayer`），manifest 里声明
   `foregroundServiceType="mediaPlayback"`，通知栏 / 锁屏 / 后台播放交给 Media3；
-- `Ac2Bridge` 提供 `play/pause/resume/stop/seek/state/spectrum`，Python 侧
+- `AudioCpmBridge` 提供 `play/pause/resume/stop/seek/state/spectrum`，Python 侧
   `native_bridge` 用 Chaquopy 的 `jclass` 调用（Termux 仍走 jnius）；
 - `MediaSession.setSessionActivity` 指向 `MainActivity`，点通知回 app；
 - `onTaskRemoved` 留空：从最近任务划掉后继续播放；
@@ -96,4 +96,4 @@ Python(Chaquopy)
 - `ac2.log` 出现 `ffbin: ffmpeg unavailable: direct=...` → 说明 nativeLibraryDir 里的文件没有 x 位且 linker64 也失败；
   此时转换/波形/封面会退化（封面走 mutagen 原图，波形走 MediaCodec/WAV），功能可用性下降但不崩。
 - 通知栏不出现 → 检查是否授予了通知权限（Android 13+）。
-- 服务启动失败 → `logcat -s AC2`，以及 `files/ac2_boot.json`。
+- 服务启动失败 → `logcat -s Audio-CPM`，以及 `files/ac2_boot.json`。

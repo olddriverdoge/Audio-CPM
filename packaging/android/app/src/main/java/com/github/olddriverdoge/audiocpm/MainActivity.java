@@ -36,7 +36,7 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 
 public class MainActivity extends Activity {
-    private static final String TAG = "AC2";
+    private static final String TAG = "Audio-CPM";
     private static final int PORT = 8765;
 
     private static final int REQ_ALL_FILES = 1001;
@@ -101,14 +101,14 @@ public class MainActivity extends Activity {
         webView.addJavascriptInterface(new Object() {
             @android.webkit.JavascriptInterface
             public String spectrum() {
-                try { return Ac2Bridge.spectrum(); } catch (Throwable t) { return "{}"; }
+                try { return AudioCpmBridge.spectrum(); } catch (Throwable t) { return "{}"; }
             }
 
             @android.webkit.JavascriptInterface
             public String setParams(String json) {
-                try { return Ac2Bridge.setParams(json); } catch (Throwable t) { return "{}"; }
+                try { return AudioCpmBridge.setParams(json); } catch (Throwable t) { return "{}"; }
             }
-        }, "Ac2Native");
+        }, "AudioCpmNative");
         WebView.setWebContentsDebuggingEnabled(true);
         root.addView(webView, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -154,9 +154,9 @@ public class MainActivity extends Activity {
             } catch (Throwable t) {
                 Log.e(TAG, "python server failed", t);
             }
-        }, "ac2-python").start();
+        }, "audio-cpm-python").start();
 
-        new Thread(this::waitAndLoad, "ac2-wait").start();
+        new Thread(this::waitAndLoad, "audio-cpm-wait").start();
 
         lastStorageGranted = hasStorageAccess();
         ensureStorageAccess();
@@ -252,7 +252,7 @@ public class MainActivity extends Activity {
     private void showAllFilesDialog() {
         new AlertDialog.Builder(this)
                 .setTitle("需要文件访问权限")
-                .setMessage("AC2 需要读取手机存储里的音乐文件。请在下一步打开“允许访问所有文件”，"
+                .setMessage("Audio-CPM 需要读取手机存储里的音乐文件。请在下一步打开“允许访问所有文件”，"
                         + "否则只能看到目录、看不到歌曲。")
                 .setPositiveButton("去授权", (d, w) -> openAllFilesSettings())
                 .setNegativeButton("稍后", null)
@@ -318,7 +318,7 @@ public class MainActivity extends Activity {
             try { Thread.sleep(500); } catch (InterruptedException ignored) {}
         }
         runOnUiThread(() -> webView.loadDataWithBaseURL(null,
-                "<h1>AC2 服务启动失败</h1><p>请查看 files/ac2_boot.json 与 logcat。</p>",
+                "<h1>Audio-CPM 服务启动失败</h1><p>请查看 files/ac2_boot.json 与 logcat。</p>",
                 "text/html", "utf-8", null));
     }
 

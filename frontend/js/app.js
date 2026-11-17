@@ -350,7 +350,7 @@ const App = (() => {
   async function applyCapabilities() {
     let caps = null;
     try { caps = await Api.caps(); } catch (_) { return; }
-    window.AC2CAPS = caps;
+    window.AUDIOCPM_CAPS = caps;
     const sel = document.getElementById('fmt-select');
     if (!sel) return;
     const allowed = new Set(caps.formats || []);

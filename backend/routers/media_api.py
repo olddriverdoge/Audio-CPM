@@ -112,7 +112,7 @@ def api_stream(request: Request):
                 headers[name] = resp.headers[h]
         headers.setdefault('Accept-Ranges', 'bytes')
         if request.headers.get('range') and 'Content-Range' not in headers:
-            headers['X-AC2-Range'] = 'unsupported'
+            headers['X-Audio-CPM-Range'] = 'unsupported'
         def gen():
             try:
                 for chunk in resp.iter_bytes():

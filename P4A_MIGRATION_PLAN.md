@@ -131,7 +131,7 @@ if __name__ == "__main__":
 
 ```ini
 [app]
-title = AC2
+title = Audio-CPM
 package.name = ac2
 package.domain = com.example
 source.dir = ../..

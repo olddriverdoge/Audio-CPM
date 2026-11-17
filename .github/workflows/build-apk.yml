@@ -48,7 +48,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: ac2-apk
+          name: audio-cpm-apk
           path: packaging/p4a/bin/*.apk
 
       - name: Upload build log

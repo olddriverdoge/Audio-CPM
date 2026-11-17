@@ -1,4 +1,4 @@
-name: build-gradle
+name: build-audio-cpm
 
 on:
   workflow_dispatch:
@@ -104,5 +104,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ac2-gradle-apk
+          name: audio-cpm-apk
           path: packaging/android/app/build/outputs/apk/debug/*.apk

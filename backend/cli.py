@@ -22,7 +22,7 @@ def _log(msg):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="AC2 Web 服务")
+    ap = argparse.ArgumentParser(description="Audio-CPM 服务")
     ap.add_argument("--host", default=os.environ.get("AC2_HOST", "127.0.0.1"),
                     help="监听地址，局域网共享用 0.0.0.0")
     ap.add_argument("--port", type=int, default=int(os.environ.get("AC2_PORT", "8000")))

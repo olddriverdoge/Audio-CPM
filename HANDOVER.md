@@ -1,4 +1,4 @@
-# AC2 Web 交接文档
+# Audio-CPM 交接文档
 
 - 入口文件：[ac_web.py](ac_web.py)（12 行，只负责启动）
 - 后端：[backend/](backend/)（配置 / ffmpeg / 任务 / 路由 / 波形，按职责分模块）
@@ -11,7 +11,7 @@
 
 ## 1. 项目是做什么的
 
-AC2 Web 是给本地音乐库用的音频工具，两个页面：
+Audio-CPM 是给本地音乐库用的音频工具，两个页面：
 
 **文件处理**
 - 目录浏览（列表 / 网格、封面缩略图、排序、搜索、最近播放筛选）
@@ -381,7 +381,7 @@ curl -s -X POST http://127.0.0.1:8000/api/move \
 
 ## 13. 变更记录（本轮）
 
-- 单文件 AC2 Web 从 v2 升级到分页版：
+- 单文件 Audio-CPM 从 v2 升级到分页版：
   - 新增 `/api/play`、`/api/stream`、`/api/thumb`、`/api/tree`、`/api/move`、`/api/mkdir`、`/api/rmdir`、`/api/rename_dir`
   - 前端拆成两个页面；整理页左右分屏 + 可拖分隔
   - 播放：网页内流播放（默认）+ 系统播放器模式
@@ -526,7 +526,7 @@ curl -s -X POST http://127.0.0.1:8000/api/move \
   - 启动时按 `ac2_last_path` 所属源同步下拉选中，避免"路径是 dav、下拉显示本地"的错位
   - 回归：新增 `davpath_test.mjs`（首次切 dav 到根、进子目录后切回再切回记忆、记忆失效回根）与 `saveflow_test.mjs`（设置面板保存→自动切换→下拉同步）全 PASS；原 8 套全 PASS
 - WebDAV 播放与整理页联动修复（v4.2）：
-  - `/api/stream` dav 代理的 Range 响应头修正：之前误拼成 `ContentRange/ContentLength/AcceptRanges`（缺连字符），浏览器收不到 `Content-Range` 无法流式播放；现在正确透传 `Content-Range/Content-Length/Accept-Ranges` 并去掉误加的 `X-AC2-Range`
+  - `/api/stream` dav 代理的 Range 响应头修正：之前误拼成 `ContentRange/ContentLength/AcceptRanges`（缺连字符），浏览器收不到 `Content-Range` 无法流式播放；现在正确透传 `Content-Range/Content-Length/Accept-Ranges` 并去掉误加的 `X-Audio-CPM-Range`
   - 切换数据源时**整理页源列表同步切到该源**（`srcBrowse`），目标目录也切到该源：优先该源自己的标签记忆（`ac2_tree_roots_<源id>` / `ac2_tree_active_<源id>`），没有则用源根
   - 启动时若上次的目标目录不属于当前源，自动改用当前源根
   - 回归：新增 `tabssync_test.mjs`（切 dav 后主列表/整理页/目标目录都到 dav；重复切回本地恢复）；原 8 套全 PASS
@@ -570,7 +570,7 @@ curl -s -X POST http://127.0.0.1:8000/api/move \
   - 前端默认根改为动态：`defaultRootUri()` 从 `/api/roots` 当前源取，去掉 `local:/sdcard/ADM`、`/sdcard` 兜底
   - 新增 `backend/native_bridge.py`：Android 注册 Java 桥（波形 `native_provider`、外部播放器 Intent），非 Android 全部 no-op；`cli.main` 启动调用 `register()`
   - `/api/play`：有原生桥走 Intent（app），否则继续 `am`（Termux），唯一平台分支集中在此
-  - 新增 `packaging/`：`p4a/main.py`、`buildozer.spec`、`android/java/Ac2Bridge.java` 骨架、`AndroidManifest.append.md`、`tests/`（17 个回归脚本 + run.sh）
+  - 新增 `packaging/`：`p4a/main.py`、`buildozer.spec`、`android/java/AudioCpmBridge.java` 骨架、`AndroidManifest.append.md`、`tests/`（17 个回归脚本 + run.sh）
   - 回归：12 套全 PASS；`/api/play` 在 Termux 仍返回 am 结果
 
 ---
@@ -579,7 +579,7 @@ curl -s -X POST http://127.0.0.1:8000/api/move \
 
 - DSH 用户级 skill：`~/.dsh/skills/efficient-file-reading/SKILL.md`（大文件分页读取约束）
 - DSH 配置：`~/.dsh/profiles/web/cordis.patch.yml` 中 `readLimit: 500`，重启 dsh web 生效
-- AC2 服务当前用 nohup 常驻，PID/日志见项目根目录
+- Audio-CPM 服务当前用 nohup 常驻，PID/日志见项目根目录
 
 ---
 

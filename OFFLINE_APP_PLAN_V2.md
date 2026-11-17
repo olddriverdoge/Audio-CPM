@@ -1,4 +1,4 @@
-# AC2 离线 App + 本地/WebDAV 双栈方案（v2）
+# Audio-CPM 离线 App + 本地/WebDAV 双栈方案（v2）
 
 > **状态说明（v3 修订）**：本版“波形砍掉 / 外部播放器砍掉”的判断已被推翻。最新方案见 [OFFLINE_APP_PLAN_V3.md](OFFLINE_APP_PLAN_V3.md)：本地波形改用 Android MediaCodec 保留、AIFF 可播放（转 WAV）、外部播放器仅本地模式保留。本文保留作“WebDAV 范围收缩 / 4 种互通 / 技术债”的参考。
 
@@ -209,7 +209,7 @@ class HttpRangeFile(io.RawIOBase):
 
 - 本地：继续 `FileResponse`（自带 Range/206）。
 - WebDAV：`/api/stream` 代理 Range，**不落盘**；透传 `Range` → 上游，返回 `206` + `Content-Range` + `Accept-Ranges`。
-- 上游不支持 Range：降级为整流转发（首播要等，拖动失效），并返回 `X-AC2-Range: unsupported` 供前端提示。
+- 上游不支持 Range：降级为整流转发（首播要等，拖动失效），并返回 `X-Audio-CPM-Range: unsupported` 供前端提示。
 - 超时/断线：GET 幂等，可重试一次；播放器自身会重连。
 - 大文件（DSD 几百 MB）不缓存；只缓存元数据/封面。
 

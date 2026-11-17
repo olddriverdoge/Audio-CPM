@@ -1,4 +1,4 @@
-# AC2 离线 App 技术方案 v3（波形 / AIFF / 外部播放器修正）
+# Audio-CPM 离线 App 技术方案 v3（波形 / AIFF / 外部播放器修正）
 
 > **打包路线待定（2026-11-15）**：本版默认“Chaquopy/单壳”打包。按最新讨论，打包壳候选改为 WebToApp / python-for-android(webview)，评估见 [PACKAGING_OPTIONS_WEBTOAPP_P4A.md](PACKAGING_OPTIONS_WEBTOAPP_P4A.md)。业务层方案（波形/AIFF/元数据/WebDAV）不受影响，差异只在启动器与 FFmpeg 二进制路径。
 
@@ -159,7 +159,7 @@ async def stream(path: str, request: Request):
                  "Content-Length": up.headers.get("content-length", "")})
 ```
 
-- 上游不支持 Range：返回 200 整流 + `X-AC2-Range: unsupported`，前端提示“该服务器不支持拖动”；
+- 上游不支持 Range：返回 200 整流 + `X-Audio-CPM-Range: unsupported`，前端提示“该服务器不支持拖动”；
 - 超时：connect 10s / read 30s；GET 幂等，断线可重试一次；
 - 不缓存音频文件；只缓存元数据/封面。
 
@@ -184,7 +184,7 @@ async def stream(path: str, request: Request):
 
 **设计：**
 
-- FLAC / MP3 / M4A(AAC) / OGG / OPUS → Kotlin `Ac2Wave.peaks(path, buckets)`，用 `MediaExtractor` + `MediaCodec` 解码，按 `presentationTimeUs` 分桶，返回每桶峰值（0~1，未归一化）；
+- FLAC / MP3 / M4A(AAC) / OGG / OPUS → Kotlin `AudioCpmWave.peaks(path, buckets)`，用 `MediaExtractor` + `MediaCodec` 解码，按 `presentationTimeUs` 分桶，返回每桶峰值（0~1，未归一化）；
 - WAV / AIFF（转 WAV 后）→ **纯 Python** 解析 PCM（标准库 `wave` + `array`，8:1 抽样），原因：Android 的 WAV/raw 解码器对 24-bit/float 支持不稳定，纯 Python 反而更可控；
 - Python 侧统一做现有归一化（20% 分位拉伸，与 [backend/waveform.py](backend/waveform.py) 一致）→ 视觉与 Termux 版完全一致；
 - 缓存 key/格式不变：`md5(v2|uri|mtime|size|buckets)` → `$AC2_DATA_DIR/cache/wave/*.json`，内存 LRU 60 条（沿用）。
@@ -192,7 +192,7 @@ async def stream(path: str, request: Request):
 ### 2.2 MediaCodec 桥实现（Kotlin，约 150 行）
 
 ```kotlin
-object Ac2Wave {
+object AudioCpmWave {
     /** 返回 {"ok":true,"peaks":[0.12,...]} 或 {"ok":false,"error":"..."} */
     @JvmStatic fun peaks(path: String, buckets: Int): String {
         val extractor = MediaExtractor()
@@ -223,7 +223,7 @@ object Ac2Wave {
 
 ```python
 from java import jclass
-_Wave = jclass("com.ac2.app.Ac2Wave")
+_Wave = jclass("com.ac2.app.AudioCpmWave")
 
 def peaks_android(path: str, buckets: int) -> list:
     d = json.loads(_Wave.peaks(path, buckets))   # 阻塞 JNI 调用，放在任务线程
@@ -233,7 +233,7 @@ def peaks_android(path: str, buckets: int) -> list:
 ```
 
 - 调用发生在 FastAPI/Starlette 的线程池里，不会阻塞事件循环；
-- `Ac2Wave.peaks` 内部捕获所有异常并返回 JSON，不让 JNI 抛到 Python。
+- `AudioCpmWave.peaks` 内部捕获所有异常并返回 JSON，不让 JNI 抛到 Python。
 
 ### 2.3 WAV / AIFF 纯 Python 波形
 
@@ -262,7 +262,7 @@ def peaks_android(path: str, buckets: int) -> list:
 ### 2.6 波形 PoC 验收（W1 必做）
 
 1. 用 Termux ffmpeg 生成测试集：FLAC 16/44.1、FLAC 24/96、MP3 320、M4A、OGG、OPUS、WAV 16/24、AIFF 16/24、AIFF-C sowt；
-2. 真机跑 `Ac2Wave.peaks`，与 Termux 版 `/api/waveform` 对比 160 桶曲线（允许 5% 误差）；
+2. 真机跑 `AudioCpmWave.peaks`，与 Termux 版 `/api/waveform` 对比 160 桶曲线（允许 5% 误差）；
 3. 5 分钟 FLAC 解码耗时 < 3 秒、内存峰值 < 50 MB；
 4. WAV/AIFF 纯 Python 路径耗时 < 3 秒；
 5. 缓存命中 < 50 ms。
@@ -432,7 +432,7 @@ write_ok = bool(privs & {"write", "write-content", "write-properties"})
 | T10 | FastAPI + pydantic 不能进 Chaquopy | 打包 | 迁 Starlette（或双适配器） | P0（打包前） |
 | T11 | 配置无 schema | 升级 | `schema_version` + 迁移 | P2 |
 | T12 | 缺 pytest/CI | 质量 | pytest + jsdom + CI | P1 |
-| **T13** | 无 Android 原生桥 | 波形/播放器 | Kotlin 桥：`Ac2Wave`、`Ac2ExternalPlayer`、权限引导 | P0 |
+| **T13** | 无 Android 原生桥 | 波形/播放器 | Kotlin 桥：`AudioCpmWave`、`Ac2ExternalPlayer`、权限引导 | P0 |
 
 依赖顺序：
 
@@ -457,7 +457,7 @@ Android Activity / 前台服务
  │     ├─ waveform_local.py（调 Kotlin 桥 / 纯 Python WAV）
  │     └─ transfer.py（4 模式）
  └─ Kotlin 桥
-       ├─ Ac2Wave.peaks(path, buckets)          MediaCodec 解码
+       ├─ AudioCpmWave.peaks(path, buckets)          MediaCodec 解码
        ├─ Ac2ExternalPlayer.open(path, pkg, act) Intent + FileProvider
        └─ Ac2Permission.ensureAllFilesAccess()  权限引导
 ```
@@ -506,7 +506,7 @@ Android Activity / 前台服务
 ### 9.3 `/api/stream`（新增 AIFF/WebDAV 分支）
 
 - `local .aif/.aiff` → `audio/wav`（缓存）；
-- `dav` → 206/200 代理，附 `Accept-Ranges`、`X-AC2-Range`。
+- `dav` → 206/200 代理，附 `Accept-Ranges`、`X-Audio-CPM-Range`。
 
 ### 9.4 `/api/play`（本地保留）
 
@@ -613,4 +613,4 @@ Android Activity / 前台服务
 | WebDAV 写权限 | 只读开关 | PROPFIND privilege-set + OPTIONS + 写失败降级 |
 | Python FFmpeg 平替 | 未调研 | 完整调研（无可直接用；MediaCodec 是正解） |
 | APK 体积 | 28~35 MB | 30~35 MB（Kotlin 桥不增体积） |
-| 新增 Kotlin 桥 | 无 | Ac2Wave / Ac2ExternalPlayer / 权限引导 |
+| 新增 Kotlin 桥 | 无 | AudioCpmWave / Ac2ExternalPlayer / 权限引导 |

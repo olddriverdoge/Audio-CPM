@@ -1,5 +1,5 @@
 /* ============================================================
- * AC2 Web v3 · 前端（命名空间 IIFE，无构建）
+ * Audio-CPM Web v3 · 前端（命名空间 IIFE，无构建）
  * Api / Store / Utils / PlayMgr / ThumbMgr / BrowseView
  * TaskRunner / MetaView / TreeView / MoveMgr / Layout / App
  * ============================================================ */

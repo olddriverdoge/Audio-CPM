@@ -11,7 +11,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 
 /** 只读文件提供者：给外部播放器 content:// URI（替代 AndroidX FileProvider）。 */
-public class Ac2FileProvider extends ContentProvider {
+public class AudioCpmFileProvider extends ContentProvider {
     @Override public boolean onCreate() { return true; }
 
     @Override public ParcelFileDescriptor openFile(Uri uri, String mode) throws FileNotFoundException {
