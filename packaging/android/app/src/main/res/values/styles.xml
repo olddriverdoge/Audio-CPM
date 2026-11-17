@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 深色界面 + 透明系统栏：状态栏区域由页面 header 的背景铺满，不再是一条黑边 -->
+    <style name="AudioCpmTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#0F1419</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+    </style>
+</resources>

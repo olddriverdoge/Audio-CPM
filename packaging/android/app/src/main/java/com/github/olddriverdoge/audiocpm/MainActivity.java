@@ -8,6 +8,8 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.net.Uri;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -23,6 +25,7 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.chaquo.python.Python;
 import com.chaquo.python.android.AndroidPlatform;
@@ -48,6 +51,7 @@ public class MainActivity extends Activity {
     private static final String KEY_ALL_FILES_PROMPTED = "all_files_prompted";
 
     private WebView webView;
+    private int insetTop, insetBottom, insetLeft, insetRight;
     /** 上次 onResume 时是否已有全盘读取权限，用于“授权返回后自动刷新页面” */
     private boolean lastStorageGranted = false;
 
@@ -56,11 +60,25 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
 
         /*
-         * targetSdk 35 在 Android 15+ 强制 edge-to-edge：
-         * 必须显式关闭 decorFitsSystemWindows，再自己按 insets 留出状态栏/导航栏的高度，
-         * 否则 WebView 会绘制到状态栏与手势条下面，顶部按钮点不到。
+         * targetSdk 35 在 Android 15+ 强制 edge-to-edge（内容必须画到系统栏后面）。
+         * 做法按官方指南 + 社区通用解：系统栏透明、自己处理 insets，
+         * 顶部交给页面 header 补 padding（避免露出窗口底色那条“黑边”）。
          */
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        /*
+         * 系统栏一律透明：状态栏区域不再是一块黑条，而是由页面 header 自己的背景色填充
+         * （现代 App 的通行做法：顶栏延伸到状态栏后面，内容再按 inset 让位）。
+         */
+        getWindow().setStatusBarColor(Color.TRANSPARENT);
+        getWindow().setNavigationBarColor(Color.TRANSPARENT);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            getWindow().setNavigationBarContrastEnforced(false);   // 关掉三键导航的半透明遮罩
+        }
+        getWindow().setBackgroundDrawable(new ColorDrawable(0xFF0F1419));  // 与页面底色一致，启动不闪白
+        WindowInsetsControllerCompat wic =
+                WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+        wic.setAppearanceLightStatusBars(false);       // 深色界面 → 白色系统图标
+        wic.setAppearanceLightNavigationBars(false);
 
         FrameLayout root = new FrameLayout(this);
         webView = new WebView(this);
@@ -69,7 +87,12 @@ public class MainActivity extends Activity {
         s.setDomStorageEnabled(true);
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setAllowFileAccess(false);
-        webView.setWebViewClient(new WebViewClient());
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                pushInsetsToWeb(insetTop, insetBottom, insetLeft, insetRight);
+            }
+        });
         // 没有 WebChromeClient 时，JS 的 alert()/confirm() 会被静默吞掉：
         // 表现就是“长按删除没弹窗、也没删成功”。这里显式用系统对话框接管。
         webView.setWebChromeClient(new android.webkit.WebChromeClient() {
@@ -115,12 +138,23 @@ public class MainActivity extends Activity {
                 FrameLayout.LayoutParams.MATCH_PARENT));
         setContentView(root);
 
-        // 把 systemBars + 刘海的高度作为 padding 让出去，横竖屏切换时自动重算
+        /*
+         * 只给底部导航栏留白（固定悬浮控件不被手势条挡住）；
+         * 顶部不再用原生 padding 顶下去——那样会在状态栏下面露出一条窗口底色（就是你说的"黑边"）。
+         * 顶部 inset 通过 CSS 变量 --sat 交给页面，由 header 自己补 padding-top，
+         * 于是 header 背景直接铺满状态栏区域，视觉上是连续的，没有分隔条。
+         */
+        root.setBackgroundColor(0xFF0F1419);
         ViewCompat.setOnApplyWindowInsetsListener(root, (v, windowInsets) -> {
             Insets bars = windowInsets.getInsets(
                     WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
-            v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
-            return windowInsets;
+            v.setPadding(0, 0, 0, bars.bottom);
+            pushInsetsToWeb(bars.top, bars.bottom, bars.left, bars.right);
+            // 归零后继续下发，避免 WebView 自己再按 inset 补一次（双重留白）
+            return new WindowInsetsCompat.Builder(windowInsets)
+                    .setInsets(WindowInsetsCompat.Type.systemBars()
+                            | WindowInsetsCompat.Type.displayCutout(), Insets.NONE)
+                    .build();
         });
         ViewCompat.requestApplyInsets(root);
 
@@ -185,6 +219,19 @@ public class MainActivity extends Activity {
         if (webView != null && webView.getParent() instanceof android.view.View) {
             ViewCompat.requestApplyInsets((android.view.View) webView.getParent());
         }
+    }
+
+    /** 把系统栏 inset 写进页面 CSS 变量（--sat/--sab/--sal/--sar），供 header / 浮层留白 */
+    private void pushInsetsToWeb(int top, int bottom, int left, int right) {
+        insetTop = top; insetBottom = bottom; insetLeft = left; insetRight = right;
+        if (webView == null) return;
+        String js = "try{var d=document.documentElement.style;"
+                + "d.setProperty('--sat','" + top + "px');"
+                + "d.setProperty('--sab','" + bottom + "px');"
+                + "d.setProperty('--sal','" + left + "px');"
+                + "d.setProperty('--sar','" + right + "px');"
+                + "}catch(e){}";
+        webView.evaluateJavascript(js, null);
     }
 
     // ---------------------------------------------------------------- 存储权限
