@@ -1,6 +1,7 @@
 /* ---------------- Wave（波形预览：渲染一次成 dataURL，播放条与列表行复用） ---------------- */
 const Wave = (() => {
   const cache = new Map();
+  const durCache = new Map();          // path -> durationMs（起播定位用）
 
   // 竖条包络，返回 PNG dataURL；模糊交给 CSS filter，避免逐帧重绘
   function render(peaks) {
@@ -45,6 +46,10 @@ const Wave = (() => {
     if (cache.has(path)) return cache.get(path);
     try {
       const d = await Api.waveform(path, 160);
+      if (d && d.durationMs > 0) {
+        durCache.set(path, d.durationMs);
+        if (durCache.size > 200) durCache.delete(durCache.keys().next().value);
+      }
       const url = render(d.peaks || []);
       if (url) {
         cache.set(path, url);
@@ -55,5 +60,6 @@ const Wave = (() => {
       return '';
     }
   }
-  return {get};
+  function durationMs(path) { return (path && durCache.get(path)) || 0; }
+  return {get, durationMs};
 })();

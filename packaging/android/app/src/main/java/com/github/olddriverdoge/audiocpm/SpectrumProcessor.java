@@ -206,7 +206,9 @@ public class SpectrumProcessor extends BaseAudioProcessor {
             // 单边谱 + 窗增益补偿：满幅正弦 ≈ 1.0
             double amp = 2.0 * peak / cg;
             double db = 20.0 * Math.log10(Math.max(amp, 1e-7));
-            float v = (float) Math.max(0.0, Math.min(1.0, (db + 100.0) / 70.0));
+            // 显示范围 0 ~ -80dB（行业常见刻度）：0dB 满幅、-80dB 静音，
+            // 不再用 -30dB 当下限（那会把正常的强信号削平）。
+            float v = (float) Math.max(0.0, Math.min(1.0, (db + 80.0) / 80.0));
             // 快起慢落（约 3:1），上升跟手、下降自然，不会像移动平均那样糊成一片
             if (v > barPrev[b]) barPrev[b] += (v - barPrev[b]) * 0.55f;
             else barPrev[b] += (v - barPrev[b]) * 0.12f;

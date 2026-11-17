@@ -9,6 +9,7 @@ const Spectrum = (() => {
   const minBtn = document.getElementById('sf-min');
   const delayEl = document.getElementById('sf-delay');
   const delayVal = document.getElementById('sf-delay-val');
+  const subEl = document.querySelector('#spectrum-float .sf-sub');
   const resize = document.getElementById('sf-resize');
   const g = canvas ? canvas.getContext('2d') : null;
   let open = false, core = null, raf = 0;
@@ -159,10 +160,9 @@ const Spectrum = (() => {
     g.font = '9px ui-monospace, Menlo, monospace';
     g.textAlign = 'right';
     g.textBaseline = 'middle';
-    // dB 刻度必须和柱高映射一致：柱高 v=1 对应 -30dB、v=0 对应 -100dB，
-    // 否则会出现“柱子看着超过 0dB 轴”的错觉。
-    [-30, -50, -70, -90, -100].forEach(db => {
-      const y = y0 + gh * ((db + 30) / -70);
+    // dB 刻度与柱高同尺：0dB 在顶、-80dB 在底（柱高 v=(db+80)/80）。
+    [0, -20, -40, -60, -80].forEach(db => {
+      const y = y0 + gh * (-db / 80);
       g.beginPath();
       g.moveTo(x0, Math.round(y) + .5);
       g.lineTo(x0 + gw, Math.round(y) + .5);
@@ -411,9 +411,31 @@ const Spectrum = (() => {
     else {
       stop(); setState('');
       stopPcmPoll();
+      if (subEl) subEl.classList.remove('show');
       try { Api.playbackSpectrum(false); } catch (_) {}
     }
   }
+
+  /* 延迟条默认收起：长按模块（画布区域）才展开，方便蓝牙耳机对齐 */
+  let lpTimer = 0;
+  function bindLongPress() {
+    if (!box || !subEl) return;
+    box.addEventListener('pointerdown', e => {
+      if (e.target.closest('.sf-head, .sf-resize, .sf-sub, button')) return;
+      if (lpTimer) clearTimeout(lpTimer);
+      lpTimer = setTimeout(() => { lpTimer = 0; subEl.classList.toggle('show'); }, 550);
+      const cancel = () => {
+        if (lpTimer) { clearTimeout(lpTimer); lpTimer = 0; }
+        box.removeEventListener('pointerup', cancel);
+        box.removeEventListener('pointercancel', cancel);
+        box.removeEventListener('pointermove', cancel);
+      };
+      box.addEventListener('pointerup', cancel);
+      box.addEventListener('pointercancel', cancel);
+      box.addEventListener('pointermove', cancel);
+    }, {passive: true});
+  }
+  bindLongPress();
 
   function toggle() {
     open = !open;

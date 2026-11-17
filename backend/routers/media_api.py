@@ -265,6 +265,17 @@ def api_cover(request: Request):
 
 
 
+def _duration_ms(path: str) -> int:
+    """用 mutagen 读时长（只读头，几十毫秒级），给前端“点文件从点击位置起播”用。"""
+    try:
+        import mutagen
+        f = mutagen.File(path)
+        sec = float(getattr(getattr(f, 'info', None), 'length', 0) or 0)
+        return int(sec * 1000) if sec > 0 else 0
+    except Exception:
+        return 0
+
+
 def api_waveform(request: Request):
     path = qs(request, 'path')
     try:
@@ -285,7 +296,8 @@ def api_waveform(request: Request):
     _ms = int((_t.perf_counter() - _t0) * 1000)
     if not peaks:
         raise HTTPException(500, "decode failed")
-    return J({"path": path, "buckets": len(peaks), "peaks": peaks, "ms": _ms})
+    return J({"path": path, "buckets": len(peaks), "peaks": peaks, "ms": _ms,
+              "durationMs": _duration_ms(path)})
 
 
 routes.append(Route('/api/play', api_play, methods=['POST']))

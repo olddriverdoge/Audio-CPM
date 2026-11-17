@@ -26,6 +26,8 @@ const Player = (() => {
   coverEl.appendChild(coverImg);
   let seeking = false;
   let hifi = false, hifiPlaying = false, hifiPos = 0, hifiDur = 0, hifiTimer = 0;
+  /* 点击文件行时带了比例但时长未知：等原生返回 durationMs 后补一次 seek */
+  let pendingRatio = 0;
 
   function fmt(t) {
     if (!isFinite(t) || t < 0) t = 0;
@@ -67,6 +69,11 @@ const Player = (() => {
         if (!s || !s.ok) return;
         hifiPos = Number(s.positionMs) || 0;
         hifiDur = Number(s.durationMs) || 0;
+        if (pendingRatio > 0 && hifiDur > 0) {
+          const ms = Math.round(pendingRatio * hifiDur);
+          pendingRatio = 0;
+          try { await Api.playbackSeek(ms); } catch (_) {}
+        }
         if (s.error) {
           window.__ac2HifiBroken = true;
           stopHifiPoll();
@@ -259,10 +266,15 @@ const Player = (() => {
     setCover(path);
     if (hifiAvailable() && String(path).indexOf('dav:') !== 0) {
       try {
+        // “点文件行 = 从点击位置起播”：时长来自波形接口缓存的 durationMs，
+        // 已知则直接换算 startMs 交给原生；未知则先记比例，等 state 回 duration 再 seek。
+        const durMs = (typeof Wave !== 'undefined' && Wave.durationMs) ? Wave.durationMs(path) : 0;
+        const startMs = (durMs > 0 && ratio > 0) ? Math.round(ratio * durMs) : 0;
+        pendingRatio = (startMs > 0 || ratio <= 0) ? 0 : ratio;
         const q = (typeof App !== 'undefined' && App.hifiQueue) ? App.hifiQueue(path) : null;
         const r = (q && q.paths && q.paths.length > 1)
-          ? await Api.playbackQueue(q.paths, q.index, 0)
-          : await Api.playbackOpen(path, 0, 0, 0, 0);
+          ? await Api.playbackQueue(q.paths, q.index, startMs)
+          : await Api.playbackOpen(path, startMs, 0, 0, 0);
         if (r && r.ok) {
           hifi = true; hifiPlaying = true; hifiPos = 0; hifiDur = 0;
           setWave(path); paintRows(); show(); startHifiPoll(); setToggle(true);
@@ -280,6 +292,7 @@ const Player = (() => {
       }
     }
     hifi = false;
+    pendingRatio = 0;          // 回退网页播放：比例由 audio.currentTime 处理
     setWave(path);
     paintRows();
     audio.src = '/api/stream?path=' + encodeURIComponent(path);

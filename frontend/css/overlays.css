@@ -114,7 +114,9 @@
   .sf-tab:hover{color:var(--text)}
   .sf-tab.active{color:var(--accent);border-color:var(--border);background:var(--panel2)}
   /* 频谱延迟（蓝牙耳机对齐用）：0~500ms */
-  .sf-sub{display:flex;align-items:center;gap:6px;padding:0 8px 4px;font-size:10px;
+  .sf-sub{display:none;align-items:center;gap:6px;padding:0 8px 4px;font-size:10px;
     color:var(--muted);flex:none}
+  /* 默认收起：长按模块才展开延迟调节 */
+  .sf-sub.show{display:flex}
   .sf-sub input[type=range]{flex:1;min-width:0;height:14px;accent-color:var(--accent)}
   .sf-sub span{min-width:38px;text-align:right;font-variant-numeric:tabular-nums}
