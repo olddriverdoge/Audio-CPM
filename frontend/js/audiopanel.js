@@ -9,6 +9,7 @@ function createAudioPanel() {
   const body = document.getElementById('af-body');
   const trackEl = document.getElementById('af-track');
   const PRESET_NAMES = ['关闭', '流行', '古典', '摇滚', '人声', '自定义'];
+  const fmtDb = v => (v > 0 ? '+' : '') + Number(v || 0) + 'dB';
   const encName = e => (e === 4 ? '32-bit 浮点' : e === 21 ? '24-bit' : e === 22 ? '32-bit' : e === 3 ? '8-bit' : '16-bit');
   let cfg = Store.get('ac3_audio_cfg', {}) || {};
   let info = null;
@@ -26,7 +27,7 @@ function createAudioPanel() {
     }
     fx('bass', cfg.bass || 0);
     fx('virt', cfg.virt || 0);
-    fx('loud', Math.round((cfg.preamp || 0) * 100));
+    fx('preamp', Math.round((cfg.preamp || 0) * 100));
     if (cfg.speed && cfg.speed !== 1) fx('speed', Math.round(cfg.speed * 100));
   }
 
@@ -43,10 +44,10 @@ function createAudioPanel() {
     let html = '';
 
     /* ---- EQ ---- */
-    html += '<div class="af-sec"><div class="af-sec-h"><span>均衡器</span>' +
+    html += '<div class="af-sec"><div class="af-sec-h"><span>均衡器 <em>软件 10 段 · 蓝牙/USB 同样生效</em></span>' +
       '<label class="af-switch"><input type="checkbox" id="af-eq-on"' + (cfg.eqOn ? ' checked' : '') +
       '><i></i></label></div>';
-    if (d.eq) {
+    if (d.bands) {
       html += '<div class="af-presets">' + PRESET_NAMES.map((n, i) =>
         '<button type="button" class="af-chip' + ((cfg.preset || 0) === i ? ' on' : '') +
         '" data-preset="' + i + '">' + n + '</button>').join('') + '</div>';
@@ -60,17 +61,18 @@ function createAudioPanel() {
           '<span class="af-db">' + (lv / 100).toFixed(1) + '</span></div>';
       });
       html += '</div>';
-      html += '<div class="af-pre"><span>前级增益（响度）</span><input type="range" class="af-slider" id="af-preamp" min="0" max="20" step="0.5" value="' + (cfg.preamp || 0) + '"><span class="af-db" id="af-preamp-v">+' + (cfg.preamp || 0) + 'dB</span></div>';
+      html += '<div class="af-pre"><span>前级增益</span><input type="range" class="af-slider" id="af-preamp" min="-20" max="20" step="0.5" value="' + (cfg.preamp || 0) + '"><span class="af-db" id="af-preamp-v">' + fmtDb(cfg.preamp || 0) + '</span></div>';
     } else {
-      html += '<div class="af-na">此设备不支持系统均衡器</div>';
+      html += '<div class="af-na">EQ 参数读取失败，可尝试关掉再打开本模块</div>';
     }
     html += '</div>';
 
     /* ---- 音效 ---- */
     html += '<div class="af-sec"><div class="af-sec-h"><span>音效</span></div>';
-    html += '<div class="af-fx"><label class="af-switch"><input type="checkbox" id="af-bass-on"' + (cfg.bass ? ' checked' : '') + '><i></i></label>' +
+    const bassOk = d.bass === true, virtOk = d.virt === true;
+    html += '<div class="af-fx' + (bassOk ? '' : ' off') + '"><label class="af-switch"><input type="checkbox" id="af-bass-on"' + (cfg.bass ? ' checked' : '') + (bassOk ? '' : ' disabled') + '><i></i></label>' +
       '<span>低音增强</span><input type="range" class="af-slider" id="af-bass" min="0" max="1000" step="50" value="' + (cfg.bass || 0) + '"></div>';
-    html += '<div class="af-fx"><label class="af-switch"><input type="checkbox" id="af-virt-on"' + (cfg.virt ? ' checked' : '') + '><i></i></label>' +
+    html += '<div class="af-fx' + (virtOk ? '' : ' off') + '"><label class="af-switch"><input type="checkbox" id="af-virt-on"' + (cfg.virt ? ' checked' : '') + (virtOk ? '' : ' disabled') + '><i></i></label>' +
       '<span>虚拟环绕</span><input type="range" class="af-slider" id="af-virt" min="0" max="1000" step="50" value="' + (cfg.virt || 0) + '"></div>';
     html += '<div class="af-fx"><span class="af-cap">播放速度</span><select id="af-speed" class="af-select">' +
       [0.5, 0.75, 1, 1.25, 1.5, 2].map(s => '<option value="' + s + '"' +
@@ -89,7 +91,7 @@ function createAudioPanel() {
     if (info.framesPerBuffer) html += row('缓冲', info.framesPerBuffer + ' 帧 · 约 ' + (info.latencyMs || 0) + ' ms');
     html += row('重采样', isResample ? '是（' + (f.sampleRate / 1000).toFixed(1) + ' → ' + (devRate / 1000).toFixed(1) + ' kHz）' : '否');
     html += row('输出方式', '共享混音（ExoPlayer）');
-    html += '<div class="af-na">独占/bit-perfect 直通需要自写 AAudio 输出，暂未启用；DSD 需转 PCM。</div>';
+    html += '<div class="af-na">EQ 与音效在 PCM 链路上处理，不依赖系统 AudioEffect，因此不会出现“设备不支持”。独占/bit-perfect 需自写 AAudio 输出，仍是共享混音；DSD 走 PCM 转换后播放。</div>';
     html += '</div>';
 
     body.innerHTML = html;
@@ -132,10 +134,10 @@ function createAudioPanel() {
     if (pre) {
       pre.addEventListener('input', () => {
         const v = document.getElementById('af-preamp-v');
-        if (v) v.textContent = '+' + Number(pre.value) + 'dB';
+        if (v) v.textContent = fmtDb(Number(pre.value));
       });
       pre.addEventListener('change', () => {
-        cfg.preamp = Number(pre.value); save(); fx('loud', Math.round(cfg.preamp * 100));
+        cfg.preamp = Number(pre.value); save(); fx('preamp', Math.round(cfg.preamp * 100));
       });
     }
     const bassOn = document.getElementById('af-bass-on');

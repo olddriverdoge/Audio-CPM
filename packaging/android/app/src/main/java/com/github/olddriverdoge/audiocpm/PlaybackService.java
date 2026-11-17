@@ -41,6 +41,8 @@ public class PlaybackService extends MediaSessionService {
 
     /** 频谱旁路：挂在 AudioSink 上只读 PCM，不改音频数据 */
     private final SpectrumProcessor spectrum = new SpectrumProcessor();
+    /** 软件 10 段 EQ + 前级：PCM 级处理，所有输出方式都生效 */
+    private final SoftwareEqProcessor softwareEq = new SoftwareEqProcessor();
 
     public static ExoPlayer getPlayer() { return player; }
     public static String getLastError() { return lastError; }
@@ -60,7 +62,7 @@ public class PlaybackService extends MediaSessionService {
             protected AudioSink buildAudioSink(Context context, boolean enableFloatOutput,
                                                boolean enableAudioTrackPlaybackParams) {
                 return new DefaultAudioSink.Builder(context)
-                        .setAudioProcessors(new AudioProcessor[]{PlaybackService.this.spectrum})
+                        .setAudioProcessors(new AudioProcessor[]{PlaybackService.this.spectrum, PlaybackService.this.softwareEq})
                         .setEnableFloatOutput(enableFloatOutput)
                         .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
                         .build();

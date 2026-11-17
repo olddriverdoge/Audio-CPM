@@ -370,14 +370,20 @@ const App = (() => {
       const on = win ? !win.classList.contains('hidden') : false;
       b.classList.toggle('on', on);
     });
-    const hint = document.getElementById('wb-hint');
+    const hint = document.getElementById('scene-home');
     if (hint) {
-      const any = Object.values(MODS).some(m => {
-        const w = document.getElementById(m.win);
-        return w && !w.classList.contains('hidden');
-      });
-      hint.style.display = any ? 'none' : '';
+      hint.style.display = '';
+      if (typeof Scenes !== 'undefined') { try { Scenes.render(); } catch (_) {} }
     }
+  }
+  function openMods() {
+    return Object.keys(MODS).filter(k => {
+      const w = document.getElementById(MODS[k].win);
+      return w && !w.classList.contains('hidden');
+    });
+  }
+  function closeAllMods() {
+    openMods().forEach(k => toggleMod(k));
   }
   function openMod(name) {
     const m = MODS[name];
@@ -442,8 +448,10 @@ const App = (() => {
     const bar = document.getElementById('modbar');
     if (bar) {
       bar.addEventListener('click', e => {
-        const b = e.target.closest('.mod-btn[data-mod]');
-        if (b) toggleMod(b.dataset.mod);
+        const b = e.target.closest('.mod-btn');
+        if (!b) return;
+        if (b.dataset.scene) { closeAllMods(); return; }
+        if (b.dataset.mod) toggleMod(b.dataset.mod);
       });
     }
     // 任何浮窗自己收起时（点它的 — 按钮）同步开关状态
@@ -453,8 +461,7 @@ const App = (() => {
       if (w) obs.observe(w, {attributes: true, attributeFilter: ['class']});
     });
     syncMods();
-    // 默认只开文件浏览
-    fwBrowse.open();
+    // 启动停在场景预设页：由卡片决定要摆哪几个模块
     setTimeout(syncMods, 0);
   }
 
@@ -674,6 +681,7 @@ const App = (() => {
     TaskRunner.init();
 
     initMods();
+    if (typeof Scenes !== 'undefined') Scenes.init();
     applyPlayMode();
 
     /* 先加载浏览目录，目标目录树放后台（WebDAV 下不再拖住播放/元数据） */
@@ -741,6 +749,7 @@ const App = (() => {
   return {
     init, browse, onPlayed, updateMoveBar: () => MoveMgr.update(), isGridView, refreshColumns,
     playNext, playPrev, autoplayNext, autoplayOn, applyPlayMode, playMode, cyclePlayMode, openMod,
+    openMods, closeAllMods,
     playbackQueueList: () => playbackList().slice(), hifiQueue, toggleMod,
     get path() { return currentPath; },
     selection: () => (bv ? bv.selected() : []),

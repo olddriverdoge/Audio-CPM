@@ -29,6 +29,7 @@
 
   <!-- 模块开关：原来的两个页面 tab 改成这些模块的开关 -->
   <div class="modbar" id="modbar">
+    <button type="button" class="mod-btn" data-scene="1" title="收起所有浮窗，回到场景预设"><i class="dot"></i>场景</button>
     <button type="button" class="mod-btn" data-mod="browse"><i class="dot"></i>文件浏览</button>
     <button type="button" class="mod-btn" data-mod="task"><i class="dot"></i>批处理</button>
     <button type="button" class="mod-btn" data-mod="tree"><i class="dot"></i>目标目录</button>
@@ -42,8 +43,13 @@
 
   <!-- 大工作台：所有功能都以浮窗形式叠在这里 -->
   <div class="workbench" id="workbench">
-    <div class="wb-hint" id="wb-hint">
-      <b>工作台</b><br>点上方模块开关打开 / 收起对应浮窗<br>文件浏览 + 批处理 + 目标目录 可拖动、可改尺寸
+    <div class="scene-home" id="scene-home">
+      <div class="sh-head">
+        <div class="sh-title"><b>工作台预设</b><span>一套场景对应一组常用模块，点卡片即摆好</span></div>
+        <button type="button" class="small" id="sh-save">保存当前为预设</button>
+      </div>
+      <div class="sh-grid" id="sh-grid"></div>
+      <div class="sh-foot">模块浮窗可自由拖动 / 缩放 / 互相覆盖；收起后点这里换场景。</div>
     </div>
   </div>
 
@@ -440,6 +446,7 @@
 <script src="/js/settings.js"></script>
 <script src="/js/dock.js"></script>
 <script src="/js/winmgr.js"></script>
+<script src="/js/scenes.js"></script>
 <script src="/js/floatwin.js"></script>
 <script src="/js/filepicker.js"></script>
 <script src="/js/player.js"></script>

@@ -92,7 +92,7 @@ def _play_impl(data):
     return J({"status": "error", "message": msg})
 
 
-def api_stream(request: Request):
+async def api_stream(request: Request):
     path = qs(request, 'path')
     ref = parse_ref(path)
     if ref.kind == 'dav':
@@ -138,6 +138,14 @@ def api_stream(request: Request):
     ext = os.path.splitext(ref.path)[1].lower()
     if ext not in MEDIA_EXTS:
         raise HTTPException(400, "not media")
+    if ext in ('.dsf', '.dff'):
+        # DSD 不能直接喂 ExoPlayer：转成 PCM WAV 再流式播放（结果有缓存）
+        from ..dsd import to_pcm_wav, DsdError
+        try:
+            wav = await run_in_threadpool(to_pcm_wav, ref.path)
+        except DsdError as e:
+            raise HTTPException(415, str(e))
+        return FileResponse(wav, media_type='audio/wav')
     if ext in ('.aif', '.aiff'):
         # 纯 Python 重封装成 WAV（不重编码、不依赖 FFmpeg）
         from ..aiff import to_wav, AiffError
