@@ -7,7 +7,7 @@ import time
 import uvicorn
 
 from .app import app
-from .config import COVER_CACHE_DIR, PRESETS_FILE, DATA_DIR
+from .config import COVER_CACHE_DIR, TASK_PRESETS_FILE, DATA_DIR
 from . import ffbin
 from .jobs import load_tasks
 from . import native_bridge
@@ -37,7 +37,7 @@ def main():
     _log("cli: tasks loaded")
     print(f"数据目录: {DATA_DIR}")
     print(f"ffmpeg: {ffbin.FFMPEG}")
-    print(f"预设配置文件: {PRESETS_FILE}")
+    print(f"预设配置文件: {TASK_PRESETS_FILE}")
     print(f"封面缓存: {COVER_CACHE_DIR}")
     host_display = '127.0.0.1' if args.host == '0.0.0.0' else args.host
     print(f"打开浏览器访问: http://{host_display}:{args.port}")

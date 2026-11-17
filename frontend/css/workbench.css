@@ -203,3 +203,28 @@
     color:var(--text);border-radius:6px;font-size:10.5px;padding:2px 4px;font-family:inherit}
   .mv-bar .primary{background:rgba(56,189,248,.12);border-color:rgba(56,189,248,.5);color:var(--accent)}
   .mv-bar button{border-radius:6px}
+
+
+  /* ---------- 顶部场景栏 / 右下角模块坞 ---------- */
+  .scene-bar{display:flex;align-items:center;gap:6px;padding-top:4px;padding-bottom:5px}
+  .scene-tabs{display:flex;align-items:center;gap:6px;overflow-x:auto;flex:1 1 auto;scrollbar-width:none}
+  .scene-tabs::-webkit-scrollbar{display:none}
+  .scene-chip{flex:0 0 auto;padding:3px 10px;border-radius:999px;border:1px solid var(--border);
+    background:rgba(17,24,32,.9);color:var(--muted);font-size:11px;font-family:inherit;cursor:pointer}
+  .scene-chip.on{color:var(--accent);border-color:rgba(56,189,248,.55);background:rgba(56,189,248,.1)}
+  .scene-add{flex:0 0 auto;width:26px;height:24px;border-radius:7px;border:1px solid var(--border);
+    background:transparent;color:var(--muted);font-size:15px;line-height:1;font-family:inherit;cursor:pointer}
+  .scene-add:hover{color:var(--accent);border-color:rgba(56,189,248,.5)}
+
+  .module-fab{position:fixed;right:14px;bottom:108px;z-index:386;width:46px;height:46px;
+    border-radius:50%;border:1px solid rgba(56,189,248,.45);background:rgba(13,20,28,.96);
+    color:var(--accent);font-size:22px;line-height:1;font-family:inherit;cursor:pointer;
+    box-shadow:0 6px 18px rgba(0,0,0,.55)}
+  .module-fab.on{background:rgba(56,189,248,.18)}
+  .module-menu{position:fixed;right:14px;bottom:162px;z-index:385;display:flex;flex-direction:column;
+    gap:6px;align-items:stretch;max-height:60vh;overflow:auto;padding:2px}
+  .module-menu.hidden{display:none}
+  .module-item{min-width:104px;padding:7px 12px;border-radius:8px;border:1px solid var(--border);
+    background:rgba(13,20,28,.97);color:var(--text);font-size:11.5px;font-family:inherit;cursor:pointer;
+    text-align:right;box-shadow:0 4px 14px rgba(0,0,0,.45)}
+  .module-item.on{color:var(--accent);border-color:rgba(56,189,248,.55);background:rgba(56,189,248,.1)}

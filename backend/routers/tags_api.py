@@ -7,9 +7,9 @@ from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.routing import Route
 
-from ..config import PRESETS_FILE
+from ..config import TASK_PRESETS_FILE
 from ..jobs_core import edit_tags_file
-from ..presets import load_presets, save_presets
+from ..task_presets import load_task_presets, save_task_presets
 from ..simple import J, body
 from ..storage import parse_ref
 
@@ -31,18 +31,18 @@ def _edit_tags_impl(data):
     return J(edit_tags_file(ref.path, data.get('tags') or {}, data.get('remove') or []))
 
 
-def api_get_presets(request: Request):
-    return J(load_presets())
+def api_get_task_presets(request: Request):
+    return J(load_task_presets())
 
 
-async def api_save_presets(request: Request):
+async def api_save_task_presets(request: Request):
     data = await body(request)
     if not isinstance(data.get('presets'), dict):
         raise HTTPException(400, "格式错误")
-    save_presets(data)
-    return J({"ok": True, "file": PRESETS_FILE})
+    save_task_presets(data)
+    return J({"ok": True, "file": TASK_PRESETS_FILE})
 
 
 routes.append(Route('/api/edit_tags', api_edit_tags, methods=['POST']))
-routes.append(Route('/api/presets', api_get_presets))
-routes.append(Route('/api/presets', api_save_presets, methods=['POST']))
+routes.append(Route('/api/task-presets', api_get_task_presets))
+routes.append(Route('/api/task-presets', api_save_task_presets, methods=['POST']))

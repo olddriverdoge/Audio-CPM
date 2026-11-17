@@ -46,6 +46,26 @@ const Logs = (() => {
   /* 当前页面对应的命名空间：处理页 / 整理页互不串流 */
   function pageNs() { return SINGLE; }
 
+  function plainText() {
+    return (buf[ns] || []).map(e => '[' + e.t + '] ' + e.text).join('\n');
+  }
+
+  async function copyAll() {
+    const text = plainText();
+    if (!text) { Utils.toast('日志为空'); return; }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else throw new Error('no clipboard');
+    } catch (_) {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      try { document.execCommand('copy'); } finally { document.body.removeChild(ta); }
+    }
+    Utils.toast('日志已复制');
+  }
+
   function add(level, text, forcedNs) {
     const key = SINGLE;
     const arr = buf[key];
@@ -88,6 +108,8 @@ const Logs = (() => {
     });
     const minBtn = document.getElementById('lf-min');
     if (minBtn) minBtn.addEventListener('click', () => toggle(false));
+    const cp = document.getElementById('lf-copy');
+    if (cp) cp.addEventListener('click', copyAll);
     const clr = document.getElementById('lf-clear');
     if (clr) clr.addEventListener('click', () => clear());
     if (typeof Dock !== 'undefined') {
@@ -96,6 +118,6 @@ const Logs = (() => {
     toggle(false);
   }
 
-  return {init, add, clear, setNs, toggle, pageNs,
+  return {init, add, clear, copyAll, setNs, toggle, pageNs,
           get current() { return ns; }, get open() { return open; }};
 })();

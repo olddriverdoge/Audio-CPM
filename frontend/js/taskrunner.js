@@ -3,7 +3,7 @@ const TaskRunner = (() => {
   function lg(level, text) { Utils.log(level, text, 'process'); }
   let evtSource = null, startTime = 0, totalFiles = 0, doneFiles = 0;
   let taskId = null;
-  let presets = {presets: {}};
+  let taskPresets = {presets: {}};
 
   function currentTask() {
     const r = document.querySelector('input[name="task"]:checked');
@@ -18,13 +18,13 @@ const TaskRunner = (() => {
     if (prow) prow.classList.toggle('hidden', t !== 'convert');
   }
 
-  async function loadPresets() {
-    try { presets = await Api.presets(); }
-    catch (e) { presets = {presets: {}}; }
-    if (!presets || typeof presets.presets !== 'object') presets = {presets: {}};
+  async function loadTaskPresets() {
+    try { taskPresets = await Api.taskPresets(); }
+    catch (e) { taskPresets = {presets: {}}; }
+    if (!taskPresets || typeof taskPresets.presets !== 'object') taskPresets = {presets: {}};
     const sel = document.getElementById('preset-select');
     sel.innerHTML = '<option value="">— 手动配置 —</option>';
-    for (const name of Object.keys(presets.presets)) {
+    for (const name of Object.keys(taskPresets.presets)) {
       const o = document.createElement('option');
       o.value = name;
       o.textContent = name;
@@ -33,8 +33,8 @@ const TaskRunner = (() => {
   }
   function applyPreset() {
     const name = document.getElementById('preset-select').value;
-    if (!name || !presets.presets[name]) return;
-    const p = presets.presets[name];
+    if (!name || !taskPresets.presets[name]) return;
+    const p = taskPresets.presets[name];
     document.querySelectorAll('input[name="task"]').forEach(r => { r.checked = (r.value === p.task); });
     syncUI();
     if (p.task === 'convert') {
@@ -76,10 +76,10 @@ const TaskRunner = (() => {
     const p = collectConfig();
     delete p.path;
     delete p.only_files;
-    presets.presets[name] = p;
+    taskPresets.presets[name] = p;
     try {
-      await Api.savePresets(presets);
-      await loadPresets();
+      await Api.saveTaskPresets(presets);
+      await loadTaskPresets();
       document.getElementById('preset-select').value = name;
       lg('ok', '预设已保存: ' + name);
     } catch (e) { lg('err', '保存失败: ' + e.message); }
@@ -88,10 +88,10 @@ const TaskRunner = (() => {
     const name = document.getElementById('preset-select').value;
     if (!name) return;
     if (!confirm('删除预设 "' + name + '" ？')) return;
-    delete presets.presets[name];
+    delete taskPresets.presets[name];
     try {
-      await Api.savePresets(presets);
-      await loadPresets();
+      await Api.saveTaskPresets(presets);
+      await loadTaskPresets();
       lg('info', '已删除预设: ' + name);
     } catch (e) { lg('err', '删除失败: ' + e.message); }
   }
@@ -125,7 +125,7 @@ const TaskRunner = (() => {
   async function previewNames() {
     if (!App.path) { Utils.toast('请先选择目录'); return; }
     const pattern = document.getElementById('name-pattern').value;
-    if (typeof App.openMod === 'function') App.openMod('log');
+    if (typeof App.openMod === 'function') App.openModule('log');
     lg('info', '重命名预览（不改文件）：' + (pattern || '默认格式'));
     try {
       const r = await Api.renamePreview({path: App.path, name_pattern: pattern,
@@ -272,6 +272,6 @@ const TaskRunner = (() => {
     checkUnfinished();
   }
 
-  return {init, syncUI, loadPresets, applyPreset, saveAsPreset, deletePreset, start, previewNames,
+  return {init, syncUI, loadTaskPresets, applyPreset, saveAsPreset, deletePreset, start, previewNames,
           currentTask, collectConfig, checkUnfinished};
 })();

@@ -5,7 +5,7 @@ const App = (() => {
   let currentPath = '';
   let currentParent = '';
   let fwBrowse = null, fwTask = null, fwTree = null;
-  const MODS = {};
+  const MODULE_REGISTRY = {};
 
   function viewMode() { return Store.get(K.viewMode, 'list') === 'grid' ? 'grid' : 'list'; }
   function gridSize() { return Number(Store.get(K.gridSize, 128)) || 128; }
@@ -278,7 +278,7 @@ const App = (() => {
       i = treeActive;
     }
     await activateTreeRoot(i);
-    openMod('tree');
+    openModule('tree');
     Utils.toast('目标目录已指向当前路径');
   }
 
@@ -302,7 +302,7 @@ const App = (() => {
     if (Player.current && Player.current === path) {
       const spWin = document.getElementById('spectrum-float');
       const wasClosed = spWin ? spWin.classList.contains('hidden') : false;
-      openMod('spectrum');
+      openModule('spectrum');
       if (wasClosed && typeof Spectrum !== 'undefined' && Spectrum.setMode) {
         try { Spectrum.setMode('waterfall'); } catch (_) {}
       }
@@ -429,8 +429,8 @@ const App = (() => {
 
   /* ---- 模块开关（modbar） ---- */
   function syncMods() {
-    document.querySelectorAll('#modbar .mod-btn').forEach(b => {
-      const m = MODS[b.dataset.mod];
+    document.querySelectorAll('#module-menu [data-mod]').forEach(b => {
+      const m = MODULE_REGISTRY[b.dataset.mod];
       if (!m) return;
       const win = document.getElementById(m.win);
       const on = win ? !win.classList.contains('hidden') : false;
@@ -439,28 +439,28 @@ const App = (() => {
     const hint = document.getElementById('scene-home');
     if (hint) {
       hint.style.display = '';
-      if (typeof Scenes !== 'undefined') { try { Scenes.render(); } catch (_) {} }
+      if (typeof SceneStore !== 'undefined') { try { SceneStore.render(); } catch (_) {} }
     }
   }
-  function openMods() {
-    return Object.keys(MODS).filter(k => {
-      const w = document.getElementById(MODS[k].win);
+  function openModules() {
+    return Object.keys(MODULE_REGISTRY).filter(k => {
+      const w = document.getElementById(MODULE_REGISTRY[k].win);
       return w && !w.classList.contains('hidden');
     });
   }
-  function closeAllMods() {
-    openMods().forEach(k => toggleMod(k));
+  function closeAllModules() {
+    openModules().forEach(k => toggleModule(k));
   }
-  function openMod(name) {
-    const m = MODS[name];
+  function openModule(name) {
+    const m = MODULE_REGISTRY[name];
     if (!m) return;
     const win = document.getElementById(m.win);
     if (!win) return;
-    if (win.classList.contains('hidden')) toggleMod(name);
+    if (win.classList.contains('hidden')) toggleModule(name);
     try { WinMgr.raise(win); } catch (_) {}
   }
-  function toggleMod(name) {
-    const m = MODS[name];
+  function toggleModule(name) {
+    const m = MODULE_REGISTRY[name];
     if (!m) return;
     const win = document.getElementById(m.win);
     if (!win) return;
@@ -499,30 +499,62 @@ const App = (() => {
       minW: 260, minH: 200
     });
 
-    MODS.browse = {win: 'fw-browse', fw: fwBrowse};
-    MODS.task = {win: 'fw-task', fw: fwTask};
-    MODS.tree = {win: 'fw-tree', fw: fwTree};
+    MODULE_REGISTRY.browse = {win: 'fw-browse', fw: fwBrowse};
+    MODULE_REGISTRY.task = {win: 'fw-task', fw: fwTask};
+    MODULE_REGISTRY.tree = {win: 'fw-tree', fw: fwTree};
     if (typeof createPlayPanel === 'function') playPanel = createPlayPanel();
-    MODS.play = {win: 'play-float', fw: playPanel};
+    MODULE_REGISTRY.play = {win: 'play-float', fw: playPanel};
     if (typeof createAudioPanel === 'function') audioPanel = createAudioPanel();
-    MODS.audio = {win: 'audio-float', fw: audioPanel};
-    MODS.meta = {win: 'meta-float', fab: 'meta-fab', min: 'mf-min'};
-    MODS.spectrum = {win: 'spectrum-float', fab: 'sf-fab', min: 'sf-min'};
-    MODS.log = {win: 'log-float', fab: 'log-fab', min: 'lf-min'};
+    MODULE_REGISTRY.audio = {win: 'audio-float', fw: audioPanel};
+    MODULE_REGISTRY.meta = {win: 'meta-float', fab: 'meta-fab', min: 'mf-min'};
+    MODULE_REGISTRY.spectrum = {win: 'spectrum-float', fab: 'sf-fab', min: 'sf-min'};
+    MODULE_REGISTRY.log = {win: 'log-float', fab: 'log-fab', min: 'lf-min'};
 
-    const bar = document.getElementById('modbar');
-    if (bar) {
-      bar.addEventListener('click', e => {
-        const b = e.target.closest('.mod-btn');
+    /* 右下角模块坞：＋ 展开纵向按钮，10 秒无操作收回 */
+    const MODULE_LABEL = {
+      browse: '文件浏览', task: '批处理', tree: '目标目录', play: '播放管理',
+      audio: '音频输出', meta: '元数据', spectrum: '频谱/声谱', log: '日志'
+    };
+    const fab = document.getElementById('module-fab');
+    const menu = document.getElementById('module-menu');
+    if (menu) {
+      menu.innerHTML = Object.keys(MODULE_REGISTRY).map(k =>
+        '<button type="button" class="module-item" data-mod="' + k + '">' +
+        (MODULE_LABEL[k] || k) + '</button>').join('');
+    }
+    let menuTimer = 0;
+    function closeModuleMenu() {
+      if (menu) menu.classList.add('hidden');
+      if (fab) fab.classList.remove('on');
+      clearTimeout(menuTimer); menuTimer = 0;
+    }
+    function bumpModuleMenu() {
+      if (!menu || menu.classList.contains('hidden')) return;
+      clearTimeout(menuTimer);
+      menuTimer = setTimeout(closeModuleMenu, 10000);   // 10 秒不点模块按钮就收回
+    }
+    function openModuleMenu() {
+      if (!menu) return;
+      menu.classList.remove('hidden');
+      if (fab) fab.classList.add('on');
+      bumpModuleMenu();
+    }
+    if (fab) fab.addEventListener('click', () => {
+      if (menu && !menu.classList.contains('hidden')) closeModuleMenu();
+      else openModuleMenu();
+    });
+    if (menu) {
+      menu.addEventListener('pointerdown', bumpModuleMenu);
+      menu.addEventListener('click', e => {
+        const b = e.target.closest('[data-mod]');
         if (!b) return;
-        if (b.dataset.scene) { closeAllMods(); return; }
-        if (b.dataset.saveScene) { Scenes.saveCurrent(); return; }
-        if (b.dataset.mod) toggleMod(b.dataset.mod);
+        toggleModule(b.dataset.mod);
+        closeModuleMenu();
       });
     }
     // 任何浮窗自己收起时（点它的 — 按钮）同步开关状态
     const obs = new MutationObserver(() => syncMods());
-    Object.values(MODS).forEach(m => {
+    Object.values(MODULE_REGISTRY).forEach(m => {
       const w = document.getElementById(m.win);
       if (w) obs.observe(w, {attributes: true, attributeFilter: ['class']});
     });
@@ -563,10 +595,29 @@ const App = (() => {
       });
       applyCaps(Sources.currentRoot());
     }
+    if (typeof Logs !== 'undefined') Logs.init();
     Layout.init();
     Settings.init();
     Columns.bindSheet();
     const columns1 = Columns.create(K.columns);
+    bv = createBrowseView({
+      container: document.getElementById('view1'),
+      mode: viewMode(), gridSize: gridSize, folderOrder: 'first',
+      onOpenDir: p => browse(p),
+      onReload: () => browse(currentPath),
+      columns: columns1,
+      clickPlays: true, selectDirs: true,
+      onRowClick: (path, e, rowEl) => playRowClick(path, e, rowEl),
+      onCounts: () => {},
+      onSelectionChange: updateSelInfo,
+      onRender: () => { try { Player.paintRows(); } catch (_) {} }
+    });
+    tree = createTreeView({
+      container: document.getElementById('tree'),
+      onSelect: () => MoveMgr.update(),
+      onTreeChanged: () => MoveMgr.update()
+    });
+    metaFloat = createMetaFloat();
 
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') Settings.close();
@@ -615,11 +666,22 @@ const App = (() => {
     document.getElementById('mv-undo').onclick = () => MoveMgr.doUndo();
 
     TaskRunner.syncUI();
-    await TaskRunner.loadPresets();
+    await TaskRunner.loadTaskPresets();
     TaskRunner.init();
 
+    MoveMgr.bind({
+      getSources: () => (bv ? bv.selected() : []),
+      getTarget: () => (tree ? tree.selected : ''),
+      afterMove: async () => {
+        await browse(currentPath);
+        if (bv) bv.clearSelection();
+        updateSelInfo();
+      }
+    });
+    if (typeof Spectrum !== 'undefined') Spectrum.init();
+
     initMods();
-    if (typeof Scenes !== 'undefined') Scenes.init();
+    if (typeof SceneStore !== 'undefined') SceneStore.init();
     applyPlayMode();
 
     /* 先加载浏览目录，目标目录树放后台（WebDAV 下不再拖住播放/元数据） */
@@ -686,9 +748,9 @@ const App = (() => {
 
   return {
     init, browse, onPlayed, updateMoveBar: () => MoveMgr.update(), isGridView, refreshColumns,
-    playNext, playPrev, autoplayNext, autoplayOn, applyPlayMode, playMode, cyclePlayMode, openMod,
-    openMods, closeAllMods, addTargetCurrent, addFavCurrent,
-    playbackQueueList: () => playbackList().slice(), hifiQueue, toggleMod,
+    playNext, playPrev, autoplayNext, autoplayOn, applyPlayMode, playMode, cyclePlayMode,
+    openModule, openModules, closeAllModules, openMod: openModule, addTargetCurrent, addFavCurrent,
+    playbackQueueList: () => playbackList().slice(), hifiQueue, toggleModule,
     get path() { return currentPath; },
     selection: () => (bv ? bv.selected() : []),
     currentParent: () => currentParent
@@ -697,5 +759,6 @@ const App = (() => {
 
 App.init().catch(e => {
   console.error(e);
-  Utils.log('err', '初始化失败: ' + e.message);
+  try { Utils.log('err', '初始化失败: ' + (e && (e.stack || e.message) || e), 'workbench'); } catch (_) {}
+  try { App.openModule('log'); } catch (_) {}
 });

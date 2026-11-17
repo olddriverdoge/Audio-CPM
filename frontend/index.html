@@ -27,27 +27,17 @@
     <button type="button" class="small hdr-btn" id="btn-player-cfg" title="设置（播放 + 界面配置）"><span class="b-ico">⚙</span><span class="b-lbl">设置</span></button>
   </header>
 
-  <!-- 模块开关：原来的两个页面 tab 改成这些模块的开关 -->
-  <div class="modbar" id="modbar">
-    <button type="button" class="mod-btn" data-scene="1" title="收起所有浮窗，回到场景预设"><i class="dot"></i>场景</button>
-    <button type="button" class="mod-btn" data-mod="browse"><i class="dot"></i>文件浏览</button>
-    <button type="button" class="mod-btn" data-mod="task"><i class="dot"></i>批处理</button>
-    <button type="button" class="mod-btn" data-mod="tree"><i class="dot"></i>目标目录</button>
-    <button type="button" class="mod-btn" data-mod="play">播放管理</button>
-    <button type="button" class="mod-btn" data-mod="audio">音频输出</button>
-
-    <button type="button" class="mod-btn" data-mod="meta"><i class="dot"></i>元数据</button>
-    <button type="button" class="mod-btn" data-mod="spectrum"><i class="dot"></i>频谱/声谱</button>
-    <button type="button" class="mod-btn" data-mod="log"><i class="dot"></i>日志</button>
-    <button type="button" class="mod-btn" data-save-scene="1" title="把当前模块组合和浮窗位置存为预设">存预设</button>
+  <!-- 顶部只放场景（模块选择在右下角的模块坞） -->
+  <div class="modbar scene-bar" id="scene-bar">
+    <div class="scene-tabs" id="scene-tabs"></div>
+    <button type="button" class="scene-add" id="scene-add" title="把当前模块布局保存为场景">＋</button>
   </div>
 
   <!-- 大工作台：所有功能都以浮窗形式叠在这里 -->
   <div class="workbench" id="workbench">
     <div class="scene-home" id="scene-home">
       <div class="sh-head">
-        <div class="sh-title"><b>工作台预设</b><span>一套场景对应一组常用模块，点卡片即摆好</span></div>
-        <button type="button" class="small" id="sh-save">保存当前为预设</button>
+        <div class="sh-title"><b>场景</b><span>一套场景对应一组模块；顶部 ＋ 保存当前布局</span></div>
       </div>
       <div class="sh-grid" id="sh-grid"></div>
       <div class="sh-foot">模块浮窗可自由拖动 / 缩放 / 互相覆盖；收起后点这里换场景。</div>
@@ -217,6 +207,10 @@
   </div>
 
 
+<!-- 右下角模块坞：＋ 展开纵向模块按钮，10 秒不操作自动收回 -->
+<button type="button" class="module-fab" id="module-fab" title="展开模块">＋</button>
+<div class="module-menu hidden" id="module-menu"></div>
+
 <audio id="audio-el" preload="metadata"></audio>
 <div class="player-bar hidden" id="player-bar">
   <div class="pb-cover" id="pb-cover" title="暂无封面">
@@ -324,6 +318,7 @@
   <div class="mf-head" id="lf-head" title="拖动可移动">
     <span class="mf-title">日志</span>
     <span class="mf-track" id="lf-ns"></span>
+    <button type="button" class="sf-btn" id="lf-copy" title="复制全部日志">复制</button>
     <button type="button" class="sf-btn" id="lf-clear" title="清空日志">🗑</button>
     <button type="button" class="sf-btn" id="lf-min" title="收起">—</button>
   </div>
@@ -441,7 +436,7 @@
 <script src="/js/settings.js"></script>
 <script src="/js/dock.js"></script>
 <script src="/js/winmgr.js"></script>
-<script src="/js/scenes.js"></script>
+<script src="/js/scene_store.js"></script>
 <script src="/js/floatwin.js"></script>
 <script src="/js/filepicker.js"></script>
 <script src="/js/player.js"></script>
