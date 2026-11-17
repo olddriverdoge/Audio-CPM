@@ -13,6 +13,7 @@ import android.util.Log;
 
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.Player;
+import androidx.media3.common.PlaybackParameters;
 import androidx.media3.exoplayer.ExoPlayer;
 
 import java.io.File;
@@ -50,6 +51,48 @@ public class AudioCpmBridge {
         if (p.endsWith(".wv")) return "audio/x-wavpack";
         if (p.endsWith(".dsf") || p.endsWith(".dff")) return "audio/x-dsf";
         return "audio/*";
+    }
+
+    /** 给 AudioFx 用的转义（保持错误信息可回传又不破坏 JSON） */
+    public static String escPublic(String s) { return esc(s); }
+
+    /** 音频效果：op=eq/band/preset/bass/virt/loud/reset */
+    public static String fx(final String op, final int a, final int b) {
+        if ("speed".equals(op)) {          // a = 速度*100，例如 150 = 1.5x
+            final float sp = Math.max(0.5f, Math.min(2.0f, a / 100f));
+            return simpleVoid(() -> {
+                ExoPlayer p = PlaybackService.getPlayer();
+                if (p == null) return;
+                p.setPlaybackParameters(new PlaybackParameters(sp));
+            });
+        }
+        return AudioFx.apply(op, a, b);
+    }
+
+    /** 输出信息：设备原生采样率/缓冲 + ExoPlayer 实际 PCM 格式 + 效果状态 */
+    public static String audioInfo() {
+        try {
+            StringBuilder sb = new StringBuilder("{\"ok\":true");
+            try {
+                android.media.AudioManager am = (android.media.AudioManager)
+                        AudioCpmApp.get().getSystemService(Context.AUDIO_SERVICE);
+                String sr = am == null ? null : am.getProperty(android.media.AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE);
+                String fp = am == null ? null : am.getProperty(android.media.AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER);
+                int rate = sr == null ? 0 : Integer.parseInt(sr);
+                int frames = fp == null ? 0 : Integer.parseInt(fp);
+                sb.append(",\"deviceSampleRate\":").append(rate);
+                sb.append(",\"framesPerBuffer\":").append(frames);
+                sb.append(",\"latencyMs\":").append(rate > 0 ? (int) Math.round(frames * 1000.0 / rate) : 0);
+            } catch (Throwable ignored) {}
+            sb.append(",\"format\":").append(SpectrumProcessor.describe());
+            sb.append(",\"fx\":").append(AudioFx.info());
+            ExoPlayer p = PlaybackService.getPlayer();
+            if (p != null) sb.append(",\"speed\":").append(p.getPlaybackParameters().speed);
+            sb.append('}');
+            return sb.toString();
+        } catch (Throwable t) {
+            return "{\"ok\":false,\"error\":\"" + esc(String.valueOf(t)) + "\"}";
+        }
     }
 
     private interface Fn<T> { T run() throws Exception; }

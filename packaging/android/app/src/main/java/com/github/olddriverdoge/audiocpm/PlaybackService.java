@@ -37,12 +37,14 @@ public class PlaybackService extends MediaSessionService {
     private static volatile ExoPlayer player;
     private static volatile MediaSession session;
     private static volatile String lastError = "";
+    private static volatile int audioSessionId = 0;
 
     /** 频谱旁路：挂在 AudioSink 上只读 PCM，不改音频数据 */
     private final SpectrumProcessor spectrum = new SpectrumProcessor();
 
     public static ExoPlayer getPlayer() { return player; }
     public static String getLastError() { return lastError; }
+    public static int getAudioSessionId() { return audioSessionId; }
 
     @Override
     public void onCreate() {
@@ -82,6 +84,12 @@ public class PlaybackService extends MediaSessionService {
             public void onPlaybackStateChanged(int state) {
                 lastError = state == Player.STATE_IDLE ? lastError : "";
                 Log.i(TAG, "playback state -> " + state);
+            }
+
+            @Override
+            public void onAudioSessionIdChanged(int id) {
+                audioSessionId = id;
+                Log.i(TAG, "audio session id = " + id);
             }
 
             @Override

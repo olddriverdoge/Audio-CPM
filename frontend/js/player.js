@@ -351,6 +351,31 @@ const Player = (() => {
     }
     syncMediaState(true);
   }
+  /* 播放管理面板用：位置/时长/播放状态/音量/重播 */
+  function positionSec() { return hifi ? hifiPos / 1000 : (audio.currentTime || 0); }
+  function durationSec() { return hifi ? (hifiDur > 0 ? hifiDur / 1000 : 0) : (isFinite(audio.duration) ? audio.duration : 0); }
+  function isPlaying() { return hifi ? hifiPlaying : !audio.paused; }
+  function setVolume(v) {
+    const x = Math.max(0, Math.min(1, Number(v) || 0));
+    try { audio.volume = x; } catch (_) {}
+    if (vol) vol.value = String(x);
+    try { if (typeof Api !== 'undefined' && Api.playbackVolume) Api.playbackVolume(x).catch(() => {}); } catch (_) {}
+  }
+  function seekSec(t) {
+    const d = durationSec();
+    if (!(d > 0)) return;
+    seekRatio(Math.max(0, Math.min(1, Number(t) / d)));
+  }
+  function replay() {
+    if (hifi) {
+      try { Api.playbackSeek(0).catch(() => {}); } catch (_) {}
+      try { Api.playbackResume().catch(() => {}); } catch (_) {}
+      hifiPlaying = true;
+      return;
+    }
+    try { audio.currentTime = 0; audio.play().catch(() => {}); } catch (_) {}
+  }
+
   // 按横向比例跳转（整理页点击行/磁贴一步到位）
   function seekRatio(r) {
     const d = hifi ? hifiDur / 1000 : audio.duration;

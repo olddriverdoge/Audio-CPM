@@ -33,6 +33,7 @@
     <button type="button" class="mod-btn" data-mod="task"><i class="dot"></i>批处理</button>
     <button type="button" class="mod-btn" data-mod="tree"><i class="dot"></i>目标目录</button>
     <button type="button" class="mod-btn" data-mod="play">播放管理</button>
+    <button type="button" class="mod-btn" data-mod="audio">音频输出</button>
     <button type="button" class="mod-btn" data-mod="move"><i class="dot"></i>移动</button>
     <button type="button" class="mod-btn" data-mod="meta"><i class="dot"></i>元数据</button>
     <button type="button" class="mod-btn" data-mod="spectrum"><i class="dot"></i>频谱/声谱</button>
@@ -241,6 +242,15 @@
 <!-- 全局悬浮频谱：默认贴边按钮，点开浮窗，右下角可拖动调整大小 -->
 <button type="button" class="sf-fab meta-fab" id="meta-fab" title="元数据（独立浮窗）">🎵<span>元数据</span></button>
 <button type="button" class="sf-fab" id="sf-fab" title="频谱 / 声谱">▤<span>频谱/声谱</span></button>
+<div class="audio-float hidden" id="audio-float">
+  <div class="mf-head" id="af-head" title="拖动可移动 / 双指可缩放">
+    <span class="mf-title">音频输出</span>
+    <span class="mf-track" id="af-track">未播放</span>
+    <button type="button" class="sf-btn" id="af-min" title="收起">—</button>
+  </div>
+  <div class="af-body" id="af-body"><div class="detail-empty">正在读取音频输出信息…</div></div>
+  <b class="fw-resize" id="af-resize" title="拖动调整大小（或双指捏合）"></b>
+</div>
 <div class="play-float hidden" id="play-float">
   <div class="mf-head" id="pf-head" title="拖动可移动 / 双指可缩放">
     <span class="mf-title">播放管理</span>
@@ -433,6 +443,7 @@
 <script src="/js/filepicker.js"></script>
 <script src="/js/player.js"></script>
 <script src="/js/playpanel.js"></script>
+<script src="/js/audiopanel.js"></script>
 <script src="/js/playmgr.js"></script>
 <script src="/js/thumbmgr.js"></script>
 <script src="/js/columns.js"></script>

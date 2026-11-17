@@ -61,6 +61,8 @@ const Api = (() => {
     playbackSeek: ms => jpost('/api/playback/seek', {positionMs: ms}),
     playbackVolume: v => jpost('/api/playback/volume', {volume: v}),
     playbackMode: (repeat, shuffle) => jpost('/api/playback/mode', {repeat, shuffle}),
-    playbackSkip: dir => jpost('/api/playback/skip', {dir})
+    playbackSkip: dir => jpost('/api/playback/skip', {dir}),
+    audioFx: (op, a, b) => jpost('/api/audio/fx', {op, a, b}),
+    audioInfo: () => jfetch('/api/audio/info')
   };
 })();

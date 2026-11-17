@@ -66,6 +66,8 @@ def register() -> bool:
             'volume': lambda v: _call('setVolume', float(v)),
             'mode': lambda rep, sh: _call('setMode', int(rep), bool(sh)),
             'skip': lambda d: _call('skip', int(d)),
+            'audio_fx': lambda op, a, b: _call('fx', str(op), int(a), int(b)),
+            'audio_info': lambda: _call('audioInfo'),
         }
     except Exception:
         _playback = None
@@ -130,6 +132,24 @@ def playback_control(action, value=None):
         if action == 'mode':
             return _playback['mode'](int((value or {}).get('repeat', 0)), bool((value or {}).get('shuffle', False)))
         return _playback[action]()
+    except Exception as e:
+        return {'ok': False, 'error': str(e)[:300]}
+
+
+def audio_fx(op, a=0, b=0):
+    if not _playback:
+        return {'ok': False, 'error': 'not_supported'}
+    try:
+        return _playback['audio_fx'](op, a, b)
+    except Exception as e:
+        return {'ok': False, 'error': str(e)[:300]}
+
+
+def audio_info():
+    if not _playback:
+        return {'ok': False, 'error': 'not_supported'}
+    try:
+        return _playback['audio_info']()
     except Exception as e:
         return {'ok': False, 'error': str(e)[:300]}
 

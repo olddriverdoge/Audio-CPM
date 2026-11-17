@@ -1,7 +1,7 @@
 /* ---------------- App：单工作台 + 模块浮窗 ---------------- */
 const App = (() => {
   let bv = null;            // 唯一的文件浏览视图（原两页合并）
-  let metaFloat = null, tree = null, playPanel = null;
+  let metaFloat = null, tree = null, playPanel = null, audioPanel = null;
   let currentPath = '';
   let currentParent = '';
   let fwBrowse = null, fwTask = null, fwTree = null;
@@ -431,6 +431,8 @@ const App = (() => {
     MODS.tree = {win: 'fw-tree', fw: fwTree};
     if (typeof createPlayPanel === 'function') playPanel = createPlayPanel();
     MODS.play = {win: 'play-float', fw: playPanel};
+    if (typeof createAudioPanel === 'function') audioPanel = createAudioPanel();
+    MODS.audio = {win: 'audio-float', fw: audioPanel};
     MODS.move = {win: 'movebar', fab: 'mv-fab', min: 'mv-min'};
     MODS.meta = {win: 'meta-float', fab: 'meta-fab', min: 'mf-min'};
     MODS.spectrum = {win: 'spectrum-float', fab: 'sf-fab', min: 'sf-min'};
