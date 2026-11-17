@@ -85,6 +85,16 @@
     box-shadow:0 4px 14px rgba(0,0,0,.45);font-family:inherit}
   .sf-fab:hover,.sf-fab.on{color:var(--accent);border-color:var(--accent)}
   body.has-player .sf-fab{bottom:140px}
+  /* 移动模块：与元数据/频谱同一列贴边按钮，浮窗宽度按内容自适应 */
+  .sf-fab.move-fab{bottom:168px}
+  body.has-player .sf-fab.move-fab{bottom:212px}
+  .move-float{position:fixed;right:10px;bottom:168px;z-index:330;width:max-content;
+    max-width:92vw;display:flex;flex-direction:column;background:rgba(13,18,24,.97);
+    border:1px solid var(--border);border-radius:8px;
+    box-shadow:0 8px 28px rgba(0,0,0,.6);overflow:hidden}
+  body.has-player .move-float{bottom:212px}
+  .move-float.hidden{display:none}
+
   .spectrum-float{position:fixed;right:10px;bottom:96px;z-index:331;width:320px;height:170px;
     min-width:180px;min-height:110px;max-width:92vw;max-height:70vh;
     display:flex;flex-direction:column;background:rgba(13,18,24,.97);
@@ -108,8 +118,8 @@
     background:linear-gradient(135deg,transparent 50%,rgba(148,163,184,.55) 50%)}
 
   /* 元数据浮窗：与频谱浮窗同交互，独立入口 */
-  .meta-fab{bottom:132px}
-  body.has-player .meta-fab{bottom:176px}
+  .sf-fab.meta-fab{bottom:132px}
+  body.has-player .sf-fab.meta-fab{bottom:176px}
   .meta-float{position:fixed;right:10px;bottom:132px;z-index:331;width:320px;height:400px;
     min-width:230px;min-height:160px;max-width:94vw;max-height:80vh;
     display:flex;flex-direction:column;background:rgba(13,18,24,.97);

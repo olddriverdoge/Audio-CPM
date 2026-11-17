@@ -9,6 +9,8 @@ const MoveMgr = (() => {
     const t = ctx && ctx.getTarget ? ctx.getTarget() : '';
     const cEl = document.getElementById('mv-count');
     if (cEl) cEl.textContent = '已选 ' + n + ' 项';
+    const fl = document.getElementById('mv-fab-label');
+    if (fl) fl.textContent = n > 0 ? ('移动 ' + n) : '移动';
     const b = document.getElementById('mv-btn');
     if (b) b.disabled = !(n > 0 && !!t);
     const u = document.getElementById('mv-undo');

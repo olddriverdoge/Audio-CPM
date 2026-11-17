@@ -121,7 +121,7 @@ const Spectrum = (() => {
       const now = performance.now();
       hist.push({t: now, data: d, bars: core.bars, linbars: core.linbars,
                  spec: core.spec, levels: core.levels});
-      const cap = Math.max(8, Math.min(120, Math.ceil(delayMs / 16.7) + 3));
+      const cap = Math.max(8, Math.min(200, Math.ceil(delayMs / 8) + 5));   // 1s 档按 ~125Hz 取数留够历史
       while (hist.length > cap) hist.shift();
     }
     if (r.sampleRate) core.sampleRate = r.sampleRate;
@@ -136,6 +136,7 @@ const Spectrum = (() => {
     }
     return hist[0];
   }
+  let pcmTickId = 0;
   function startPcmPoll() {
     if (pcmTimer) return;
     try { Api.playbackSpectrum(true); } catch (_) {}
@@ -144,8 +145,9 @@ const Spectrum = (() => {
     const nat = (typeof window.AudioCpmNative === 'object' && window.AudioCpmNative
                  && typeof window.AudioCpmNative.spectrum === 'function');
     if (nat) {
+      const myId = ++pcmTickId;
       const tick = () => {
-        if (!pcmTimer) return;
+        if (!pcmTimer || myId !== pcmTickId) return;
         if (core && core.native) {
           try { const s = window.AudioCpmNative.spectrum(); if (s) applySpectrum(JSON.parse(s)); } catch (_) {}
         }
@@ -184,7 +186,10 @@ const Spectrum = (() => {
     return null;
   }
 
-  function stopPcmPoll() { if (pcmTimer) { clearInterval(pcmTimer); pcmTimer = 0; } }
+  function stopPcmPoll() {
+    pcmTickId++;
+    if (pcmTimer) { clearInterval(pcmTimer); pcmTimer = 0; }
+  }
 
   function layoutCanvas() {
     if (!canvas) return;
@@ -544,6 +549,31 @@ const Spectrum = (() => {
     }
   }
 
+  /* 切歌：底层 ExoPlayer/SpectrumProcessor 重建，旧的谱系作废。
+     清空历史与瀑布后重新下发参数、重启取数，避免"显示错乱，收起再开才正常" */
+  function onTrackChange() {
+    hist = [];
+    dataSeq = 0; wfSeq = -1; lastDataAt = performance.now();
+    peakVals = []; peakAt = [];
+    wfRowKey = ''; wfImgKey = '';
+    if (core && core.native) {
+      const barN = Math.max(1, effBars());
+      live = {data: null, bars: null, linbars: null, spec: null, levels: null};
+      core.data = new Uint8Array(96); core.levels = new Uint8Array(96);
+      core.bars = new Uint8Array(barN); core.linbars = new Uint8Array(barN);
+      core.spec = new Uint8Array(0);
+    }
+    try { if (wfCtx) { wfCtx.fillStyle = '#000'; wfCtx.fillRect(0, 0, wfW, wfH); } } catch (_) {}
+    paramsSig = '';                      // 新 processor 是默认参数，必须重新下发
+    pushParams();
+    if (!open) return;
+    stopped = false; pausedAt = 0;
+    stopPcmPoll();                       // 老链退出（pcmTickId 递增）
+    try { Api.playbackSpectrum(true); } catch (_) {}
+    startPcmPoll();
+    if (!raf) start();
+  }
+
   function start() {
     ensureCore();
     if (!core) { setState('不可用'); return; }
@@ -688,7 +718,7 @@ const Spectrum = (() => {
     const lab = document.createElement('label');
     lab.textContent = '延迟（蓝牙对齐）'; lab.htmlFor = 'sf-delay';
     const inp = document.createElement('input');
-    inp.type = 'range'; inp.id = 'sf-delay'; inp.min = '0'; inp.max = '500'; inp.step = '20';
+    inp.type = 'range'; inp.id = 'sf-delay'; inp.min = '0'; inp.max = '1000'; inp.step = '20';
     const val = document.createElement('span'); val.id = 'sf-delay-val';
     row.append(lab, inp, val);
     // 通用项（两种场景都生效）
@@ -728,7 +758,7 @@ const Spectrum = (() => {
   }
 
   function setDelay(ms, save) {
-    delayMs = Math.max(0, Math.min(500, Math.round(ms) || 0));
+    delayMs = Math.max(0, Math.min(1000, Math.round(ms) || 0));
     if (delayEl) delayEl.value = String(delayMs);
     if (delayVal) delayVal.textContent = delayMs + 'ms';
     if (save) Store.set(K.spectrumDelay, delayMs);
@@ -920,5 +950,5 @@ const Spectrum = (() => {
     });
   }
 
-  return {init, toggle, setMode, get open() { return open; }, get mode() { return mode; }};
+  return {init, toggle, setMode, onTrackChange, get open() { return open; }, get mode() { return mode; }};
 })();

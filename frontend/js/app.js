@@ -173,22 +173,42 @@ const App = (() => {
   function browse(path) { return loadDir('main', path); }
   function srcBrowse(path, opts) { return loadDir('src', path, opts); }
 
+  function viewLabel(m) { return m === 'grid' ? '网格' : '列表'; }
+  function sizeLabel(sz) { return sz >= 192 ? 'L' : (sz >= 128 ? 'M' : 'S'); }
+  // 处理页的视图切换/封面尺寸按钮在模块内部（不再占顶部）
+  function paintViewButtons() {
+    const vb = document.getElementById('s1-view-btn');
+    if (vb) vb.textContent = viewLabel(viewMode());
+    const sb = document.getElementById('s1-size-btn');
+    if (sb) {
+      sb.textContent = sizeLabel(gridSize());
+      sb.classList.toggle('hidden', viewMode() !== 'grid');
+    }
+    const v2 = document.getElementById('s2-view-btn');
+    if (v2) v2.textContent = viewLabel(s2ViewMode());
+    const s2 = document.getElementById('s2-size-btn');
+    if (s2) {
+      s2.textContent = sizeLabel(gridSize());
+      s2.classList.toggle('hidden', s2ViewMode() !== 'grid');
+    }
+  }
   function setViewMode(m) {
     if (m !== 'grid') m = 'list';
     Store.set(K.viewMode, m);
-    document.querySelectorAll('#view-seg button').forEach(b => {
-      b.classList.toggle('active', b.dataset.view === m);
-    });
-    document.getElementById('gridsize-seg').classList.toggle('hidden', m !== 'grid');
-    bv1.setMode(m);
+    if (bv1) bv1.setMode(m);
+    paintViewButtons();
     Player.syncBar();
   }
+  function cycleViewMode() { setViewMode(viewMode() === 'grid' ? 'list' : 'grid'); }
   function setGridSize(sz) {
     Store.set(K.gridSize, sz);
-    document.querySelectorAll('#gridsize-seg button').forEach(b => {
-      b.classList.toggle('active', Number(b.dataset.size) === sz);
-    });
-    bv1.render();
+    paintViewButtons();
+    if (bv1) bv1.render();
+   }
+  function cycleGridSize() {
+    const sizes = [96, 128, 192];
+    const i = sizes.indexOf(gridSize());
+    setGridSize(sizes[(i + 1) % sizes.length]);
   }
 
   function setPage(p) {
@@ -201,10 +221,12 @@ const App = (() => {
     document.querySelectorAll('#page-seg button').forEach(b => {
       b.classList.toggle('active', b.dataset.page === p);
     });
-    const viewSeg = document.getElementById('view-seg');
-    const gsSeg = document.getElementById('gridsize-seg');
-    if (viewSeg) viewSeg.classList.toggle('hidden', p !== 'process');
-    if (gsSeg) gsSeg.classList.toggle('hidden', p !== 'process' || viewMode() !== 'grid');
+    paintViewButtons();
+    // 移动模块只在整理页可用：换到处理页时收起，避免选中数残留
+    const mvFabEl = document.getElementById('mv-fab');
+    const mvBoxEl = document.getElementById('movebar');
+    if (mvFabEl) mvFabEl.style.display = (p === 'organize') ? '' : 'none';
+    if (mvBoxEl && p !== 'organize') mvBoxEl.classList.add('hidden');
     if (p === 'organize' && bv2 && !bv2.path && (srcPath || currentPath)) {
       srcBrowse(srcPath || currentPath);
     }
@@ -413,14 +435,12 @@ const App = (() => {
     });
 
     /* Header */
-    document.getElementById('view-seg').addEventListener('click', e => {
-      const b = e.target.closest('button[data-view]');
-      if (b) setViewMode(b.dataset.view);
-    });
-    document.getElementById('gridsize-seg').addEventListener('click', e => {
-      const b = e.target.closest('button[data-size]');
-      if (b) setGridSize(Number(b.dataset.size));
-    });
+    const s1v = document.getElementById('s1-view-btn');
+    if (s1v) s1v.addEventListener('click', cycleViewMode);
+    const s1sz = document.getElementById('s1-size-btn');
+    if (s1sz) s1sz.addEventListener('click', cycleGridSize);
+    const s2sz = document.getElementById('s2-size-btn');
+    if (s2sz) s2sz.addEventListener('click', cycleGridSize);
     document.getElementById('page-seg').addEventListener('click', e => {
       const b = e.target.closest('button[data-page]');
       if (b) setPage(b.dataset.page);
@@ -448,9 +468,6 @@ const App = (() => {
         });
       }
     }
-    document.querySelectorAll('#view-seg button').forEach(b => {
-      b.classList.toggle('active', b.dataset.view === viewMode());
-    });
 
     /* 顺序自动播放开关 */
     const apBtn = document.getElementById('btn-autoplay');
@@ -463,10 +480,6 @@ const App = (() => {
       });
       paintAutoplay();
     }
-    document.getElementById('gridsize-seg').classList.toggle('hidden', viewMode() !== 'grid');
-    document.querySelectorAll('#gridsize-seg button').forEach(b => {
-      b.classList.toggle('active', Number(b.dataset.size) === gridSize());
-    });
 
     /* 整理页：文件选择区视图用一个按钮循环切换，目标目录树不受影响 */
     const s2vBtn = document.getElementById('s2-view-btn');
@@ -474,23 +487,57 @@ const App = (() => {
       s2vBtn.textContent = s2ViewLabel(s2ViewMode());
       s2vBtn.addEventListener('click', cycleS2View);
     }
+    paintViewButtons();
 
-    /* 移动条收起 / 展开（横屏省空间），状态记忆 */
+    /* 移动文件模块：与频谱/元数据一致的独立浮窗（贴边按钮打开，宽度按内容自适应） */
     const mvBar = document.getElementById('movebar');
-    const mvToggle = document.getElementById('mv-toggle');
-    function syncMoveBar() {
-      const c = Store.get(K.moveCollapsed, false) === true;
-      mvBar.classList.toggle('collapsed', c);
-      mvToggle.textContent = c ? '⌃ 移动' : '收起 ⌄';
-      mvToggle.title = c ? '展开移动条' : '收起移动条（贴右边，省出高度）';
+    const mvFab = document.getElementById('mv-fab');
+    const mvHead = document.getElementById('mv-head');
+    const mvMin = document.getElementById('mv-min');
+    let mvOpen = false;
+    function mvApplyPos() {
+      if (!mvBar) return;
+      const saved = Store.get(K.movePos, null);
+      if (saved && Number.isFinite(Number(saved.x)) && Number.isFinite(Number(saved.y))) {
+        mvBar.style.left = Math.max(4, Math.min(window.innerWidth - 60, Number(saved.x))) + 'px';
+        mvBar.style.top = Math.max(4, Math.min(window.innerHeight - 60, Number(saved.y))) + 'px';
+        mvBar.style.right = 'auto'; mvBar.style.bottom = 'auto';
+      } else {
+        mvBar.style.left = 'auto'; mvBar.style.right = '10px';
+        mvBar.style.top = 'auto'; mvBar.style.bottom = '168px';
+      }
     }
-    if (mvToggle) {
-      mvToggle.addEventListener('click', () => {
-        Store.set(K.moveCollapsed, Store.get(K.moveCollapsed, false) !== true);
-        syncMoveBar();
+    function mvToggleOpen() {
+      mvOpen = !mvOpen;
+      mvBar.classList.toggle('hidden', !mvOpen);
+      if (mvFab) mvFab.style.display = mvOpen ? 'none' : '';
+      if (mvOpen) mvApplyPos();
+    }
+    if (mvFab) mvFab.addEventListener('click', mvToggleOpen);
+    if (mvMin) mvMin.addEventListener('click', () => { if (mvOpen) mvToggleOpen(); });
+    if (mvHead && mvBar) {
+      let st = null;
+      mvHead.addEventListener('pointerdown', e => {
+        st = {x0: e.clientX, y0: e.clientY, l: mvBar.offsetLeft, t: mvBar.offsetTop};
+        try { mvHead.setPointerCapture(e.pointerId); } catch (_) {}
+        if (e.cancelable) e.preventDefault();
       });
+      mvHead.addEventListener('pointermove', e => {
+        if (!st) return;
+        const w = mvBar.offsetWidth, h = mvBar.offsetHeight;
+        mvBar.style.right = 'auto'; mvBar.style.bottom = 'auto';
+        mvBar.style.left = Math.max(4, Math.min(window.innerWidth - w - 4, st.l + (e.clientX - st.x0))) + 'px';
+        mvBar.style.top = Math.max(4, Math.min(window.innerHeight - h - 4, st.t + (e.clientY - st.y0))) + 'px';
+        if (e.cancelable) e.preventDefault();
+      });
+      ['pointerup', 'pointercancel'].forEach(t => mvHead.addEventListener(t, () => {
+        if (!st) return;
+        st = null;
+        const r = mvBar.getBoundingClientRect();
+        Store.set(K.movePos, {x: Math.round(r.left), y: Math.round(r.top)});
+      }));
     }
-    syncMoveBar();
+    mvApplyPos();
 
     /* Views */
     /* 两个页面的文件列表用同一份配置语义（以整理页为准）：点击播放、目录可选、长按菜单、列配置 */

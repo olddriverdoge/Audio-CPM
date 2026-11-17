@@ -47,6 +47,7 @@ const Player = (() => {
   function adoptNative(p) {
     if (!p || p === cur) return;
     cur = p;
+    try { if (typeof Spectrum !== 'undefined') Spectrum.onTrackChange(); } catch (_) {}
     try { audio.pause(); audio.removeAttribute('src'); } catch (_) {}
     titleEl.textContent = Utils.basename(p);
     titleEl.title = p;
@@ -255,6 +256,7 @@ const Player = (() => {
     if (!path) throw new Error('空路径');
     const ratio = Math.max(0, Math.min(0.999, Number(startRatio) || 0));
     cur = path;
+    try { if (typeof Spectrum !== 'undefined') Spectrum.onTrackChange(); } catch (_) {}
     // 切歌前先停掉 WebView 那一路，避免 HiFi 与网页播放同时出声（爆音/叠音）
     try { audio.pause(); } catch (_) {}
     titleEl.textContent = Utils.basename(path);

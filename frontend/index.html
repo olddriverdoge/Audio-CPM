@@ -24,15 +24,6 @@
     <select id="source-select" class="small" title="数据源（本地 / WebDAV）"
             style="max-width:150px"></select>
     <span class="spacer"></span>
-    <div class="seg" id="view-seg">
-      <button type="button" data-view="list" class="active">列表</button>
-      <button type="button" data-view="grid">网格</button>
-    </div>
-    <div class="seg hidden" id="gridsize-seg" title="封面尺寸">
-      <button type="button" data-size="96">S</button>
-      <button type="button" data-size="128" class="active">M</button>
-      <button type="button" data-size="192">L</button>
-    </div>
     <button type="button" class="small" id="btn-fullscreen" title="全屏">⛶</button>
     <button type="button" class="small" id="btn-autoplay" title="顺序播放：播完自动播放列表下一首">⏭ 顺序</button>
     <button type="button" class="small" id="btn-player-cfg" title="设置（播放 + 界面配置）">⚙ 设置</button>
@@ -47,6 +38,10 @@
       </div>
       <div class="sortbar">
         <input type="search" id="search-input" placeholder="搜索当前目录">
+        <button id="s1-view-btn" type="button" class="small"
+                title="切换视图：列表 / 网格">列表</button>
+        <button id="s1-size-btn" type="button" class="small hidden"
+                title="封面尺寸：S / M / L">M</button>
         <span class="spacer"></span>
         <span class="sel-tools hidden" id="sel-tools">
           <span class="status" id="sel-info">未选择</span>
@@ -169,6 +164,8 @@
             <input type="search" id="s2-search" placeholder="搜索">
             <button id="s2-view-btn" type="button" class="small"
                     title="切换文件选择区视图：列表 / 网格（目标目录保持树状）">列表</button>
+            <button id="s2-size-btn" type="button" class="small hidden"
+                    title="封面尺寸：S / M / L">M</button>
             <span class="spacer"></span>
             <span class="sel-tools hidden" id="s2-sel-tools">
               <span class="status" id="s2-selinfo">已选 0</span>
@@ -195,21 +192,26 @@
       </div>
     </div>
 
-    <div class="movebar" id="movebar">
-      <button type="button" class="mv-toggle" id="mv-toggle"
-              title="收起 / 展开移动条">⌃ 收起</button>
-      <span class="status" id="mv-count">已选 0 个文件</span>
-      <div class="mv-body">
-        <select id="mv-conflict" title="同名冲突策略">
-          <option value="skip">跳过同名</option>
-          <option value="rename">重命名</option>
-          <option value="overwrite">覆盖</option>
-        </select>
-        <button class="primary" id="mv-btn" disabled>移动</button>
-        <button id="mv-undo" disabled>撤销</button>
-      </div>
-    </div>
   </section>
+
+  <!-- 全局悬浮移动模块：贴边按钮 + 按内容自适应宽度的浮窗（与频谱/元数据同交互） -->
+  <button type="button" class="sf-fab move-fab" id="mv-fab" title="移动文件（独立浮窗）">⇄<span id="mv-fab-label">移动</span></button>
+  <div class="move-float hidden" id="movebar">
+    <div class="mf-head" id="mv-head" title="拖动可移动">
+      <span class="mf-title">移动</span>
+      <span class="mf-track" id="mv-count">已选 0 项</span>
+      <button type="button" class="sf-btn" id="mv-min" title="收起">—</button>
+    </div>
+    <div class="mv-body">
+      <select id="mv-conflict" title="同名冲突策略">
+        <option value="skip">跳过同名</option>
+        <option value="rename">重命名</option>
+        <option value="overwrite">覆盖</option>
+      </select>
+      <button class="primary" id="mv-btn" disabled>移动</button>
+      <button id="mv-undo" disabled>撤销</button>
+    </div>
+  </div>
 </div>
 
 <audio id="audio-el" preload="metadata"></audio>
