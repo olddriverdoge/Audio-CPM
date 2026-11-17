@@ -272,49 +272,8 @@ function createMetaFloat() {
   if (fab) fab.addEventListener('click', () => toggle());
   if (minBtn) minBtn.addEventListener('click', () => toggle(false));
 
-  /* 拖动（头部） */
-  if (head) {
-    let st = null;
-    head.addEventListener('pointerdown', e => {
-      st = {x0: e.clientX, y0: e.clientY, l: box.offsetLeft, t: box.offsetTop};
-      try { head.setPointerCapture(e.pointerId); } catch (_) {}
-      if (e.cancelable) e.preventDefault();
-    });
-    head.addEventListener('pointermove', e => {
-      if (!st) return;
-      box.style.right = 'auto'; box.style.bottom = 'auto';
-      box.style.left = clampX(st.l + (e.clientX - st.x0)) + 'px';
-      box.style.top = clampY(st.t + (e.clientY - st.y0)) + 'px';
-      if (e.cancelable) e.preventDefault();
-    });
-    ['pointerup', 'pointercancel'].forEach(t => head.addEventListener(t, () => {
-      if (!st) return;
-      st = null;
-      savePos();
-    }));
-  }
-  /* 缩放（右下角） */
-  if (resize) {
-    let rs = null;
-    resize.addEventListener('pointerdown', e => {
-      rs = {x0: e.clientX, y0: e.clientY, w: box.offsetWidth, h: box.offsetHeight};
-      try { resize.setPointerCapture(e.pointerId); } catch (_) {}
-      if (e.cancelable) e.preventDefault();
-    });
-    resize.addEventListener('pointermove', e => {
-      if (!rs) return;
-      const w = Math.max(230, Math.min(window.innerWidth - 8, rs.w + (e.clientX - rs.x0)));
-      const h = Math.max(160, Math.min(window.innerHeight - 8, rs.h + (e.clientY - rs.y0)));
-      box.style.width = w + 'px';
-      box.style.height = h + 'px';
-      if (e.cancelable) e.preventDefault();
-    });
-    ['pointerup', 'pointercancel'].forEach(t => resize.addEventListener(t, () => {
-      if (!rs) return;
-      rs = null;
-      Store.set(K.metaSize, {w: box.offsetWidth, h: box.offsetHeight});
-    }));
-  }
+  /* 拖动/缩放/置顶统一交给 WinMgr（见 app.js 注册） */
+
   window.addEventListener('resize', () => {
     if (!open) return;
     const r = box.getBoundingClientRect();

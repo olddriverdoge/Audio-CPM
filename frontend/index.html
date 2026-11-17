@@ -15,7 +15,7 @@
 <body>
 <div class="app" id="app">
 
-  <header class="hdr">
+  <header class="hdr" id="app-hdr">
     <span class="logo" title="Audio-CPM">
       <img class="logo-img" src="/img/logo.png" alt="Audio-CPM">
       <span class="logo-text">Audio-CPM</span>
@@ -24,8 +24,8 @@
             style="max-width:150px"></select>
     <span class="spacer"></span>
     <button type="button" class="small" id="btn-fullscreen" title="全屏">⛶</button>
-    <button type="button" class="small" id="btn-autoplay" title="顺序播放：播完自动播放列表下一首">⏭ 顺序</button>
-    <button type="button" class="small" id="btn-player-cfg" title="设置（播放 + 界面配置）">⚙ 设置</button>
+    <button type="button" class="small hdr-btn" id="btn-autoplay" title="顺序播放：播完自动播放列表下一首"><span class="b-ico">⏭</span><span class="b-lbl">顺序</span></button>
+    <button type="button" class="small hdr-btn" id="btn-player-cfg" title="设置（播放 + 界面配置）"><span class="b-ico">⚙</span><span class="b-lbl">设置</span></button>
   </header>
 
   <!-- 模块开关：原来的两个页面 tab 改成这些模块的开关 -->
@@ -279,6 +279,7 @@
     <button type="button" data-ns="workbench">工作台</button>
   </div>
   <div class="log-body" id="lf-body"><div class="detail-empty">暂无日志</div></div>
+  <b class="fw-resize" id="lf-resize" title="拖动调整大小（或双指捏合）"></b>
 </div>
 
 <div id="toast-wrap"></div>
@@ -387,6 +388,7 @@
 <script src="/js/wave.js"></script>
 <script src="/js/settings.js"></script>
 <script src="/js/dock.js"></script>
+<script src="/js/winmgr.js"></script>
 <script src="/js/floatwin.js"></script>
 <script src="/js/filepicker.js"></script>
 <script src="/js/player.js"></script>

@@ -477,55 +477,19 @@ const App = (() => {
     }
     paintViewButtons();
 
-    /* 移动浮窗（宽度按内容自适应） */
+    /* 移动浮窗：位置/尺寸/置顶由 WinMgr 统一管理（宽度按内容自适应） */
     const mvBar = document.getElementById('movebar');
     const mvFab = document.getElementById('mv-fab');
-    const mvHead = document.getElementById('mv-head');
     const mvMin = document.getElementById('mv-min');
     let mvOpen = false;
-    function mvApplyPos() {
-      if (!mvBar) return;
-      const saved = Store.get(K.movePos, null);
-      if (saved && Number.isFinite(Number(saved.x)) && Number.isFinite(Number(saved.y))) {
-        mvBar.style.left = Math.max(4, Math.min(window.innerWidth - 60, Number(saved.x))) + 'px';
-        mvBar.style.top = Math.max(4, Math.min(window.innerHeight - 60, Number(saved.y))) + 'px';
-        mvBar.style.right = 'auto'; mvBar.style.bottom = 'auto';
-      } else {
-        mvBar.style.left = 'auto'; mvBar.style.right = '10px';
-        mvBar.style.top = 'auto'; mvBar.style.bottom = '168px';
-      }
-    }
     function mvToggleOpen() {
       mvOpen = !mvOpen;
       mvBar.classList.toggle('hidden', !mvOpen);
       if (mvFab) mvFab.style.display = 'none';
-      if (mvOpen) mvApplyPos();
     }
     if (mvFab) mvFab.addEventListener('click', mvToggleOpen);
     if (mvMin) mvMin.addEventListener('click', () => { if (mvOpen) mvToggleOpen(); });
-    if (mvHead && mvBar) {
-      let st = null;
-      mvHead.addEventListener('pointerdown', e => {
-        st = {x0: e.clientX, y0: e.clientY, l: mvBar.offsetLeft, t: mvBar.offsetTop};
-        try { mvHead.setPointerCapture(e.pointerId); } catch (_) {}
-        if (e.cancelable) e.preventDefault();
-      });
-      mvHead.addEventListener('pointermove', e => {
-        if (!st) return;
-        const w = mvBar.offsetWidth, h = mvBar.offsetHeight;
-        mvBar.style.right = 'auto'; mvBar.style.bottom = 'auto';
-        mvBar.style.left = Math.max(4, Math.min(window.innerWidth - w - 4, st.l + (e.clientX - st.x0))) + 'px';
-        mvBar.style.top = Math.max(4, Math.min(window.innerHeight - h - 4, st.t + (e.clientY - st.y0))) + 'px';
-        if (e.cancelable) e.preventDefault();
-      });
-      ['pointerup', 'pointercancel'].forEach(t => mvHead.addEventListener(t, () => {
-        if (!st) return;
-        st = null;
-        const r = mvBar.getBoundingClientRect();
-        Store.set(K.movePos, {x: Math.round(r.left), y: Math.round(r.top)});
-      }));
-    }
-    mvApplyPos();
+    WinMgr.register({id: 'move', win: mvBar, head: 'mv-head', contentSized: true, minW: 140, minH: 52});
 
     /* 文件浏览：唯一实例 */
     bv = createBrowseView({
@@ -547,6 +511,10 @@ const App = (() => {
     if (typeof Logs !== 'undefined') Logs.init();
     if (typeof createMetaFloat === 'function') metaFloat = createMetaFloat();
     if (typeof Spectrum !== 'undefined') Spectrum.init();
+    /* 所有浮窗统一：夹在可用区域内 + 点击置顶 + 双指缩放 */
+    WinMgr.register({id: 'meta', win: 'meta-float', head: 'mf-head', resize: 'mf-resize', minW: 240, minH: 180});
+    WinMgr.register({id: 'spectrum', win: 'spectrum-float', head: 'sf-head', resize: 'sf-resize', minW: 200, minH: 130});
+    WinMgr.register({id: 'log', win: 'log-float', head: 'lf-head', resize: 'lf-resize', minW: 220, minH: 140});
 
     tree = createTreeView({
       container: document.getElementById('tree'),

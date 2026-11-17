@@ -92,7 +92,6 @@ const Logs = (() => {
     if (clr) clr.addEventListener('click', () => clear());
     if (typeof Dock !== 'undefined') {
       Dock.bindFab(fabEl, K.fabLog, 'right');
-      Dock.bindWin(floatEl, document.getElementById('lf-head'), K.winLog);
     }
     toggle(false);
   }

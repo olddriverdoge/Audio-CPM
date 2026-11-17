@@ -973,7 +973,7 @@ const Spectrum = (() => {
     box.classList.toggle('hidden', !open);
     if (fab) fab.style.display = open ? 'none' : '';
     if (open) {
-      applySize(); applyPos(); if (winCtl) winCtl.apply(); layoutCanvas(); paintTrack(); paintTabs(); paintScene();
+      if (winCtl) winCtl.apply(); layoutCanvas(); paintTrack(); paintTabs(); paintScene();
       stopped = false; pausedAt = 0;
       suspended = false; switchTok++;    // 手动展开＝立刻恢复，取消切歌等待
       paramsSig = '';
@@ -1019,33 +1019,7 @@ const Spectrum = (() => {
     try { if (navigator.vibrate) navigator.vibrate(8); } catch (_) {}
   }
 
-  // 右下角拖动缩放（记住尺寸）
-  let rz = null;
-  if (resize) {
-    resize.addEventListener('pointerdown', e => {
-      const r = box.getBoundingClientRect();
-      rz = {x: e.clientX, y: e.clientY,
-            w: box.offsetWidth || r.width || 320,
-            h: box.offsetHeight || r.height || 170};
-      try { resize.setPointerCapture(e.pointerId); } catch (_) {}
-      e.preventDefault();
-    });
-    resize.addEventListener('pointermove', e => {
-      if (!rz) return;
-      const w = Math.max(180, Math.min(window.innerWidth * .92, rz.w + (e.clientX - rz.x)));
-      const h = Math.max(110, Math.min(window.innerHeight * .7, rz.h + (e.clientY - rz.y)));
-      box.style.width = Math.round(w) + 'px';
-      box.style.height = Math.round(h) + 'px';
-      layoutCanvas();
-    });
-    ['pointerup', 'pointercancel'].forEach(t => resize.addEventListener(t, () => {
-      if (!rz) return;
-      rz = null;
-      const w = Math.round(parseFloat(box.style.width) || box.offsetWidth || 0);
-      const h = Math.round(parseFloat(box.style.height) || box.offsetHeight || 0);
-      if (w > 0 && h > 0) Store.set(K.spectrumSize, {w, h});
-    }));
-  }
+  /* 缩放/拖动/置顶统一交给 WinMgr（见 app.js 注册） */
 
   function init() {
     if (!box || !canvas) return;
@@ -1063,11 +1037,7 @@ const Spectrum = (() => {
     });
     if (typeof Dock !== 'undefined') {
       Dock.bindFab(fab, K.fabSpectrum, 'right');
-      winCtl = Dock.bindWin(box, head, K.winSpectrum);
     }
-    applySize();
-    applyPos();
-    if (winCtl) winCtl.apply();
     paintTabs();
     apply();
     paintTrack();

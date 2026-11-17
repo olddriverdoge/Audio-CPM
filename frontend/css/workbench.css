@@ -49,3 +49,24 @@
 
   /* 模块已统一由 modbar 启停：原来的贴边按钮只作为内部状态载体，不再显示 */
   #mv-fab,#meta-fab,#sf-fab,#log-fab{display:none !important}
+
+  /* ---------- 顶部：紧凑单行 header + 模块条（状态栏区域由 header 背景直接铺满） ---------- */
+  .hdr{flex-wrap:nowrap;gap:7px;padding:4px 10px;overflow:hidden;align-items:center;
+    background:linear-gradient(180deg,#1b232c 0%,var(--panel) 100%);border-bottom:none}
+  body.app-mode .hdr{padding-top:calc(4px + var(--sat,0px))}
+  .hdr .logo{font-size:13.5px}
+  .hdr .logo-img{width:19px;height:19px;border-radius:4.5px}
+  .hdr #source-select{flex:1 1 auto;min-width:64px;max-width:150px;font-size:11.5px;
+    padding:3px 6px;border-radius:6px;background:var(--panel2);border:1px solid var(--border);color:var(--text)}
+  .hdr .hdr-btn{display:inline-flex;align-items:center;gap:3px;height:28px;padding:0 9px;
+    border-radius:999px;border:1px solid var(--border);background:var(--panel2);
+    color:var(--muted);font-size:11.5px;line-height:1;font-family:inherit}
+  .hdr .hdr-btn:hover{color:var(--text);border-color:#3d4a5c}
+  .hdr .b-ico{font-size:13px}
+  @media (max-width:430px){.hdr .b-lbl{display:none}.hdr .hdr-btn{padding:0 8px}}
+  /* header 与模块条之间用一条更柔的分隔，视觉上连成一体 */
+  .modbar{border-bottom:1px solid #232d3a;padding:5px 10px}
+  /* 浮窗默认尺寸（首次打开时的测量基准，之后由 WinMgr 记忆） */
+  #fw-browse{width:min(820px, calc(100vw - 24px));height:min(560px, 62vh)}
+  #fw-task{width:min(460px, calc(100vw - 24px));height:min(500px, 58vh)}
+  #fw-tree{width:min(420px, calc(100vw - 24px));height:min(480px, 58vh)}
