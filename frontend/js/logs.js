@@ -1,8 +1,9 @@
 /* ---------------- Logs：全局日志浮窗（按页面隔离） ---------------------------- */
 const Logs = (() => {
-  const NAMES = {process: '文件处理', organize: '文件整理'};
+  const NAMES = {workbench: '工作台'};
+  const SINGLE = 'workbench';   // 页面合并成工作台后日志统一一条流
   const MAX = 400;
-  const buf = {process: [], organize: []};
+  const buf = {workbench: []};
   let ns = 'process';
   let floatEl = null, bodyEl = null, tabsEl = null, fabEl = null;
   let open = false;
@@ -43,15 +44,10 @@ const Logs = (() => {
   }
 
   /* 当前页面对应的命名空间：处理页 / 整理页互不串流 */
-  function pageNs() {
-    try {
-      const p = Store.get(K.page, 'process');
-      return p === 'organize' ? 'organize' : 'process';
-    } catch (_) { return 'process'; }
-  }
+  function pageNs() { return SINGLE; }
 
   function add(level, text, forcedNs) {
-    const key = NAMES[forcedNs] ? forcedNs : pageNs();
+    const key = SINGLE;
     const arr = buf[key];
     arr.push({t: stamp(), level: level || 'info', text: String(text == null ? '' : text)});
     while (arr.length > MAX) arr.shift();

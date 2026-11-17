@@ -1,48 +1,26 @@
-/* ---------------- App ---------------- */
+/* ---------------- App：单工作台 + 模块浮窗 ---------------- */
 const App = (() => {
-  let bv1 = null, bv2 = null, metaFloat = null, tree = null;
+  let bv = null;            // 唯一的文件浏览视图（原两页合并）
+  let metaFloat = null, tree = null;
   let currentPath = '';
   let currentParent = '';
-  let srcPath = '';
+  let fwBrowse = null, fwTask = null, fwTree = null;
+  const MODS = {};
 
   function viewMode() { return Store.get(K.viewMode, 'list') === 'grid' ? 'grid' : 'list'; }
   function gridSize() { return Number(Store.get(K.gridSize, 128)) || 128; }
-  // 整理页源列表只有 列表 / 网格 两种（旧的 compact 一律当列表）
-  function s2ViewMode() { return Store.get(K.s2ViewMode, 'list') === 'grid' ? 'grid' : 'list'; }
-  function s2ViewLabel(m) { return m === 'grid' ? '网格' : '列表'; }
-  function setS2ViewMode(m) {
-    m = (m === 'grid') ? 'grid' : 'list';
-    Store.set(K.s2ViewMode, m);
-    const btn = document.getElementById('s2-view-btn');
-    if (btn) btn.textContent = s2ViewLabel(m);
-    if (bv2) bv2.setMode(m);
-    Player.syncBar();
-  }
-  function cycleS2View() { setS2ViewMode(s2ViewMode() === 'grid' ? 'list' : 'grid'); }
-  // 当前页签处于网格视图 → 显示底部播放条；列表视图用行内波形
-  function isGridView() {
-    const p = Store.get(K.page, 'process');
-    return p === 'organize' ? s2ViewMode() === 'grid' : viewMode() === 'grid';
-  }
+  // 网格视图 → 显示底部播放条；列表视图 → 行内波形
+  function isGridView() { return viewMode() === 'grid'; }
 
-  /* 两个页面的文件列表共用同一套选择/计数展示逻辑 */
-  function paintSel(bv, infoId, toolsId) {
+  function paintSel() {
     const n = bv ? bv.count() : 0;
-    const el = document.getElementById(infoId);
+    const el = document.getElementById('sel-info');
     if (el) el.textContent = n === 0 ? '未选择（将处理整个目录）' : '已选 ' + n + ' 个文件';
-    const tools = document.getElementById(toolsId);
+    const tools = document.getElementById('sel-tools');
     if (tools) tools.classList.toggle('hidden', n === 0);
+    if (typeof MoveMgr !== 'undefined') MoveMgr.update();
   }
-  function paintCounts(c, allId, playedId) {
-    const a = document.getElementById(allId);
-    const p = document.getElementById(playedId);
-    if (a) a.textContent = c.total;
-    if (p) p.textContent = c.played;
-  }
-  function updateSelInfo() { paintSel(bv1, 'sel-info', 'sel-tools'); }
-  function updateSelInfo2() { paintSel(bv2, 's2-selinfo', 's2-sel-tools'); MoveMgr.update(); }
-  function updateCounts1(c) { paintCounts(c, 'cnt-all', 'cnt-played'); }
-  function updateCounts2(c) { paintCounts(c, 's2-cnt-all', 's2-cnt-played'); }
+  function updateSelInfo() { paintSel(); }
 
   /* 路径面包屑：点某一段跳到该级；长按整行弹输入框编辑路径 */
   function editPath(box) {
@@ -80,7 +58,7 @@ const App = (() => {
       if (p && box._onJump && p !== box.dataset.path) box._onJump(p);
     });
   }
-  /* 路径引用：local:/sdcard/x、dav:nas/Music/x（旧裸路径按本地处理） */
+  /* 路径引用：local:/sdcard/x、dav:nas/Music/x */
   function refParts(p) {
     const s = String(p || '');
     if (s.indexOf('dav:') === 0) {
@@ -93,9 +71,7 @@ const App = (() => {
     if (s.indexOf('local:') === 0) return {type: 'local', source: '', rest: s.slice(6) || '/'};
     return {type: 'local', source: '', rest: s || '/'};
   }
-  function refPrefix(parts) {
-    return parts.type === 'dav' ? ('dav:' + parts.source) : 'local:';
-  }
+  function refPrefix(parts) { return parts.type === 'dav' ? ('dav:' + parts.source) : 'local:'; }
   function renderCrumbs(id, path, onJump) {
     const box = document.getElementById(id);
     if (!box) return;
@@ -125,57 +101,37 @@ const App = (() => {
       Store.set(K.recent, arr.slice(0, 15));
     } catch (e) {}
   }
-  function showRecent() {
-    const arr = Store.get(K.recent, []);
-    if (!Array.isArray(arr) || !arr.length) { alert('暂无最近记录'); return; }
-    const sel = prompt('选择要跳转的最近目录（输入序号）:\n\n' +
-      arr.map((p, i) => (i + 1) + '. ' + p).join('\n'), '1');
-    if (!sel) return;
-    const idx = parseInt(sel, 10) - 1;
-    if (idx >= 0 && idx < arr.length) browse(arr[idx]);
-  }
 
-  /* 两个页面的目录加载共用一份实现：kind = 'main'（处理页）| 'src'（整理页源列表） */
-  const dirSeq = {main: 0, src: 0};
-  async function loadDir(kind, path, opts) {
-    const isSrc = kind === 'src';
-    if (!path) path = isSrc ? srcPath : currentPath;
-    const my = ++dirSeq[kind];
+  const dirSeq = 0;
+  let seqNow = 0;
+  async function loadDir(path, opts) {
+    if (!path) path = currentPath;
+    const my = ++seqNow;
     try {
       const d = await Api.browse(path);
-      if (my !== dirSeq[kind]) return false;   // 后发起的跳转优先，丢弃过期响应
-      if (isSrc) {
-        srcPath = d.path;
-        Store.set(K.s2LastPath, d.path);
-        renderCrumbs('pb2-crumbs', d.path, p => loadDir('src', p));
-        bv2.setData(d);
-        if (!opts || opts.clearUndo !== false) MoveMgr.clearUndo();
-        updateSelInfo2();
-      } else {
-        currentPath = d.path;
-        currentParent = d.parent || '';
-        Store.set(K.lastPath, d.path);
-        renderCrumbs('pb1-crumbs', d.path, p => loadDir('main', p));
-        pushRecent(d.path);
-        bv1.setData(d);
-        updateSelInfo();
-        if (typeof Sources !== 'undefined') Sources.rememberPath(d.path);
-      }
+      if (my !== seqNow) return false;   // 后发起的跳转优先
+      currentPath = d.path;
+      currentParent = d.parent || '';
+      Store.set(K.lastPath, d.path);
+      renderCrumbs('pb1-crumbs', d.path, p => loadDir(p));
+      const track = document.getElementById('browse-track');
+      if (track) track.textContent = d.path;
+      bv.setData(d);
+      updateSelInfo();
+      pushRecent(d.path);
+      if (typeof Sources !== 'undefined') Sources.rememberPath(d.path);
       return true;
     } catch (e) {
-      if (my !== dirSeq[kind]) return false;
-      const label = isSrc ? '源目录' : '浏览';
-      Utils.log('err', label + '失败: ' + e.message, isSrc ? 'organize' : 'process');
-      Utils.toast(label + '失败: ' + e.message, 'err');
+      if (my !== seqNow) return false;
+      Utils.log('err', '浏览失败: ' + e.message);
+      Utils.toast('浏览失败: ' + e.message, 'err');
       return false;
     }
   }
-  function browse(path) { return loadDir('main', path); }
-  function srcBrowse(path, opts) { return loadDir('src', path, opts); }
+  function browse(path) { return loadDir(path); }
 
   function viewLabel(m) { return m === 'grid' ? '网格' : '列表'; }
   function sizeLabel(sz) { return sz >= 192 ? 'L' : (sz >= 128 ? 'M' : 'S'); }
-  // 处理页的视图切换/封面尺寸按钮在模块内部（不再占顶部）
   function paintViewButtons() {
     const vb = document.getElementById('s1-view-btn');
     if (vb) vb.textContent = viewLabel(viewMode());
@@ -184,18 +140,11 @@ const App = (() => {
       sb.textContent = sizeLabel(gridSize());
       sb.classList.toggle('hidden', viewMode() !== 'grid');
     }
-    const v2 = document.getElementById('s2-view-btn');
-    if (v2) v2.textContent = viewLabel(s2ViewMode());
-    const s2 = document.getElementById('s2-size-btn');
-    if (s2) {
-      s2.textContent = sizeLabel(gridSize());
-      s2.classList.toggle('hidden', s2ViewMode() !== 'grid');
-    }
   }
   function setViewMode(m) {
     if (m !== 'grid') m = 'list';
     Store.set(K.viewMode, m);
-    if (bv1) bv1.setMode(m);
+    if (bv) bv.setMode(m);
     paintViewButtons();
     Player.syncBar();
   }
@@ -203,38 +152,15 @@ const App = (() => {
   function setGridSize(sz) {
     Store.set(K.gridSize, sz);
     paintViewButtons();
-    if (bv1) bv1.render();
-   }
+    if (bv) bv.render();
+  }
   function cycleGridSize() {
     const sizes = [96, 128, 192];
     const i = sizes.indexOf(gridSize());
     setGridSize(sizes[(i + 1) % sizes.length]);
   }
 
-  function setPage(p) {
-    p = (p === 'organize') ? 'organize' : 'process';
-    Store.set(K.page, p);
-    const p1 = document.getElementById('mod1');
-    const p2 = document.getElementById('mod2');
-    if (p1) p1.classList.toggle('hidden', p !== 'process');
-    if (p2) p2.classList.toggle('hidden', p !== 'organize');
-    document.querySelectorAll('#page-seg button').forEach(b => {
-      b.classList.toggle('active', b.dataset.page === p);
-    });
-    paintViewButtons();
-    // 移动模块只在整理页可用：换到处理页时收起，避免选中数残留
-    const mvFabEl = document.getElementById('mv-fab');
-    const mvBoxEl = document.getElementById('movebar');
-    if (mvFabEl) mvFabEl.style.display = (p === 'organize') ? '' : 'none';
-    if (mvBoxEl && p !== 'organize') mvBoxEl.classList.add('hidden');
-    if (p === 'organize' && bv2 && !bv2.path && (srcPath || currentPath)) {
-      srcBrowse(srcPath || currentPath);
-    }
-    if (typeof Logs !== 'undefined') Logs.setNs(p === 'organize' ? 'organize' : 'process');
-    Player.syncBar();
-    Player.paintRows();
-  }
-
+  /* ---- 目标目录多标签 ---- */
   let treeRoots = [];
   let treeActive = 0;
   function treeBaseName(p) {
@@ -271,6 +197,8 @@ const App = (() => {
       '" data-i="' + i + '" title="' + Utils.escapeHtml(p) + '">' +
       Utils.escapeHtml(treeBaseName(p)) + '</button>').join('') +
       '<button type="button" class="tree-tab tree-tab-add" id="tree-tab-add" title="新增目标目录标签">＋</button>';
+    const track = document.getElementById('tree-track');
+    if (track) track.textContent = treeRoots[treeActive] || '';
   }
   async function activateTreeRoot(i) {
     if (i < 0 || i >= treeRoots.length) return;
@@ -278,6 +206,8 @@ const App = (() => {
     saveTreeRoots();
     renderTreeTabs();
     const p = treeRoots[i];
+    const track = document.getElementById('tree-track');
+    if (track) track.textContent = p;
     try {
       await tree.setRoot(p);
       Store.set(K.targetPath, p);
@@ -286,7 +216,7 @@ const App = (() => {
     }
   }
 
-  /* 两个页面的行点击共用：一次点击开始播放并落到点击位置 */
+  /* 一次点击：开始播放并落到点击位置 */
   function playRowClick(path, e, rowEl) {
     if (!path) return;
     const box = rowEl ? (rowEl.querySelector('.row-wave') || rowEl) : null;
@@ -296,35 +226,21 @@ const App = (() => {
     PlayMgr.play(path, ratio);
   }
 
-  function refreshColumns() {
-    if (bv1) bv1.render();
-    if (bv2) bv2.render();
-  }
+  function refreshColumns() { if (bv) bv.render(); }
 
   function onPlayed(path) {
-    // 播放（含点击/自动播放）不改动选择；选择只由长按进入选择模式后发生
-    if (bv1) bv1.onExternalPlayed(path);
-    if (bv2) bv2.onExternalPlayed(path);
-    // 播放联动：全局元数据浮窗跟随当前播放/点击
+    if (bv) bv.onExternalPlayed(path);
     if (metaFloat) metaFloat.load(path);
     updateSelInfo();
-    updateSelInfo2();
   }
-
-  function updateMoveBar() { MoveMgr.update(); }
 
   /* ---- 顺序自动播放 ---- */
   const AUDIO_EXT = /\.(flac|wav|aif|aiff|mp3|m4a|aac|ogg|opus|ape|wv|dsf|dff)$/i;
   function isAudioPath(p) { return AUDIO_EXT.test(String(p || '')); }
   function playbackList() {
-    const p = Store.get(K.page, 'process');
-    const arr = (p === 'organize' && bv2) ? bv2.visible() : (bv1 ? bv1.visible() : []);
-    return arr.filter(f => f && f.path && isAudioPath(f.path));   // 顺序播放只在音频之间走
+    const arr = bv ? bv.visible() : [];
+    return arr.filter(f => f && f.path && isAudioPath(f.path));
   }
-  /**
-   * 交给原生 ExoPlayer 的顺序队列（后台自动下一首靠它，不依赖 WebView 的 JS 定时器）。
-   * 只取本机文件、限定窗口大小，避免把整库塞给播放器。
-   */
   function hifiQueue(path) {
     const list = playbackList().filter(f => f.path && f.path.indexOf('dav:') !== 0);
     const i = list.findIndex(f => f.path === path);
@@ -342,7 +258,7 @@ const App = (() => {
     const list = playbackList().filter(f => f && f.path);
     if (!list.length) return false;
     let i = list.findIndex(f => f.path === Player.current);
-    if (i < 0) i = -1;              // 当前曲目不在列表：从第一首开始
+    if (i < 0) i = -1;
     const next = list[i + 1];
     if (!next) { Utils.toast('已播放到列表末尾', 'warn'); return false; }
     PlayMgr.play(next.path);
@@ -350,7 +266,7 @@ const App = (() => {
   }
   function autoplayNext() { return autoplayOn() ? playNext() : false; }
 
-  /* 输出格式按后端能力裁剪：app 包里的 ffmpeg 只编了 flac/aac/pcm，mp3/ogg/opus 直接不展示 */
+  /* 输出格式按后端能力裁剪 */
   const FMT_CODEC = v => {
     const c = String(v || '').split('-')[0].toLowerCase();
     return c === 'aiff' ? 'aif' : c;
@@ -359,7 +275,6 @@ const App = (() => {
     let caps = null;
     try { caps = await Api.caps(); } catch (_) { return; }
     window.AUDIOCPM_CAPS = caps;
-    // app 壳内隐藏顶部 logo、剔除全屏按钮（仅 web 版保留）
     try { document.body.classList.toggle('app-mode', !!caps.android); } catch (_) {}
     if (caps.android) {
       const fs = document.getElementById('btn-fullscreen');
@@ -394,14 +309,97 @@ const App = (() => {
     }
   }
 
+  /* ---- 模块开关（modbar） ---- */
+  function syncMods() {
+    document.querySelectorAll('#modbar .mod-btn').forEach(b => {
+      const m = MODS[b.dataset.mod];
+      if (!m) return;
+      const win = document.getElementById(m.win);
+      const on = win ? !win.classList.contains('hidden') : false;
+      b.classList.toggle('on', on);
+    });
+    const hint = document.getElementById('wb-hint');
+    if (hint) {
+      const any = Object.values(MODS).some(m => {
+        const w = document.getElementById(m.win);
+        return w && !w.classList.contains('hidden');
+      });
+      hint.style.display = any ? 'none' : '';
+    }
+  }
+  function toggleMod(name) {
+    const m = MODS[name];
+    if (!m) return;
+    const win = document.getElementById(m.win);
+    if (!win) return;
+    const open = !win.classList.contains('hidden');
+    if (open) {
+      if (m.fw) m.fw.close();
+      else { const btn = document.getElementById(m.min); if (btn) btn.click(); }
+    } else {
+      if (m.fw) m.fw.open();
+      else { const fab = document.getElementById(m.fab); if (fab) fab.click(); }
+    }
+    setTimeout(syncMods, 0);
+  }
+  function initMods() {
+    fwBrowse = createFloatWin({
+      winId: 'fw-browse', headId: 'fw-browse-head', resizeId: 'fw-browse-resize',
+      minId: 'fw-browse-min', storeKey: 'ac3_win_browse',
+      defW: Math.min(820, Math.max(320, window.innerWidth - 24)),
+      defH: Math.min(560, Math.max(320, window.innerHeight - 190)),
+      minW: 280, minH: 200,
+      onOpen: () => { if (bv) bv.render(); paintViewButtons(); }
+    });
+    fwTask = createFloatWin({
+      winId: 'fw-task', headId: 'fw-task-head', resizeId: 'fw-task-resize',
+      minId: 'fw-task-min', storeKey: 'ac3_win_task',
+      defW: Math.min(460, window.innerWidth - 24),
+      defH: Math.min(500, window.innerHeight - 190),
+      minW: 300, minH: 220,
+      onOpen: () => { if (typeof TaskRunner !== 'undefined') TaskRunner.syncUI(); }
+    });
+    fwTree = createFloatWin({
+      winId: 'fw-tree', headId: 'fw-tree-head', resizeId: 'fw-tree-resize',
+      minId: 'fw-tree-min', storeKey: 'ac3_win_tree',
+      defW: Math.min(420, window.innerWidth - 24),
+      defH: Math.min(480, window.innerHeight - 190),
+      minW: 260, minH: 200
+    });
+
+    MODS.browse = {win: 'fw-browse', fw: fwBrowse};
+    MODS.task = {win: 'fw-task', fw: fwTask};
+    MODS.tree = {win: 'fw-tree', fw: fwTree};
+    MODS.move = {win: 'movebar', fab: 'mv-fab', min: 'mv-min'};
+    MODS.meta = {win: 'meta-float', fab: 'meta-fab', min: 'mf-min'};
+    MODS.spectrum = {win: 'spectrum-float', fab: 'sf-fab', min: 'sf-min'};
+    MODS.log = {win: 'log-float', fab: 'log-fab', min: 'lf-min'};
+
+    const bar = document.getElementById('modbar');
+    if (bar) {
+      bar.addEventListener('click', e => {
+        const b = e.target.closest('.mod-btn[data-mod]');
+        if (b) toggleMod(b.dataset.mod);
+      });
+    }
+    // 任何浮窗自己收起时（点它的 — 按钮）同步开关状态
+    const obs = new MutationObserver(() => syncMods());
+    Object.values(MODS).forEach(m => {
+      const w = document.getElementById(m.win);
+      if (w) obs.observe(w, {attributes: true, attributeFilter: ['class']});
+    });
+    syncMods();
+    // 默认只开文件浏览
+    fwBrowse.open();
+    setTimeout(syncMods, 0);
+  }
+
   async function init() {
-    // 先恢复本地 JSON 配置，后续初始化读到的才是一致状态
     await Promise.all([
       (typeof UiCfg !== 'undefined') ? UiCfg.load() : Promise.resolve(),
       (typeof Sources !== 'undefined') ? Sources.refresh() : Promise.resolve(),
     ]);
     if (typeof UiCfg !== 'undefined') UiCfg.init();
-    // 能力下发要在任何任务面板交互之前完成，避免先渲染出不可用的格式
     await applyCapabilities();
     if (typeof Sources !== 'undefined') {
       Sources.init();
@@ -409,14 +407,12 @@ const App = (() => {
         applyCaps(root);
         const want = Sources.pathFor(root);
         let ok = await browse(want);
-        if (!ok && want !== root.path) ok = await browse(root.path);   // 记忆路径失效时回根目录
+        if (!ok && want !== root.path) ok = await browse(root.path);
         if (!ok) {
           Utils.toast('切换到「' + (root.name || root.id) + '」失败，已保留当前目录', 'err');
           return;
         }
-        // 整理页源列表跟随（同一个源、同一路径）
-        try { if (bv2) await srcBrowse(want); } catch (_) {}
-        // 目标目录切到该源：优先该源自己的标签记忆，没有就用源根
+        // 目标目录切到该源（后台加载，不阻塞浏览/播放/元数据）
         const savedRoots = Store.get('ac2_tree_roots_' + root.id, null);
         treeRoots = (Array.isArray(savedRoots) && savedRoots.length)
           ? savedRoots.filter(x => typeof x === 'string' && x.trim())
@@ -425,7 +421,7 @@ const App = (() => {
         treeActive = Math.max(0, Math.min(treeRoots.length - 1, n));
         saveTreeRoots();
         renderTreeTabs();
-        await activateTreeRoot(treeActive);
+        activateTreeRoot(treeActive).catch(() => {});
         Utils.toast('已切换数据源: ' + (root.name || root.id));
       });
       applyCaps(Sources.currentRoot());
@@ -434,24 +430,18 @@ const App = (() => {
     Settings.init();
     Columns.bindSheet();
     const columns1 = Columns.create(K.columns);
-    const columns2 = Columns.create(K.columns2);
+
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') Settings.close();
     });
 
-    /* Header */
+    /* 头部按钮 */
     const s1v = document.getElementById('s1-view-btn');
     if (s1v) s1v.addEventListener('click', cycleViewMode);
     const s1sz = document.getElementById('s1-size-btn');
     if (s1sz) s1sz.addEventListener('click', cycleGridSize);
-    const s2sz = document.getElementById('s2-size-btn');
-    if (s2sz) s2sz.addEventListener('click', cycleGridSize);
-    document.getElementById('page-seg').addEventListener('click', e => {
-      const b = e.target.closest('button[data-page]');
-      if (b) setPage(b.dataset.page);
-    });
 
-    /* 全屏（安卓 Chrome 支持 documentElement.requestFullscreen） */
+    /* 全屏（仅网页版；app 内已被剔除） */
     const fsBtn = document.getElementById('btn-fullscreen');
     if (fsBtn) {
       const can = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled ||
@@ -474,7 +464,7 @@ const App = (() => {
       }
     }
 
-    /* 顺序自动播放开关 */
+    /* 顺序自动播放 */
     const apBtn = document.getElementById('btn-autoplay');
     if (apBtn) {
       apBtn.addEventListener('click', () => {
@@ -485,16 +475,9 @@ const App = (() => {
       });
       paintAutoplay();
     }
-
-    /* 整理页：文件选择区视图用一个按钮循环切换，目标目录树不受影响 */
-    const s2vBtn = document.getElementById('s2-view-btn');
-    if (s2vBtn) {
-      s2vBtn.textContent = s2ViewLabel(s2ViewMode());
-      s2vBtn.addEventListener('click', cycleS2View);
-    }
     paintViewButtons();
 
-    /* 移动文件模块：与频谱/元数据一致的独立浮窗（贴边按钮打开，宽度按内容自适应） */
+    /* 移动浮窗（宽度按内容自适应） */
     const mvBar = document.getElementById('movebar');
     const mvFab = document.getElementById('mv-fab');
     const mvHead = document.getElementById('mv-head');
@@ -515,11 +498,10 @@ const App = (() => {
     function mvToggleOpen() {
       mvOpen = !mvOpen;
       mvBar.classList.toggle('hidden', !mvOpen);
-      if (mvFab) mvFab.style.display = mvOpen ? 'none' : '';
+      if (mvFab) mvFab.style.display = 'none';
       if (mvOpen) mvApplyPos();
     }
     if (mvFab) mvFab.addEventListener('click', mvToggleOpen);
-    try { if (typeof Dock !== 'undefined') Dock.bindFab(mvFab, K.fabMove, 'right'); } catch (_) {}
     if (mvMin) mvMin.addEventListener('click', () => { if (mvOpen) mvToggleOpen(); });
     if (mvHead && mvBar) {
       let st = null;
@@ -545,9 +527,8 @@ const App = (() => {
     }
     mvApplyPos();
 
-    /* Views */
-    /* 两个页面的文件列表用同一份配置语义（以整理页为准）：点击播放、目录可选、长按菜单、列配置 */
-    bv1 = createBrowseView({
+    /* 文件浏览：唯一实例 */
+    bv = createBrowseView({
       container: document.getElementById('view1'),
       ns: 'process',
       mode: viewMode(),
@@ -559,30 +540,12 @@ const App = (() => {
       clickPlays: true,
       selectDirs: true,
       onRowClick: (path, e, rowEl) => playRowClick(path, e, rowEl),
-      onCounts: updateCounts1,
       onSelectionChange: updateSelInfo,
       onRender: () => Player.paintRows()
     });
-    bv2 = createBrowseView({
-      container: document.getElementById('view2'),
-      ns: 'organize',
-      mode: s2ViewMode(),
-      gridSize: gridSize,
-      folderOrder: 'first',
-      onOpenDir: p => srcBrowse(p),
-      onReload: () => srcBrowse(srcPath),
-      columns: columns2,
-      clickPlays: true,
-      selectDirs: true,
-      onRowClick: (path, e, rowEl) => playRowClick(path, e, rowEl),
-      onCounts: updateCounts2,
-      onSelectionChange: updateSelInfo2,
-      onRender: () => Player.paintRows()
-    });
-    /* 元数据 = 全局独立浮窗（两页共用，可拖动/缩放），频谱同样是全局浮窗 */
+
     if (typeof Logs !== 'undefined') Logs.init();
     if (typeof createMetaFloat === 'function') metaFloat = createMetaFloat();
-    try { if (typeof Dock !== 'undefined') Dock.bindFab(document.getElementById('meta-fab'), K.fabMeta, 'right'); } catch (_) {}
     if (typeof Spectrum !== 'undefined') Spectrum.init();
 
     tree = createTreeView({
@@ -590,26 +553,30 @@ const App = (() => {
       onSelect: () => MoveMgr.update(),
       onTreeChanged: () => MoveMgr.update()
     });
+    const exOne = document.getElementById('tree-expand-one');
+    if (exOne) exOne.addEventListener('click', () => tree.expandOneLevel());
+    const colAll = document.getElementById('tree-collapse-all');
+    if (colAll) colAll.addEventListener('click', () => tree.collapseAll());
 
     MoveMgr.bind({
-      getSources: () => bv2.selected(),
+      getSources: () => (bv ? bv.selected() : []),
       getTarget: () => tree.selected,
       afterMove: async () => {
-        await srcBrowse(srcPath, {clearUndo: false});
-        bv2.clearSelection();
-        updateSelInfo2();
+        await browse(currentPath);
+        if (bv) bv.clearSelection();
+        updateSelInfo();
       }
     });
 
-    /* 模块 1 搜索 / 选择（排序改到表头） */
+    /* 文件浏览搜索 / 选择 */
     document.getElementById('search-input').addEventListener('input', Utils.debounce(e => {
-      bv1.setSearch(e.target.value);
+      bv.setSearch(e.target.value);
     }, 140));
-    document.getElementById('btn-selall').onclick = () => bv1.selectAllVisible(true);
-    document.getElementById('btn-selclear').onclick = () => bv1.clearSelection();
-    document.getElementById('btn-del').onclick = () => bv1.deleteSelected();
+    document.getElementById('btn-selall').onclick = () => bv.selectAllVisible(true);
+    document.getElementById('btn-selclear').onclick = () => bv.clearSelection();
+    document.getElementById('btn-del').onclick = () => bv.deleteSelected();
 
-    /* 任务 + 预设 */
+    /* 批处理：任务 + 预设 */
     document.querySelectorAll('input[name="task"]').forEach(r => {
       r.addEventListener('change', () => TaskRunner.syncUI());
     });
@@ -631,16 +598,7 @@ const App = (() => {
       };
     }
 
-    /* 模块 2 源列表 */
-    document.getElementById('s2-search').addEventListener('input', Utils.debounce(e => {
-      bv2.setSearch(e.target.value);
-    }, 140));
-    document.getElementById('s2-selall').onclick = () => bv2.selectAllVisible(true);
-    document.getElementById('s2-clear').onclick = () => bv2.clearSelection();
-    document.getElementById('s2-del').onclick = () => bv2.deleteSelected();
-
-    /* 目录树：路径走面包屑，刷新按钮单独绑定 */
-    /* 目标目录多标签：点切换、＋新增、长按移除 */
+    /* 目标目录多标签 */
     const tabsEl = document.getElementById('tree-tabs');
     if (tabsEl) {
       let tabTimer = null;
@@ -689,62 +647,49 @@ const App = (() => {
     document.getElementById('mv-undo').onclick = () => MoveMgr.doUndo();
 
     TaskRunner.syncUI();
-    setPage(Store.get(K.page, 'process'));
     await TaskRunner.loadPresets();
     TaskRunner.init();
 
+    initMods();
+
+    /* 先加载浏览目录，目标目录树放后台（WebDAV 下不再拖住播放/元数据） */
     const last = Store.get(K.lastPath, '') || (await defaultRoot());
     await browse(last);
     if (typeof Sources !== 'undefined') Sources.syncPick(last);
-    const lastSrc = Store.get(K.s2LastPath, '') || currentPath || last;
-    await srcBrowse(lastSrc);
     const curRoot = (typeof Sources !== 'undefined') ? Sources.currentRoot() : null;
     const localRoot = curRoot ? curRoot.path : defaultRootUri();
     let target = Store.get(K.targetPath, '') || localRoot;
     if (curRoot && typeof Sources !== 'undefined') {
       const tsrc = Sources.sourceOf(target);
-      if (!tsrc || tsrc.id !== curRoot.id) target = localRoot;   // 上次的目标目录不属于当前源 → 用当前源根
+      if (!tsrc || tsrc.id !== curRoot.id) target = localRoot;
     }
     loadTreeRoots(target);
     renderTreeTabs();
-    await activateTreeRoot(treeActive);
+    activateTreeRoot(treeActive).catch(() => {});
     updateSelInfo();
-    updateSelInfo2();
     Player.paintRows();
     Player.syncBar();
 
-    /* 权限弹窗返回 / 切回前台后自动刷新，避免“授权后要重启 app” */
-    /*
-     * 熄屏回来后的卡顿，原来就出在这里：每次 visibilitychange/focus 都整目录重新 browse 一次
-     * （两个页面各一遍：重新拉列表、重建整表 DOM、重载缩略图、重算波形），熄屏越久越容易
-     * 同时触发 focus + visibilitychange，两遍叠加就是肉眼可见的卡顿。
-     * 现在回到前台只做"轻刷新"：重绘已有数据 + 同步播放状态，不再重新拉目录。
-     * 需要重新拉目录时由用户下拉刷新 / 切目录触发。
-     */
-    let _resumeAt = 0, _wasHidden = false;
+    /* 熄屏回来只做轻刷新 */
+    let _resumeAt = 0;
     function softResume() {
-      if (document.visibilityState !== 'visible') { _wasHidden = true; return; }
+      if (document.visibilityState !== 'visible') return;
       const now = Date.now();
       if (now - _resumeAt < 800) return;
       _resumeAt = now;
       try { refreshColumns(); } catch (_) {}
       try { Player.syncBar(); } catch (_) {}
       try { Player.paintRows(); } catch (_) {}
-      if (typeof Spectrum !== 'undefined') {
-        try { Spectrum.onVisible(); } catch (_) {}
-      }
-      _wasHidden = false;
+      if (typeof Spectrum !== 'undefined') { try { Spectrum.onVisible(); } catch (_) {} }
     }
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') {
-        _wasHidden = true;
         if (typeof Spectrum !== 'undefined') { try { Spectrum.onHidden(); } catch (_) {} }
         return;
       }
       softResume();
     });
     window.addEventListener('focus', softResume);
-
   }
 
   async function defaultRoot() {
@@ -755,7 +700,6 @@ const App = (() => {
     } catch (_) { return 'local:/'; }
   }
 
-  /* 数据源能力：WebDAV 只读源禁用本地处理相关入口 */
   function applyCaps(root) {
     const dav = !!(root && root.kind === 'dav');
     const startBtn = document.getElementById('start-btn');
@@ -765,19 +709,16 @@ const App = (() => {
     }
     const ext = document.getElementById('pb-ext');
     if (ext) ext.style.display = dav ? 'none' : '';
-    const pageBtn = document.querySelector('#page-seg button[data-page="process"]');
-    if (pageBtn) pageBtn.title = dav ? '当前数据源只读：文件处理仅支持本地' : '';
     const tip = document.getElementById('task-status');
     if (tip && dav) tip.textContent = '当前是 WebDAV 数据源：文件处理仅支持本地';
     else if (tip && !dav && tip.textContent.indexOf('WebDAV') >= 0) tip.textContent = '';
   }
 
   return {
-    init, browse, srcBrowse, onPlayed, updateMoveBar, isGridView, refreshColumns,
-    playNext, autoplayNext, autoplayOn, hifiQueue,
+    init, browse, onPlayed, updateMoveBar: () => MoveMgr.update(), isGridView, refreshColumns,
+    playNext, autoplayNext, autoplayOn, hifiQueue, toggleMod,
     get path() { return currentPath; },
-    get srcPath() { return srcPath; },
-    selection: () => (bv1 ? bv1.selected() : []),
+    selection: () => (bv ? bv.selected() : []),
     currentParent: () => currentParent
   };
 })();

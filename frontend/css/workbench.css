@@ -1,0 +1,51 @@
+  /* ---------- 工作台：模块开关 + 通用浮窗 ---------- */
+  .modbar{flex:0 0 auto;display:flex;gap:6px;align-items:center;padding:6px 10px 7px;
+    background:var(--panel);border-bottom:1px solid var(--border);
+    overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .modbar::-webkit-scrollbar{display:none}
+  .mod-btn{flex:0 0 auto;font-size:11.5px;padding:4px 10px;border-radius:999px;
+    border:1px solid var(--border);background:var(--panel2);color:var(--muted);
+    cursor:pointer;font-family:inherit;white-space:nowrap;line-height:1.35}
+  .mod-btn:hover{color:var(--text);border-color:#3d4a5c}
+  .mod-btn.on{color:var(--accent);border-color:var(--accent);background:rgba(56,189,248,.10)}
+  .mod-btn .dot{display:inline-block;width:6px;height:6px;border-radius:50%;
+    background:#3a4757;margin-right:5px;vertical-align:1px}
+  .mod-btn.on .dot{background:var(--accent)}
+
+  .workbench{flex:1 1 auto;position:relative;min-height:0;overflow:hidden;
+    background:radial-gradient(1200px 600px at 50% -10%,#141b24 0%,#0f1419 60%)}
+  .wb-hint{position:absolute;left:0;right:0;top:38%;text-align:center;color:#3d4a5c;
+    font-size:12.5px;line-height:2;pointer-events:none;padding:0 24px}
+  .wb-hint b{color:var(--muted);font-weight:600}
+
+  /* 通用浮窗（文件浏览 / 批处理 / 目标目录） */
+  .fw-win{position:fixed;z-index:335;display:flex;flex-direction:column;min-width:0;
+    background:rgba(13,18,24,.985);border:1px solid var(--border);border-radius:9px;
+    box-shadow:0 10px 32px rgba(0,0,0,.62);overflow:hidden}
+  .fw-win.hidden{display:none}
+  .fw-body{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:6px;
+    padding:7px;overflow:hidden}
+  .fw-body.scroll{overflow:auto}
+  .fw-body .panel{background:none;border:none;border-radius:0;padding:0;margin:0}
+  .fw-resize{position:absolute;right:0;bottom:0;width:26px;height:26px;z-index:3;
+    cursor:nwse-resize;touch-action:none;
+    background:linear-gradient(135deg,transparent 50%,rgba(148,163,184,.5) 50%)}
+  /* 文件浏览窗里让列表吃满剩余高度，并允许内部滚动 */
+  #fw-browse #view1{height:auto;flex:1 1 auto;min-height:150px;max-height:none}
+  #fw-browse .pathbar{margin-bottom:4px}
+  #fw-browse .sortbar{margin-bottom:0}
+  /* 目标目录窗 */
+  #fw-tree .tree-body{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:4px}
+  #fw-tree .tree{flex:1 1 auto;min-height:0;overflow:auto}
+  #fw-tree .tree-tabs{flex:0 0 auto}
+  .tree-tools{display:flex;gap:4px;align-items:center;flex:none}
+  .tree-tools .sf-btn{font-size:11.5px;padding:1px 5px;border:1px solid var(--border);
+    border-radius:5px}
+  /* 批处理窗里配置区可纵向滚动，执行按钮固定在底部 */
+  #fw-task .fw-body{padding:0}
+  #fw-task .task-scroll{flex:1 1 auto;min-height:0;overflow:auto;padding:8px 8px 4px}
+  #fw-task .task-foot{flex:0 0 auto;padding:6px 8px 8px;border-top:1px solid var(--border);
+    background:rgba(13,18,24,.6)}
+
+  /* 模块已统一由 modbar 启停：原来的贴边按钮只作为内部状态载体，不再显示 */
+  #mv-fab,#meta-fab,#sf-fab,#log-fab{display:none !important}

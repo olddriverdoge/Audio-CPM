@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="/css/process.css">
 <link rel="stylesheet" href="/css/organize.css">
 <link rel="stylesheet" href="/css/overlays.css">
-
+<link rel="stylesheet" href="/css/workbench.css">
 </head>
 <body>
 <div class="app" id="app">
@@ -20,10 +20,6 @@
       <img class="logo-img" src="/img/logo.png" alt="Audio-CPM">
       <span class="logo-text">Audio-CPM</span>
     </span>
-    <div class="seg" id="page-seg">
-      <button type="button" data-page="process" class="active">文件处理</button>
-      <button type="button" data-page="organize">文件整理</button>
-    </div>
     <select id="source-select" class="small" title="数据源（本地 / WebDAV）"
             style="max-width:150px"></select>
     <span class="spacer"></span>
@@ -32,19 +28,39 @@
     <button type="button" class="small" id="btn-player-cfg" title="设置（播放 + 界面配置）">⚙ 设置</button>
   </header>
 
-  <!-- ==================== 页面 A · 文件处理 ==================== -->
-  <section class="page page-process" id="mod1">
-    <div class="p1-main" id="p1-main">
-    <div class="panel">
+  <!-- 模块开关：原来的两个页面 tab 改成这些模块的开关 -->
+  <div class="modbar" id="modbar">
+    <button type="button" class="mod-btn" data-mod="browse"><i class="dot"></i>文件浏览</button>
+    <button type="button" class="mod-btn" data-mod="task"><i class="dot"></i>批处理</button>
+    <button type="button" class="mod-btn" data-mod="tree"><i class="dot"></i>目标目录</button>
+    <button type="button" class="mod-btn" data-mod="move"><i class="dot"></i>移动</button>
+    <button type="button" class="mod-btn" data-mod="meta"><i class="dot"></i>元数据</button>
+    <button type="button" class="mod-btn" data-mod="spectrum"><i class="dot"></i>频谱/声谱</button>
+    <button type="button" class="mod-btn" data-mod="log"><i class="dot"></i>日志</button>
+  </div>
+
+  <!-- 大工作台：所有功能都以浮窗形式叠在这里 -->
+  <div class="workbench" id="workbench">
+    <div class="wb-hint" id="wb-hint">
+      <b>工作台</b><br>点上方模块开关打开 / 收起对应浮窗<br>文件浏览 + 批处理 + 目标目录 可拖动、可改尺寸
+    </div>
+  </div>
+
+  <!-- ==================== 浮窗 · 文件浏览（两页共用，唯一实例） ==================== -->
+  <div class="fw-win hidden" id="fw-browse">
+    <div class="mf-head" id="fw-browse-head" title="拖动可移动">
+      <span class="mf-title">文件浏览</span>
+      <span class="mf-track" id="browse-track">未选择目录</span>
+      <button type="button" class="sf-btn" id="fw-browse-min" title="收起">—</button>
+    </div>
+    <div class="fw-body" id="fw-browse-body">
       <div class="pathbar pathrow" id="pb1">
         <div class="pb-crumbs" id="pb1-crumbs" title="点路径段跳转，长按编辑路径"></div>
       </div>
       <div class="sortbar">
         <input type="search" id="search-input" placeholder="搜索当前目录">
-        <button id="s1-view-btn" type="button" class="small"
-                title="切换视图：列表 / 网格">列表</button>
-        <button id="s1-size-btn" type="button" class="small hidden"
-                title="封面尺寸：S / M / L">M</button>
+        <button id="s1-view-btn" type="button" class="small" title="切换视图：列表 / 网格">列表</button>
+        <button id="s1-size-btn" type="button" class="small hidden" title="封面尺寸：S / M / L">M</button>
         <span class="spacer"></span>
         <span class="sel-tools hidden" id="sel-tools">
           <span class="status" id="sel-info">未选择</span>
@@ -55,138 +71,128 @@
       </div>
       <div class="view-wrap" id="view1"><div class="empty">加载中...</div></div>
     </div>
+    <b class="fw-resize" id="fw-browse-resize" title="拖动调整大小"></b>
+  </div>
 
-    <div class="panel">
-      <div class="row">
-        <label class="chk"><input type="radio" name="task" value="convert" checked> 转换格式</label>
-        <label class="chk"><input type="radio" name="task" value="tags"> 重命名</label>
-        <label class="chk"><input type="radio" name="task" value="cover"> 替换封面</label>
-      </div>
-
-      <div id="ui-convert">
-        <div class="row">
-          <label>格式</label>
-          <select id="fmt-select" style="flex:1;max-width:320px">
-            <optgroup label="无损（bit / kHz）">
-              <option value="FLAC">FLAC（保留源参数）</option>
-              <option value="FLAC-16-44" selected>FLAC 16bit / 44.1kHz</option>
-              <option value="FLAC-16-48">FLAC 16bit / 48kHz</option>
-              <option value="FLAC-24-44">FLAC 24bit / 44.1kHz</option>
-              <option value="FLAC-24-48">FLAC 24bit / 48kHz</option>
-              <option value="FLAC-24-96">FLAC 24bit / 96kHz</option>
-              <option value="FLAC-24-192">FLAC 24bit / 192kHz</option>
-              <option value="WAV-16-44">WAV 16bit / 44.1kHz</option>
-              <option value="WAV-24-48">WAV 24bit / 48kHz</option>
-              <option value="WAV-24-96">WAV 24bit / 96kHz</option>
-              <option value="AIFF-16-44">AIFF 16bit / 44.1kHz</option>
-              <option value="AIFF-24-48">AIFF 24bit / 48kHz</option>
-              <option value="AIFF-24-96">AIFF 24bit / 96kHz</option>
-            </optgroup>
-            <optgroup label="有损（kbps）">
-              <option value="M4A-128">M4A 128k</option>
-              <option value="M4A-192">M4A 192k</option>
-              <option value="M4A-256">M4A 256k</option>
-              <option value="M4A-320">M4A 320k</option>
-            </optgroup>
-          </select>
-          <label class="chk"><input type="checkbox" id="delete-source" checked> 成功后删源</label>
-        </div>
-        <div class="row">
-          <label>输出目录</label>
-          <input type="text" id="output-dir" class="path" placeholder="留空=原地（保持结构）">
-          <button class="small" id="btn-use-cur-dir">当前路径</button>
-        </div>
-        <div class="row">
-          <label class="chk"><input type="checkbox" id="also-tags"> 自动重命名</label>
-        </div>
-      </div>
-
-      <div id="ui-tags" class="hidden">
-        <div class="row">
-          <label>命名格式</label>
-          <input type="text" id="name-pattern" class="path"
-                 value="{album_artist} - {title} - {composer} - {album}">
-        </div>
-        <div class="row">
-          <label style="font-size:11.5px">变量</label>
-          <span class="status">{artist} {album_artist} {title} {album} {composer} {track} {disc} {year} {genre} {filename}</span>
-        </div>
-        <div class="row">
-          <span class="status">目录内所有格式的音频文件都会参与重命名（不再限定单一格式）</span>
-        </div>
-      </div>
-
-      <div id="ui-cover" class="hidden">
-        <div class="row">
-          <label>封面图片</label>
-          <input type="text" id="cover-path" class="path" placeholder="留空=自动用当前目录里的 jpg/png">
-          <button class="small" id="btn-pick-cover" type="button">选择</button>
-        </div>
-        <div class="row">
-          <span class="status">可跨目录选一张图；留空时仍按旧逻辑找当前目录里的第一张图片。所有音频格式都会参与替换。</span>
-        </div>
-      </div>
-
-      <div class="row" id="preset-row" style="margin-top:4px;border-top:1px solid var(--border);padding-top:6px">
-        <label>预设</label>
-        <select id="preset-select" style="flex:1;max-width:240px"></select>
-        <button class="small" id="btn-save-preset">保存为预设</button>
-        <button class="small danger" id="btn-del-preset">删除</button>
-      </div>
-
-      <div class="row" style="margin-top:6px;border-top:1px solid var(--border);padding-top:6px">
-        <button class="primary" id="start-btn" style="min-width:116px">▶ 开始执行</button>
-        <button class="small danger hidden" id="cancel-btn" title="取消当前任务">✕ 取消</button>
-        <span class="status" id="task-status"></span>
-        <span class="spacer"></span>
-        <span class="status" id="progress-status">就绪</span>
-      </div>
-      <div class="progress-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+  <!-- ==================== 浮窗 · 批处理（原文件处理配置区） ==================== -->
+  <div class="fw-win hidden" id="fw-task">
+    <div class="mf-head" id="fw-task-head" title="拖动可移动">
+      <span class="mf-title">批处理</span>
+      <span class="mf-track" id="task-track">转换 / 重命名 / 替换封面</span>
+      <button type="button" class="sf-btn" id="fw-task-min" title="收起">—</button>
     </div>
-    </div><!-- /p1-main -->
-  </section>
-
-  <!-- ==================== 页面 B · 文件整理 ==================== -->
-  <section class="page page-organize hidden" id="mod2">
-    <div class="m2-row" id="m2-row">
-      <div class="m2-right" id="m2-right">
-        <div class="m2-src" id="m2-src">
-          <div class="pathbar pathrow" id="pb2">
-            <div class="pb-crumbs" id="pb2-crumbs" title="点路径段跳转，长按编辑路径"></div>
-          </div>
-          <div class="sortbar">
-            <input type="search" id="s2-search" placeholder="搜索">
-            <button id="s2-view-btn" type="button" class="small"
-                    title="切换文件选择区视图：列表 / 网格（目标目录保持树状）">列表</button>
-            <button id="s2-size-btn" type="button" class="small hidden"
-                    title="封面尺寸：S / M / L">M</button>
-            <span class="spacer"></span>
-            <span class="sel-tools hidden" id="s2-sel-tools">
-              <span class="status" id="s2-selinfo">已选 0</span>
-              <button id="s2-selall" class="small">全选</button>
-              <button id="s2-clear" class="small">清空</button>
-              <button id="s2-del" class="small danger" title="删除选中项（不可恢复）">删除</button>
-            </span>
-          </div>
-          <div class="view-wrap" id="view2"><div class="empty">加载中...</div></div>
+    <div class="fw-body" id="fw-task-body">
+      <div class="task-scroll">
+        <div class="row">
+          <label class="chk"><input type="radio" name="task" value="convert" checked> 转换格式</label>
+          <label class="chk"><input type="radio" name="task" value="tags"> 重命名</label>
+          <label class="chk"><input type="radio" name="task" value="cover"> 替换封面</label>
         </div>
 
-        <div class="split h-split" id="split3" title="拖动调整上下高度"></div>
-
-        <div class="m2-tree collapsed" id="m2-tree">
-          <div class="tree-head" id="tree-head" title="点击展开 / 收起目标目录">
-            <span class="pb-caret" id="tree-caret">▸</span>
-            <span class="pane-head" style="margin:0">目标目录</span>
+        <div id="ui-convert">
+          <div class="row">
+            <label>格式</label>
+            <select id="fmt-select" style="flex:1;max-width:320px">
+              <optgroup label="无损（bit / kHz）">
+                <option value="FLAC">FLAC（保留源参数）</option>
+                <option value="FLAC-16-44" selected>FLAC 16bit / 44.1kHz</option>
+                <option value="FLAC-16-48">FLAC 16bit / 48kHz</option>
+                <option value="FLAC-24-44">FLAC 24bit / 44.1kHz</option>
+                <option value="FLAC-24-48">FLAC 24bit / 48kHz</option>
+                <option value="FLAC-24-96">FLAC 24bit / 96kHz</option>
+                <option value="FLAC-24-192">FLAC 24bit / 192kHz</option>
+                <option value="WAV-16-44">WAV 16bit / 44.1kHz</option>
+                <option value="WAV-24-48">WAV 24bit / 48kHz</option>
+                <option value="WAV-24-96">WAV 24bit / 96kHz</option>
+                <option value="AIFF-16-44">AIFF 16bit / 44.1kHz</option>
+                <option value="AIFF-24-48">AIFF 24bit / 48kHz</option>
+                <option value="AIFF-24-96">AIFF 24bit / 96kHz</option>
+              </optgroup>
+              <optgroup label="有损（kbps）">
+                <option value="M4A-128">M4A 128k</option>
+                <option value="M4A-192">M4A 192k</option>
+                <option value="M4A-256">M4A 256k</option>
+                <option value="M4A-320">M4A 320k</option>
+              </optgroup>
+            </select>
+            <label class="chk"><input type="checkbox" id="delete-source" checked> 成功后删源</label>
           </div>
-          <div class="tree-body" id="tree-body">
-            <div class="tree-tabs" id="tree-tabs"></div>
-            <div class="tree" id="tree"></div>
+          <div class="row">
+            <label>输出目录</label>
+            <input type="text" id="output-dir" class="path" placeholder="留空=原地（保持结构）">
+            <button class="small" id="btn-use-cur-dir">当前路径</button>
+          </div>
+          <div class="row">
+            <label class="chk"><input type="checkbox" id="also-tags"> 自动重命名</label>
           </div>
         </div>
+
+        <div id="ui-tags" class="hidden">
+          <div class="row">
+            <label>命名格式</label>
+            <input type="text" id="name-pattern" class="path"
+                   value="{album_artist} - {title} - {composer} - {album}">
+          </div>
+          <div class="row">
+            <label style="font-size:11.5px">变量</label>
+            <span class="status">{artist} {album_artist} {title} {album} {composer} {track} {disc} {year} {genre} {filename}</span>
+          </div>
+          <div class="row">
+            <span class="status">目录内所有格式的音频文件都会参与重命名（不再限定单一格式）</span>
+          </div>
+        </div>
+
+        <div id="ui-cover" class="hidden">
+          <div class="row">
+            <label>封面图片</label>
+            <input type="text" id="cover-path" class="path" placeholder="留空=自动用当前目录里的 jpg/png">
+            <button class="small" id="btn-pick-cover" type="button">选择</button>
+          </div>
+          <div class="row">
+            <span class="status">可跨目录选一张图；留空时仍按旧逻辑找当前目录里的第一张图片。所有音频格式都会参与替换。</span>
+          </div>
+        </div>
+
+        <div class="row" id="preset-row" style="margin-top:4px;border-top:1px solid var(--border);padding-top:6px">
+          <label>预设</label>
+          <select id="preset-select" style="flex:1;max-width:240px"></select>
+          <button class="small" id="btn-save-preset">保存为预设</button>
+          <button class="small danger" id="btn-del-preset">删除</button>
+        </div>
+      </div>
+      <div class="task-foot">
+        <div class="row" style="margin:0">
+          <button class="primary" id="start-btn" style="min-width:116px">▶ 开始执行</button>
+          <button class="small danger hidden" id="cancel-btn" title="取消当前任务">✕ 取消</button>
+          <span class="status" id="task-status"></span>
+          <span class="spacer"></span>
+          <span class="status" id="progress-status">就绪</span>
+        </div>
+        <div class="progress-wrap" style="margin-top:4px"><div class="progress-bar" id="progress-bar"></div></div>
       </div>
     </div>
+    <b class="fw-resize" id="fw-task-resize" title="拖动调整大小"></b>
+  </div>
 
-  </section>
+  <!-- ==================== 浮窗 · 目标目录（原目标路径树） ==================== -->
+  <div class="fw-win hidden" id="fw-tree">
+    <div class="mf-head" id="fw-tree-head" title="拖动可移动">
+      <span class="mf-title">目标目录</span>
+      <span class="mf-track" id="tree-track"></span>
+      <span class="tree-tools">
+        <button type="button" class="sf-btn" id="tree-expand-one" title="展开下一层（只加载一层，避免 WebDAV 被拉爆）">＋一层</button>
+        <button type="button" class="sf-btn" id="tree-collapse-all" title="全部收起">收起</button>
+      </span>
+      <button type="button" class="sf-btn" id="fw-tree-min" title="收起">—</button>
+    </div>
+    <div class="fw-body" id="fw-tree-body">
+      <div class="tree-body" id="tree-body">
+        <div class="tree-tabs" id="tree-tabs"></div>
+        <div class="tree" id="tree"></div>
+      </div>
+    </div>
+    <b class="fw-resize" id="fw-tree-resize" title="拖动调整大小"></b>
+  </div>
 
   <!-- 全局悬浮移动模块：贴边按钮 + 按内容自适应宽度的浮窗（与频谱/元数据同交互） -->
   <button type="button" class="sf-fab move-fab" id="mv-fab" title="移动文件（独立浮窗）">⇄<span id="mv-fab-label">移动</span></button>
@@ -261,17 +267,16 @@
   <b class="sf-resize" id="sf-resize" title="拖动调整大小"></b>
 </div>
 
-<button type="button" class="sf-fab log-fab" id="log-fab" title="日志（按页面隔离）">📋<span>日志</span></button>
+<button type="button" class="sf-fab log-fab" id="log-fab" title="日志（全局）">📋<span>日志</span></button>
 <div class="log-float hidden" id="log-float">
   <div class="mf-head" id="lf-head" title="拖动可移动">
     <span class="mf-title">日志</span>
     <span class="mf-track" id="lf-ns"></span>
-    <button type="button" class="sf-btn" id="lf-clear" title="清空当前页日志">🗑</button>
+    <button type="button" class="sf-btn" id="lf-clear" title="清空日志">🗑</button>
     <button type="button" class="sf-btn" id="lf-min" title="收起">—</button>
   </div>
   <div class="log-tabs" id="lf-tabs">
-    <button type="button" data-ns="process">文件处理</button>
-    <button type="button" data-ns="organize">文件整理</button>
+    <button type="button" data-ns="workbench">工作台</button>
   </div>
   <div class="log-body" id="lf-body"><div class="detail-empty">暂无日志</div></div>
 </div>
@@ -382,6 +387,7 @@
 <script src="/js/wave.js"></script>
 <script src="/js/settings.js"></script>
 <script src="/js/dock.js"></script>
+<script src="/js/floatwin.js"></script>
 <script src="/js/filepicker.js"></script>
 <script src="/js/player.js"></script>
 <script src="/js/playmgr.js"></script>

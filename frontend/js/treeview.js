@@ -13,7 +13,7 @@ function createTreeView(opts) {
       const kids = n.querySelector('.tree-children');
       if (kids && kids.style.display !== 'none') arr.push(n.dataset.path);
     });
-    Store.set(expKey(), arr.slice(0, 200));
+    Store.set(expKey(), arr.slice(0, 60));
   }
   function savedExpanded() {
     const v = Store.get(expKey(), []);
@@ -99,14 +99,13 @@ function createTreeView(opts) {
     if (opts.onSelect) opts.onSelect(path);
   }
 
+  /* 只恢复用户上次手动展开的少量节点；WebDAV 下绝不自动递归拉整棵树 */
   async function autoExpand() {
-    const want = savedExpanded();
-    const wantSet = new Set(want.filter(p => p !== root));
-    let budget = 80;
+    const wantSet = new Set(savedExpanded().filter(p => p !== root));
+    let budget = 6;
     async function walk(node, depth) {
-      if (budget <= 0 || depth > 4) return;
-      const should = wantSet.size ? wantSet.has(node.dataset.path) : (depth === 1);
-      if (!should || !hasKids(node)) return;
+      if (budget <= 0 || depth > 3) return;
+      if (!wantSet.has(node.dataset.path) || !hasKids(node)) return;
       budget--;
       const ok = await expandNode(node);
       if (!ok) return;
@@ -114,6 +113,40 @@ function createTreeView(opts) {
     }
     const rootNode = nodeMap.get(root);
     if (rootNode) for (const k of childNodes(rootNode)) await walk(k, 1);
+  }
+
+  /* 手动「展开下一层」：只对当前已展开的节点各展开一级，限量 12 次请求 */
+  async function expandOneLevel() {
+    const vis = [];
+    container.querySelectorAll('.tree-node').forEach(n => {
+      const kids = n.querySelector('.tree-children');
+      if (kids && kids.style.display !== 'none') vis.push(n);
+    });
+    let budget = 12;
+    for (const n of vis) {
+      for (const k of childNodes(n)) {
+        if (budget <= 0) break;
+        if (!hasKids(k)) continue;
+        if (k.querySelector('.tree-children').style.display !== 'none') continue;
+        budget--;
+        await expandNode(k);
+      }
+      if (budget <= 0) break;
+    }
+    if (budget <= 0) Utils.toast('已展开一层（为保护 WebDAV 只加载了部分，继续点可再展开）', 'warn');
+  }
+
+  /* 手动「全部收起」：只保留根节点一层 */
+  function collapseAll() {
+    container.querySelectorAll('.tree-node').forEach(n => {
+      if (n === nodeMap.get(root)) return;
+      const kids = n.querySelector('.tree-children');
+      const tri = n.querySelector('.tri');
+      if (kids) kids.style.display = 'none';
+      if (tri) tri.textContent = '▶';
+    });
+    saveExpanded();
+    Utils.toast('已收起目标目录');
   }
 
   let rootSeq = 0;
@@ -269,7 +302,7 @@ function createTreeView(opts) {
   }
 
   return {
-    setRoot, reloadRoot, selectNode,
+    setRoot, reloadRoot, selectNode, expandOneLevel, collapseAll,
     get selected() { return selected; },
     get root() { return root; }
   };

@@ -3,6 +3,7 @@ const Layout = (() => {
   let rightEl = null, srcEl = null, treeCollapsed = true;
 
   function bindSplit(el, onMove, onEnd) {
+    if (!el) return;                       // 工作台改造后分隔条可能不存在
     let dragging = false;
     const move = e => {
       if (!dragging) return;
@@ -62,6 +63,7 @@ const Layout = (() => {
     applyTree();
 
     bindSplit(split3, (x, y) => {
+      if (!right) return;
       const rect = right.getBoundingClientRect();
       if (rect.height <= 0) return;
       r3 = Utils.clamp((y - rect.top) / rect.height, 0.15, 0.8);
