@@ -522,21 +522,19 @@ const Spectrum = (() => {
         g.fillRect(area.x0, area.y0 + area.gh - 2, area.gw, 2);
       }
       setState(!core ? '未启用' : '暂停');
-      raf = requestAnimationFrame(draw);
-      return;
+      return;            // 排帧统一由 draw() 末尾负责；这里若再排会形成双链并指数增长
     }
     pausedAt = 0;
     // 切歌/缓冲的空窗：原生还没产出新帧时不要空转重绘（此前会把 rAF 全花在画旧数据/空帧上）
     if (core.native && performance.now() - lastDataAt > 450
         && (typeof Player.hifiPlaying !== 'function' || Player.hifiPlaying())) {
-      if (performance.now() - lastDataAt > 1500) healStream('buffering ' + Math.round(performance.now() - lastDataAt) + 'ms');
+      if (performance.now() - lastDataAt > 3000) healStream('buffering ' + Math.round(performance.now() - lastDataAt) + 'ms');
       g.fillStyle = 'rgba(148,163,184,.5)';
       g.textAlign = 'center'; g.textBaseline = 'middle';
       g.font = '12px ui-monospace, Menlo, monospace';
       g.fillText('缓冲中…', w / 2, h / 2);
       setState('缓冲');
-      raf = requestAnimationFrame(draw);
-      return;
+      return;            // 同上：绝不能在 drawFrame 内再排帧
     }
     if (!core.native) {
       if (core.ctx.state === 'suspended') core.ctx.resume().catch(() => {});
