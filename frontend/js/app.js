@@ -165,7 +165,7 @@ const App = (() => {
     } catch (e) {
       if (my !== dirSeq[kind]) return false;
       const label = isSrc ? '源目录' : '浏览';
-      Utils.log('err', label + '失败: ' + e.message);
+      Utils.log('err', label + '失败: ' + e.message, isSrc ? 'organize' : 'process');
       Utils.toast(label + '失败: ' + e.message, 'err');
       return false;
     }
@@ -230,6 +230,7 @@ const App = (() => {
     if (p === 'organize' && bv2 && !bv2.path && (srcPath || currentPath)) {
       srcBrowse(srcPath || currentPath);
     }
+    if (typeof Logs !== 'undefined') Logs.setNs(p === 'organize' ? 'organize' : 'process');
     Player.syncBar();
     Player.paintRows();
   }
@@ -548,6 +549,7 @@ const App = (() => {
     /* 两个页面的文件列表用同一份配置语义（以整理页为准）：点击播放、目录可选、长按菜单、列配置 */
     bv1 = createBrowseView({
       container: document.getElementById('view1'),
+      ns: 'process',
       mode: viewMode(),
       gridSize: gridSize,
       folderOrder: 'first',
@@ -563,6 +565,7 @@ const App = (() => {
     });
     bv2 = createBrowseView({
       container: document.getElementById('view2'),
+      ns: 'organize',
       mode: s2ViewMode(),
       gridSize: gridSize,
       folderOrder: 'first',
@@ -577,6 +580,7 @@ const App = (() => {
       onRender: () => Player.paintRows()
     });
     /* 元数据 = 全局独立浮窗（两页共用，可拖动/缩放），频谱同样是全局浮窗 */
+    if (typeof Logs !== 'undefined') Logs.init();
     if (typeof createMetaFloat === 'function') metaFloat = createMetaFloat();
     try { if (typeof Dock !== 'undefined') Dock.bindFab(document.getElementById('meta-fab'), K.fabMeta, 'right'); } catch (_) {}
     if (typeof Spectrum !== 'undefined') Spectrum.init();
@@ -616,13 +620,16 @@ const App = (() => {
     document.getElementById('btn-save-preset').onclick = () => TaskRunner.saveAsPreset();
     document.getElementById('btn-del-preset').onclick = () => TaskRunner.deletePreset();
     document.getElementById('start-btn').onclick = () => TaskRunner.start();
-
-    /* 日志折叠 */
-    document.getElementById('log-toggle').addEventListener('click', () => {
-      const log = document.getElementById('log');
-      log.classList.toggle('collapsed');
-      document.getElementById('log-tri').textContent = log.classList.contains('collapsed') ? '▸' : '▾';
-    });
+    const pickCoverBtn = document.getElementById('btn-pick-cover');
+    if (pickCoverBtn) {
+      pickCoverBtn.onclick = async () => {
+        const p = await FilePicker.pickImage(document.getElementById('cover-path').value.trim() || currentPath);
+        if (p) {
+          document.getElementById('cover-path').value = p;
+          Utils.log('info', '已选择封面: ' + p);
+        }
+      };
+    }
 
     /* 模块 2 源列表 */
     document.getElementById('s2-search').addEventListener('input', Utils.debounce(e => {
@@ -707,17 +714,36 @@ const App = (() => {
     Player.syncBar();
 
     /* 权限弹窗返回 / 切回前台后自动刷新，避免“授权后要重启 app” */
-    let _resumeAt = 0;
-    function refreshOnResume() {
-      if (document.visibilityState !== 'visible') return;
+    /*
+     * 熄屏回来后的卡顿，原来就出在这里：每次 visibilitychange/focus 都整目录重新 browse 一次
+     * （两个页面各一遍：重新拉列表、重建整表 DOM、重载缩略图、重算波形），熄屏越久越容易
+     * 同时触发 focus + visibilitychange，两遍叠加就是肉眼可见的卡顿。
+     * 现在回到前台只做"轻刷新"：重绘已有数据 + 同步播放状态，不再重新拉目录。
+     * 需要重新拉目录时由用户下拉刷新 / 切目录触发。
+     */
+    let _resumeAt = 0, _wasHidden = false;
+    function softResume() {
+      if (document.visibilityState !== 'visible') { _wasHidden = true; return; }
       const now = Date.now();
-      if (now - _resumeAt < 1200) return;
+      if (now - _resumeAt < 800) return;
       _resumeAt = now;
-      try { if (currentPath) browse(currentPath); } catch (_) {}
-      try { if (srcPath) srcBrowse(srcPath, {clearUndo: false}); } catch (_) {}
+      try { refreshColumns(); } catch (_) {}
+      try { Player.syncBar(); } catch (_) {}
+      try { Player.paintRows(); } catch (_) {}
+      if (typeof Spectrum !== 'undefined') {
+        try { Spectrum.onVisible(); } catch (_) {}
+      }
+      _wasHidden = false;
     }
-    document.addEventListener('visibilitychange', refreshOnResume);
-    window.addEventListener('focus', refreshOnResume);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        _wasHidden = true;
+        if (typeof Spectrum !== 'undefined') { try { Spectrum.onHidden(); } catch (_) {} }
+        return;
+      }
+      softResume();
+    });
+    window.addEventListener('focus', softResume);
 
   }
 

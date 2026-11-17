@@ -1,5 +1,6 @@
 /* ---------------- MoveMgr ---------------- */
 const MoveMgr = (() => {
+  function lg(level, text) { Utils.log(level, text, 'organize'); }
   let pairs = [];
   let ctx = null;
 
@@ -29,17 +30,17 @@ const MoveMgr = (() => {
     try {
       const r = await Api.move(sources, target, conflict);
       pairs = (r.results || []).filter(x => x.status === 'ok').map(x => ({src: x.src, dst: x.dst}));
-      Utils.log(r.failed ? 'warn' : 'ok',
+      lg(r.failed ? 'warn' : 'ok',
         '移动完成: 成功 ' + r.moved + ' / 跳过 ' + r.skipped + ' / 失败 ' + r.failed);
       for (const x of (r.results || [])) {
         if (x.status === 'error') {
-          Utils.log('err', '移动失败: ' + Utils.basename(x.src) + ' ' + (x.reason || ''));
+          lg('err', '移动失败: ' + Utils.basename(x.src) + ' ' + (x.reason || ''));
         }
       }
       await ctx.afterMove();
     } catch (e) {
       Utils.toast('移动失败: ' + e.message, 'err');
-      Utils.log('err', '移动失败: ' + e.message);
+      lg('err', '移动失败: ' + e.message);
     } finally {
       update();
     }
@@ -57,7 +58,7 @@ const MoveMgr = (() => {
         if (res && res.status === 'ok') ok++; else bad++;
       } catch (e) { bad++; }
     }
-    Utils.log(bad ? 'warn' : 'ok', '撤销完成: 恢复 ' + ok + ' / 跳过 ' + bad);
+    lg(bad ? 'warn' : 'ok', '撤销完成: 恢复 ' + ok + ' / 跳过 ' + bad);
     await ctx.afterMove();
     update();
   }

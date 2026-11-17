@@ -59,7 +59,9 @@ const Utils = (() => {
       setTimeout(() => el.remove(), 320);
     }, 2400);
   }
-  function log(level, text) {
+  function log(level, text, ns) {
+    // 统一走全局日志浮窗（按页面隔离：process / organize）
+    if (typeof Logs !== 'undefined' && Logs.add) { Logs.add(level, text, ns); return; }
     const el = document.getElementById('log');
     if (!el) return;
     const time = new Date().toLocaleTimeString('zh-CN', {hour12:false});

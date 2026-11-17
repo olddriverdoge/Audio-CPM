@@ -225,13 +225,13 @@ function createTreeView(opts) {
     if (!name) return;
     try {
       const r = await Api.mkdir(parentPath, name);
-      if (!r.ok) { Utils.toast('新建失败: ' + r.error, 'err'); return; }
+      if (!r.ok) { Utils.toast('新建失败: ' + r.error, 'err'); Utils.log('err', '新建失败: ' + r.error, 'organize'); return; }
       const pnode = nodeMap.get(parentPath);
       if (pnode) { pnode.dataset.loaded = ''; await expandNode(pnode); }
       if (nodeMap.has(r.path)) selectNode(r.path);
-      Utils.log('ok', '已新建目录: ' + r.path);
+      Utils.log('ok', '已新建目录: ' + r.path, 'organize');
       if (opts.onTreeChanged) opts.onTreeChanged();
-    } catch (e) { Utils.toast('新建失败: ' + e.message, 'err'); }
+    } catch (e) { Utils.toast('新建失败: ' + e.message, 'err'); Utils.log('err', '新建失败: ' + e.message, 'organize'); }
   }
   async function doRename(path) {
     const oldName = Utils.basename(path);
@@ -239,19 +239,19 @@ function createTreeView(opts) {
     if (!name || name === oldName) return;
     try {
       const r = await Api.renameDir(path, name);
-      if (!r.ok) { Utils.toast('重命名失败: ' + r.error, 'err'); return; }
+      if (!r.ok) { Utils.toast('重命名失败: ' + r.error, 'err'); Utils.log('err', '重命名失败: ' + r.error, 'organize'); return; }
       if (selected === path) { selected = null; if (opts.onSelect) opts.onSelect(null); }
       await refreshParent(path);
       if (nodeMap.has(r.path)) selectNode(r.path);
-      Utils.log('ok', '已重命名: ' + oldName + ' → ' + name);
+      Utils.log('ok', '已重命名: ' + oldName + ' → ' + name, 'organize');
       if (opts.onTreeChanged) opts.onTreeChanged();
-    } catch (e) { Utils.toast('重命名失败: ' + e.message, 'err'); }
+    } catch (e) { Utils.toast('重命名失败: ' + e.message, 'err'); Utils.log('err', '重命名失败: ' + e.message, 'organize'); }
   }
   async function doRmdir(path) {
     if (!confirm('删除文件夹？\n' + path + '\n（仅能删除空目录）')) return;
     try {
       const r = await Api.rmdir(path);
-      if (!r.ok) { Utils.toast('删除失败: ' + r.error, 'err'); return; }
+      if (!r.ok) { Utils.toast('删除失败: ' + r.error, 'err'); Utils.log('err', '删除目录失败: ' + r.error, 'organize'); return; }
       const node = nodeMap.get(path);
       if (node) {
         const kids = node.querySelectorAll('.tree-node');
@@ -263,9 +263,9 @@ function createTreeView(opts) {
         selected = null;
         if (opts.onSelect) opts.onSelect(null);
       }
-      Utils.log('ok', '已删除目录: ' + path);
+      Utils.log('ok', '已删除目录: ' + path, 'organize');
       if (opts.onTreeChanged) opts.onTreeChanged();
-    } catch (e) { Utils.toast('删除失败: ' + e.message, 'err'); }
+    } catch (e) { Utils.toast('删除失败: ' + e.message, 'err'); Utils.log('err', '删除目录失败: ' + e.message, 'organize'); }
   }
 
   return {

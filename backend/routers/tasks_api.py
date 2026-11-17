@@ -69,7 +69,8 @@ async def api_start(request: Request):
             return r1
         return J({"task_id": create_task(fn, f"转换 {spec} @ {path}")})
     if task == 'tags':
-        fmt = (data.get('format') or 'flac').lower()
+        # 前端已去掉"目标格式"：不传就是所有音频格式
+        fmt = (data.get('format') or '').lower() or None
 
         def fn(cb):
             return manage_tags_v2(path, format=fmt,
@@ -77,11 +78,22 @@ async def api_start(request: Request):
                                   only_files=only_files, progress_cb=cb)
         return J({"task_id": create_task(fn, f"整理标签 @ {path}")})
     if task == 'cover':
-        fmt = (data.get('format') or 'flac').lower()
+        fmt = (data.get('format') or '').lower() or None
+        cover_path = None
+        raw_cover = str(data.get('cover_path') or '').strip()
+        if raw_cover:
+            r3 = parse_ref(raw_cover)
+            if r3.kind == 'dav':
+                raise HTTPException(400, "封面图片请用本地文件")
+            cover_path = r3.path
+            if not os.path.isfile(cover_path):
+                raise HTTPException(400, f"封面文件不存在: {cover_path}")
+        desc = ("替换封面（%s）" % cover_path) if cover_path else "替换封面 @ %s" % path
 
         def fn(cb):
-            return modify_cover_v2(path, formats=fmt, only_files=only_files, progress_cb=cb)
-        return J({"task_id": create_task(fn, f"替换封面 @ {path}")})
+            return modify_cover_v2(path, formats=fmt, only_files=only_files,
+                                   cover_path=cover_path, progress_cb=cb)
+        return J({"task_id": create_task(fn, desc)})
     if task == 'check':
         fmt = (data.get('format') or 'flac').lower()
 

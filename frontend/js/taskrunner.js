@@ -1,5 +1,6 @@
 /* ---------------- TaskRunner ---------------- */
 const TaskRunner = (() => {
+  function lg(level, text) { Utils.log(level, text, 'process'); }
   let evtSource = null, startTime = 0, totalFiles = 0, doneFiles = 0;
   let taskId = null;
   let presets = {presets: {}};
@@ -42,10 +43,10 @@ const TaskRunner = (() => {
       if (p.delete_source !== undefined) document.getElementById('delete-source').checked = !!p.delete_source;
       if (p.also_tags !== undefined) document.getElementById('also-tags').checked = !!p.also_tags;
     } else if (p.task === 'tags') {
-      if (p.format) document.getElementById('tags-format').value = p.format;
       if (p.name_pattern !== undefined) document.getElementById('name-pattern').value = p.name_pattern;
     } else if (p.task === 'cover') {
-      if (p.format) document.getElementById('cover-format').value = p.format;
+      const cp = document.getElementById('cover-path');
+      if (cp && p.cover_path) cp.value = p.cover_path;
     }
   }
   function collectConfig() {
@@ -58,10 +59,12 @@ const TaskRunner = (() => {
       cfg.also_tags = document.getElementById('also-tags').checked;
       cfg.name_pattern = document.getElementById('name-pattern').value;
     } else if (task === 'tags') {
-      cfg.format = document.getElementById('tags-format').value;
+      // 目标格式已移除：重命名对所有音频格式生效
       cfg.name_pattern = document.getElementById('name-pattern').value;
     } else if (task === 'cover') {
-      cfg.format = document.getElementById('cover-format').value;
+      // 目标格式已移除：所有音频格式都会替换封面；可单独指定封面图片
+      const cp = document.getElementById('cover-path');
+      cfg.cover_path = cp ? cp.value.trim() : '';
     }
     const sel = App.selection();
     if (sel.length) cfg.only_files = sel;
@@ -78,8 +81,8 @@ const TaskRunner = (() => {
       await Api.savePresets(presets);
       await loadPresets();
       document.getElementById('preset-select').value = name;
-      Utils.log('ok', '预设已保存: ' + name);
-    } catch (e) { Utils.log('err', '保存失败: ' + e.message); }
+      lg('ok', '预设已保存: ' + name);
+    } catch (e) { lg('err', '保存失败: ' + e.message); }
   }
   async function deletePreset() {
     const name = document.getElementById('preset-select').value;
@@ -89,14 +92,14 @@ const TaskRunner = (() => {
     try {
       await Api.savePresets(presets);
       await loadPresets();
-      Utils.log('info', '已删除预设: ' + name);
-    } catch (e) { Utils.log('err', '删除失败: ' + e.message); }
+      lg('info', '已删除预设: ' + name);
+    } catch (e) { lg('err', '删除失败: ' + e.message); }
   }
 
   async function start() {
     if (!App.path) { alert('请先选择目录'); return; }
     const cfg = collectConfig();
-    document.getElementById('log').innerHTML = '';
+    if (typeof Logs !== 'undefined') Logs.clear('process');
     const bar = document.getElementById('progress-bar');
     bar.style.width = '0%';
     bar.classList.remove('indeterminate');
@@ -110,7 +113,7 @@ const TaskRunner = (() => {
       taskId = data.task_id;
       subscribe(data.task_id);
     } catch (e) {
-      Utils.log('err', '启动失败: ' + e.message);
+      lg('err', '启动失败: ' + e.message);
       setRunning(false);
     }
   }
@@ -125,9 +128,9 @@ const TaskRunner = (() => {
     if (cb) { cb.disabled = true; cb.textContent = '取消中…'; }
     try {
       await Api.cancelTask(taskId);
-      Utils.log('warn', '已请求取消任务…');
+      lg('warn', '已请求取消任务…');
     } catch (e) {
-      Utils.log('err', '取消失败: ' + e.message);
+      lg('err', '取消失败: ' + e.message);
       if (cb) { cb.disabled = false; cb.textContent = '✕ 取消'; }
     }
   }
@@ -139,7 +142,7 @@ const TaskRunner = (() => {
       if (bad) {
         const el = document.getElementById('task-status');
         if (el) el.textContent = (bad.status === 'interrupted' ? '上次未完成 ' : '进行中 ') + (bad.description || bad.id || '');
-        Utils.log('warn', '检测到未完成任务：' + (bad.description || bad.id) + '（' + bad.status + '）');
+        lg('warn', '检测到未完成任务：' + (bad.description || bad.id) + '（' + bad.status + '）');
       }
     } catch (_) {}
   }
@@ -167,7 +170,7 @@ const TaskRunner = (() => {
     bar.classList.remove('indeterminate');
     document.getElementById('progress-status').textContent = '已取消';
     document.getElementById('task-status').textContent = '⊘';
-    Utils.log('warn', '任务已取消');
+    lg('warn', '任务已取消');
   }
   function handleProgress(ev) {
     const bar = document.getElementById('progress-bar');
@@ -175,13 +178,13 @@ const TaskRunner = (() => {
     switch (ev.event) {
       case 'plan':
         totalFiles = ev.total || 0; doneFiles = 0;
-        Utils.log('info', '[' + ev.phase + '] 共 ' + totalFiles + ' 个文件 @ ' + ev.folder);
-        if (ev.cover) Utils.log('info', '封面: ' + ev.cover);
+        lg('info', '[' + ev.phase + '] 共 ' + totalFiles + ' 个文件 @ ' + ev.folder);
+        if (ev.cover) lg('info', '封面: ' + ev.cover);
         document.getElementById('progress-status').textContent = ev.phase + ': 0 / ' + totalFiles;
         bar.classList.add('indeterminate');
         break;
       case 'probe':
-        Utils.log('info', '[probe] ' + bname(ev.file));
+        lg('info', '[probe] ' + bname(ev.file));
         break;
       case 'file_progress':
         if (totalFiles > 0) {
@@ -195,10 +198,10 @@ const TaskRunner = (() => {
       case 'file_done':
         doneFiles = ev.index;
         if (ev.status === 'ok') {
-          Utils.log('ok', '✓ [' + ev.index + '/' + totalFiles + '] ' + bname(ev.file) +
+          lg('ok', '✓ [' + ev.index + '/' + totalFiles + '] ' + bname(ev.file) +
             (ev.output ? '  →  ' + bname(ev.output) : ''));
         } else {
-          Utils.log('err', '✗ [' + ev.index + '/' + totalFiles + '] ' + bname(ev.file) +
+          lg('err', '✗ [' + ev.index + '/' + totalFiles + '] ' + bname(ev.file) +
             '  ' + (ev.error || ''));
         }
         if (totalFiles > 0) {
@@ -209,11 +212,11 @@ const TaskRunner = (() => {
         break;
       case 'file_skip':
         doneFiles = ev.index;
-        Utils.log('warn', '跳过 [' + ev.index + '/' + totalFiles + '] ' + bname(ev.file) +
+        lg('warn', '跳过 [' + ev.index + '/' + totalFiles + '] ' + bname(ev.file) +
           ' (' + ev.reason + ')');
         break;
       case 'phase':
-        Utils.log('info', '--- 阶段: ' + ev.phase + ' ---');
+        lg('info', '--- 阶段: ' + ev.phase + ' ---');
         break;
     }
   }
@@ -232,13 +235,13 @@ const TaskRunner = (() => {
                 (data && data.convert ? data.convert.success : '');
       const f = (data && data.failed !== undefined) ? data.failed :
                 (data && data.convert ? data.convert.failed : '');
-      if (typeof s === 'number') Utils.log('ok', '任务完成：成功 ' + s + ' / 失败 ' + f);
-      else Utils.log('ok', '任务完成');
+      if (typeof s === 'number') lg('ok', '任务完成：成功 ' + s + ' / 失败 ' + f);
+      else lg('ok', '任务完成');
       document.getElementById('task-status').textContent = '✔';
       if (App.path) setTimeout(() => App.browse(App.path), 500);
     } else {
       document.getElementById('progress-status').textContent = '出错 · 用时 ' + elapsed + 's';
-      Utils.log('err', '任务失败: ' + (data && data.error ? data.error : 'unknown'));
+      lg('err', '任务失败: ' + (data && data.error ? data.error : 'unknown'));
       document.getElementById('task-status').textContent = '✘';
     }
   }

@@ -407,7 +407,28 @@ const Player = (() => {
   /* 切后台 / 切页签：浏览器若把播放暂停，回到前台自动续播（网页播放模式） */
   let wasPlaying = false;
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) { wasPlaying = !audio.paused && !!cur; return; }
+    if (document.hidden) {
+      wasPlaying = !audio.paused && !!cur;
+      stopHifiPoll();          // 熄屏期间别每 250ms 打一次 HTTP，回来时统一补一次
+      return;
+    }
+    const wasHifi = !!hifi;
+    if (wasHifi) {
+      // 先同步拉一次状态，再恢复轮询：亮度回归时不会再堆一堆请求
+      Api.playbackState().then(s => {
+        if (s && s.ok) {
+          hifiPos = Number(s.positionMs) || 0;
+          hifiDur = Number(s.durationMs) || 0;
+          if (s.path) { const ref = 'local:' + s.path; if (ref !== cur) adoptNative(ref); }
+          const d = hifiDur / 1000, p = hifiPos / 1000;
+          if (d > 0) { seek.max = String(d); durEl.textContent = fmt(d); }
+          if (!seeking) { seek.value = String(p); curEl.textContent = fmt(p); }
+          setPct(d > 0 ? p / d * 100 : 0);
+          setToggle(!!s.playing);
+        }
+      }).catch(() => {});
+      startHifiPoll();
+    }
     if (wasPlaying && cur && audio.paused && Settings.playMode() === 'web') {
       audio.play().catch(() => {});
     }

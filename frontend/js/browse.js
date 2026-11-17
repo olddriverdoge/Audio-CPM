@@ -13,6 +13,8 @@ function createBrowseView(cfg) {
   };
 
   const esc = Utils.escapeHtml;
+  const NS = cfg.ns || 'process';       // 日志归属页（列表 1=处理 / 列表 2=整理）
+  function lg(level, text) { Utils.log(level, text, NS); }
 
   function searchFiles() {
     const q = (st.search || '').trim().toLowerCase();
@@ -425,12 +427,12 @@ function createBrowseView(cfg) {
       let ok = 0, bad = 0;
       for (const one of (r.results || [])) {
         if (one.status === 'ok') { ok++; st.sel.delete(one.src || one.path || ''); }
-        else { bad++; Utils.log('err', '删除失败: ' + Utils.basename(one.src || one.path || '') + ' ' + (one.reason || '')); }
+        else { bad++; lg('err', '删除失败: ' + Utils.basename(one.src || one.path || '') + ' ' + (one.reason || '')); }
       }
       for (const p of paths) {
         try { if (typeof Player !== 'undefined' && Player.current === p) Player.close(); } catch (_) {}
       }
-      Utils.log(bad ? 'warn' : 'ok', '删除完成: 成功 ' + ok + ' / 失败 ' + bad);
+      lg(bad ? 'warn' : 'ok', '删除完成: 成功 ' + ok + ' / 失败 ' + bad);
       Utils.toast(bad ? ('删除完成，' + bad + ' 项失败') : ('已删除 ' + ok + ' 项'));
       if (cfg.onReload) await cfg.onReload(); else render();
     } catch (e) {

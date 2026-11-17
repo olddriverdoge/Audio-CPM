@@ -109,25 +109,18 @@
           <span class="status">{artist} {album_artist} {title} {album} {composer} {track} {disc} {year} {genre} {filename}</span>
         </div>
         <div class="row">
-          <label>目标格式</label>
-          <select id="tags-format">
-            <option value="flac" selected>flac</option>
-            <option value="mp3">mp3</option>
-            <option value="m4a">m4a</option>
-            <option value="wav">wav</option>
-          </select>
+          <span class="status">目录内所有格式的音频文件都会参与重命名（不再限定单一格式）</span>
         </div>
       </div>
 
       <div id="ui-cover" class="hidden">
         <div class="row">
-          <label>目标格式</label>
-          <select id="cover-format">
-            <option value="flac" selected>flac</option>
-            <option value="mp3">mp3</option>
-            <option value="m4a">m4a</option>
-          </select>
-          <span class="status">（目录内需有 jpg/png 封面）</span>
+          <label>封面图片</label>
+          <input type="text" id="cover-path" class="path" placeholder="留空=自动用当前目录里的 jpg/png">
+          <button class="small" id="btn-pick-cover" type="button">选择</button>
+        </div>
+        <div class="row">
+          <span class="status">可跨目录选一张图；留空时仍按旧逻辑找当前目录里的第一张图片。所有音频格式都会参与替换。</span>
         </div>
       </div>
 
@@ -146,8 +139,6 @@
         <span class="status" id="progress-status">就绪</span>
       </div>
       <div class="progress-wrap"><div class="progress-bar" id="progress-bar"></div></div>
-      <div class="loghead" id="log-toggle">日志 <span id="log-tri">▾</span></div>
-      <div class="log" id="log"></div>
     </div>
     </div><!-- /p1-main -->
   </section>
@@ -267,6 +258,21 @@
   <b class="sf-resize" id="sf-resize" title="拖动调整大小"></b>
 </div>
 
+<button type="button" class="sf-fab log-fab" id="log-fab" title="日志（按页面隔离）">📋<span>日志</span></button>
+<div class="log-float hidden" id="log-float">
+  <div class="mf-head" id="lf-head" title="拖动可移动">
+    <span class="mf-title">日志</span>
+    <span class="mf-track" id="lf-ns"></span>
+    <button type="button" class="sf-btn" id="lf-clear" title="清空当前页日志">🗑</button>
+    <button type="button" class="sf-btn" id="lf-min" title="收起">—</button>
+  </div>
+  <div class="log-tabs" id="lf-tabs">
+    <button type="button" data-ns="process">文件处理</button>
+    <button type="button" data-ns="organize">文件整理</button>
+  </div>
+  <div class="log-body" id="lf-body"><div class="detail-empty">暂无日志</div></div>
+</div>
+
 <div id="toast-wrap"></div>
 <div id="menu-overlay" class="hidden"><div id="ctx-menu" class="ctx-menu"></div></div>
 
@@ -366,12 +372,14 @@
 <script src="/js/keys.js"></script>
 <script src="/js/store.js"></script>
 <script src="/js/utils.js"></script>
+<script src="/js/logs.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/sources.js"></script>
 <script src="/js/uicfg.js"></script>
 <script src="/js/wave.js"></script>
 <script src="/js/settings.js"></script>
 <script src="/js/dock.js"></script>
+<script src="/js/filepicker.js"></script>
 <script src="/js/player.js"></script>
 <script src="/js/playmgr.js"></script>
 <script src="/js/thumbmgr.js"></script>

@@ -225,16 +225,17 @@ def manage_single_tags_v2(input_file: str, name_pattern: Optional[str]) -> str:
     os.rename(input_file, new_name)
     return new_name
 
-def manage_tags_v2(iopath, format='flac', name_pattern=None,
+def manage_tags_v2(iopath, format=None, name_pattern=None,
                    only_files=None, progress_cb=None):
+    """format 为空表示"所有音频格式"（前端已不再要求选目标格式）。"""
     global HWACCEL_ENABLED
     HWACCEL_ENABLED = check_hwaccel_support()
+    exts = {f'.{format.lower()}'} if format else MEDIA_EXTS
     only_files = expand_only_files(only_files)
     if only_files is not None:
-        files = [f for f in only_files
-                 if os.path.splitext(f)[1].lower() == f'.{format.lower()}']
+        files = [f for f in only_files if os.path.splitext(f)[1].lower() in exts]
     else:
-        files = collect_media_recursive(iopath, {f'.{format.lower()}'})
+        files = collect_media_recursive(iopath, exts)
     total = len(files)
     result = {"success": 0, "failed": 0, "files": []}
     if progress_cb:
@@ -259,20 +260,34 @@ def manage_tags_v2(iopath, format='flac', name_pattern=None,
                              "file":f,"status":"error","error":str(e)})
     return result
 
-def modify_cover_v2(iopath, formats='flac', only_files=None, progress_cb=None):
-    cover_path = None
-    for name in os.listdir(iopath):
-        if os.path.splitext(name)[1].lower() in IMAGE_EXTS:
-            cover_path = os.path.join(iopath, name); break
-    if not cover_path: raise Exception("未找到封面图片（jpg/png 等）")
+# 能内嵌封面的容器（wav/aiff 等放不了 attached_pic，直接跳过）
+COVER_EXTS = {'.flac', '.mp3', '.m4a'}
+
+
+def modify_cover_v2(iopath, formats=None, only_files=None, cover_path=None, progress_cb=None):
+    """封面来源二选一：显式传入 cover_path（用户选的图），或退回"目录内第一张图片"。
+
+    不再硬编码只认同文件夹封面：前端可以把任意目录的一张图选进来。
+    """
+    if cover_path:
+        cover_path = os.path.abspath(cover_path)
+        if not os.path.isfile(cover_path):
+            raise Exception("封面文件不存在: %s" % cover_path)
+        if os.path.splitext(cover_path)[1].lower() not in IMAGE_EXTS:
+            raise Exception("封面必须是图片文件（jpg/png/bmp/webp）: %s" % cover_path)
+    else:
+        for name in os.listdir(iopath):
+            if os.path.splitext(name)[1].lower() in IMAGE_EXTS:
+                cover_path = os.path.join(iopath, name); break
+        if not cover_path: raise Exception("未选择封面图片，且当前目录里也没有 jpg/png 等图片")
+    exts = {f'.{formats.lower()}'} if formats else COVER_EXTS
     only_files = expand_only_files(only_files)
     if only_files is not None:
-        files = [f for f in only_files
-                 if os.path.splitext(f)[1].lower() == f'.{formats.lower()}']
+        files = [f for f in only_files if os.path.splitext(f)[1].lower() in exts]
     else:
         files = [os.path.join(iopath, n) for n in os.listdir(iopath)
                  if os.path.isfile(os.path.join(iopath, n))
-                 and os.path.splitext(n)[1].lower() == f'.{formats.lower()}']
+                 and os.path.splitext(n)[1].lower() in exts]
     total = len(files)
     result = {"success": 0, "failed": 0, "files": []}
     if progress_cb:

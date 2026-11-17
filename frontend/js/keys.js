@@ -29,5 +29,6 @@ const K = {
   wfBands:'ac2_wf_bands', wfY:'ac2_wf_y',
   metaPos:'ac2_meta_pos', metaSize:'ac2_meta_size', movePos:'ac2_move_pos',
   fabSpectrum:'ac2_fab_spectrum', fabMeta:'ac2_fab_meta', fabMove:'ac2_fab_move',
-  winSpectrum:'ac2_win_spectrum'
+  winSpectrum:'ac2_win_spectrum',
+  fabLog:'ac2_fab_log', winLog:'ac2_win_log'
 };

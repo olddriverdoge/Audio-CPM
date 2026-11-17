@@ -1,10 +1,13 @@
 /* ---------------- MetaView ---------------- */
 function createMetaView(container, opts) {
   opts = opts || {};
-  const editable = opts.editable !== false;
+  /* 默认只读：先展示 metadata，点「编辑」才进入可编辑并出现保存按钮 */
+  const canEdit = opts.editable !== false;
   const esc = Utils.escapeHtml;
   let curPath = null;
   let curTags = {};
+  let curData = null;
+  let editing = false;
 
   function kv(k, v) {
     if (v === undefined || v === null || v === '') return '';
@@ -59,8 +62,8 @@ function createMetaView(container, opts) {
     html += '<div class="kv"><span class="k">内嵌封面</span><span class="v">' +
       (d.has_cover ? '✓ 有' : '✗ 无') + '</span></div>';
 
-    // 2) 元数据（可编辑优先，否则只读列表）
-    if (editable) {
+    // 2) 元数据：默认只读展示，点「编辑」才切换成可编辑表格
+    if (canEdit && editing) {
       html += '<h3>元数据（可编辑）</h3><div class="tag-edit-wrap"></div>' +
         '<div class="tag-tools">' +
         '<input type="text" class="newkey" placeholder="key">' +
@@ -70,14 +73,17 @@ function createMetaView(container, opts) {
         '<span class="save-msg"></span>' +
         '</div>';
     } else if (tagKeys.length) {
-      html += '<h3>元数据</h3>';
+      html += '<h3>元数据' + (canEdit ?
+        ' <button type="button" class="small" data-act="probe-edit">✎ 编辑</button>' : '') + '</h3>';
       for (const k of tagKeys) {
         let v = tags[k];
         if (typeof v === 'string' && v.length > 200) v = v.slice(0, 200) + '...';
         html += kv(k, v);
       }
     } else {
-      html += '<h3>元数据</h3><div class="detail-empty">无标签</div>';
+      html += '<h3>元数据' + (canEdit ?
+        ' <button type="button" class="small" data-act="probe-edit">✎ 编辑</button>' : '') +
+        '</h3><div class="detail-empty">无标签</div>';
     }
 
     // 3) 文件 / 格式 / 音频流等靠后
@@ -103,7 +109,7 @@ function createMetaView(container, opts) {
     }
 
     container.innerHTML = html;
-    if (editable) renderTagTable(tags);
+    if (canEdit && editing) renderTagTable(tags);
   }
 
   async function load(path) {
@@ -112,6 +118,7 @@ function createMetaView(container, opts) {
     setEmpty('加载中...');
     try {
       const d = await Api.probe(path);
+      curData = d;
       curTags = Object.assign({}, d.tags || {});
       render(d);
     } catch (e) {
@@ -166,6 +173,7 @@ function createMetaView(container, opts) {
       if (r.ok) {
         setMsg('✓ 已保存', 'ok');
         Utils.log('ok', '元数据保存成功: ' + Utils.basename(curPath));
+        editing = false;                 // 保存后回到只读态
         const p = curPath;
         setTimeout(() => load(p), 250);
       } else {
@@ -181,7 +189,8 @@ function createMetaView(container, opts) {
     const t = e.target.closest('[data-act]');
     if (!t) return;
     const act = t.dataset.act;
-    if (act === 'probe-add') addTag();
+    if (act === 'probe-edit') { editing = true; if (curData) render(curData); }
+    else if (act === 'probe-add') addTag();
     else if (act === 'probe-save') save();
     else if (act === 'probe-del') {
       const tr = t.closest('tr');

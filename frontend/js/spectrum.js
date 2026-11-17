@@ -650,6 +650,28 @@ const Spectrum = (() => {
     }, 1000);
   }
 
+  /* 熄屏 / 切后台：rAF 已停，但原生 FFT 与 HTTP 取数还在跑，
+     回来时容易一次性补一大批帧 + 重绘瀑布，表现就是"刚点亮时卡一阵"。
+     这里干脆在不可见时整条链停掉，可见后再接上。 */
+  function onHidden() {
+    if (!open) return;
+    ++switchTok;
+    suspended = true;
+    stopPcmPoll();
+    stop();
+    try { Api.playbackSpectrum(false); } catch (_) {}
+    setState('暂停·已停算');
+  }
+
+  function onVisible() {
+    if (!open || !suspended) return;
+    const tok = ++switchTok;
+    setTimeout(() => {
+      if (tok !== switchTok || !open) return;
+      resumeStream();
+    }, 350);
+  }
+
   /* ---------- 调节区：长按展开、5s 自动收起、竖向靠左、按场景只显示对应项 ---------- */
   const REL_K = {fast: 0.20, mid: 0.12, slow: 0.07};
   const BRIGHT = {dark: [55, 255], std: [0, 255], bright: [0, 178]};
@@ -974,6 +996,6 @@ const Spectrum = (() => {
     });
   }
 
-  return {init, toggle, setMode, onTrackChange, resumeStream,
+  return {init, toggle, setMode, onTrackChange, resumeStream, onHidden, onVisible,
           get open() { return open; }, get mode() { return mode; }};
 })();
