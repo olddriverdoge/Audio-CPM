@@ -141,6 +141,20 @@ const Spectrum = (() => {
     }
     return hist[0];
   }
+  let lastHeal = 0, badFrames = 0;
+  /* 取数自救：只要"缓冲中"持续超过 1.5s，就重开原生开关 + 重建取数链。
+     seek/切歌/息屏任何一条路径把链子弄停（原生 enabled 被关、rAF 链断、tick 换代），这里都能拉回来。 */
+  function healStream(reason) {
+    const now = performance.now();
+    if (now - lastHeal < 2000) return;
+    lastHeal = now;
+    try { Api.playbackSpectrum(true); } catch (_) {}
+    stopPcmPoll();
+    startPcmPoll();
+    if (!raf) start();
+    try { Utils.log('warn', '频谱取数停摆(' + (reason || '') + ')，已自动重连'); } catch (_) {}
+  }
+
   let pcmTickId = 0;
   function startPcmPoll() {
     if (pcmTimer) return;
@@ -154,7 +168,12 @@ const Spectrum = (() => {
       const tick = () => {
         if (!pcmTimer || myId !== pcmTickId) return;
         if (core && core.native) {
-          try { const s = window.AudioCpmNative.spectrum(); if (s) applySpectrum(JSON.parse(s)); } catch (_) {}
+          try {
+            const s = window.AudioCpmNative.spectrum();
+            if (s) { applySpectrum(JSON.parse(s)); badFrames = 0; }
+          } catch (e) {
+            if (++badFrames > 20) { badFrames = 0; healStream('bridge'); }   // 桥调用连续失败：重连
+          }
         }
         requestAnimationFrame(tick);
       };
@@ -496,6 +515,7 @@ const Spectrum = (() => {
     // 切歌/缓冲的空窗：原生还没产出新帧时不要空转重绘（此前会把 rAF 全花在画旧数据/空帧上）
     if (core.native && performance.now() - lastDataAt > 450
         && (typeof Player.hifiPlaying !== 'function' || Player.hifiPlaying())) {
+      if (performance.now() - lastDataAt > 1500) healStream('buffering ' + Math.round(performance.now() - lastDataAt) + 'ms');
       g.fillStyle = 'rgba(148,163,184,.5)';
       g.textAlign = 'center'; g.textBaseline = 'middle';
       g.font = '12px ui-monospace, Menlo, monospace';
