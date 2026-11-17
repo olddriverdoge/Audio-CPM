@@ -35,10 +35,11 @@
     <button type="button" class="mod-btn" data-mod="tree"><i class="dot"></i>目标目录</button>
     <button type="button" class="mod-btn" data-mod="play">播放管理</button>
     <button type="button" class="mod-btn" data-mod="audio">音频输出</button>
-    <button type="button" class="mod-btn" data-mod="move"><i class="dot"></i>移动</button>
+
     <button type="button" class="mod-btn" data-mod="meta"><i class="dot"></i>元数据</button>
     <button type="button" class="mod-btn" data-mod="spectrum"><i class="dot"></i>频谱/声谱</button>
     <button type="button" class="mod-btn" data-mod="log"><i class="dot"></i>日志</button>
+    <button type="button" class="mod-btn" data-save-scene="1" title="把当前模块组合和浮窗位置存为预设">存预设</button>
   </div>
 
   <!-- 大工作台：所有功能都以浮窗形式叠在这里 -->
@@ -64,6 +65,7 @@
       <div class="pathbar pathrow" id="pb1">
         <div class="pb-crumbs" id="pb1-crumbs" title="点路径段跳转，长按编辑路径"></div>
       </div>
+      <div class="favbar" id="fav-bar"></div>
       <div class="sortbar">
         <input type="search" id="search-input" placeholder="搜索当前目录">
         <button id="s1-view-btn" type="button" class="small" title="切换视图：列表 / 网格">列表</button>
@@ -195,6 +197,17 @@
       <button type="button" class="sf-btn" id="fw-tree-min" title="收起">—</button>
     </div>
     <div class="fw-body" id="fw-tree-body">
+      <div class="mv-bar">
+        <span class="mv-n" id="mv-count">已选 0 项</span>
+        <select id="mv-conflict" title="同名冲突策略">
+          <option value="skip">跳过同名</option>
+          <option value="rename">重命名</option>
+          <option value="overwrite">覆盖</option>
+        </select>
+        <button class="primary small" id="mv-btn" disabled>移动</button>
+        <button class="small" id="mv-copy" disabled>复制</button>
+        <button class="small" id="mv-undo" disabled>撤销</button>
+      </div>
       <div class="tree-body" id="tree-body">
         <div class="tree-tabs" id="tree-tabs"></div>
         <div class="tree" id="tree"></div>
@@ -203,25 +216,6 @@
     <b class="fw-resize" id="fw-tree-resize" title="拖动调整大小"></b>
   </div>
 
-  <!-- 全局悬浮移动模块：贴边按钮 + 按内容自适应宽度的浮窗（与频谱/元数据同交互） -->
-  <button type="button" class="sf-fab move-fab" id="mv-fab" title="移动文件（独立浮窗）">⇄<span id="mv-fab-label">移动</span></button>
-  <div class="move-float hidden" id="movebar">
-    <div class="mf-head" id="mv-head" title="拖动可移动">
-      <span class="mf-title">移动</span>
-      <span class="mf-track" id="mv-count">已选 0 项</span>
-      <button type="button" class="sf-btn" id="mv-min" title="收起">—</button>
-    </div>
-    <div class="mv-body">
-      <select id="mv-conflict" title="同名冲突策略">
-        <option value="skip">跳过同名</option>
-        <option value="rename">重命名</option>
-        <option value="overwrite">覆盖</option>
-      </select>
-      <button class="primary" id="mv-btn" disabled>移动</button>
-      <button id="mv-undo" disabled>撤销</button>
-    </div>
-  </div>
-</div>
 
 <audio id="audio-el" preload="metadata"></audio>
 <div class="player-bar hidden" id="player-bar">

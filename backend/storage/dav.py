@@ -176,6 +176,12 @@ class DavClient:
         if r.status_code not in (200, 201, 204):
             raise DavError('MOVE %s' % r.status_code)
 
+    def copy(self, src, dst):
+        r = self.client.request('COPY', self._url(src),
+                                headers={'Destination': self._url(dst), 'Overwrite': 'F'})
+        if r.status_code not in (200, 201, 204):
+            raise DavError('COPY %s' % r.status_code)
+
     def delete(self, path):
         r = self.client.delete(self._url(path))
         if r.status_code not in (200, 204):

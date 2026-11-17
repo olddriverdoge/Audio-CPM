@@ -28,6 +28,7 @@ const Api = (() => {
     play: (path, player, activity) => jpost('/api/play', {path, player, activity}),
     tree: p => jfetch('/api/tree?path=' + enc(p)),
     move: (sources, target, conflict) => jpost('/api/move', {sources, target, conflict}),
+    copy: (sources, target, conflict) => jpost('/api/copy', {sources, target, conflict}),
     mkdir: (parent, name) => jpost('/api/mkdir', {parent, name}),
     rmdir: path => jpost('/api/rmdir', {path}),
     renameDir: (path, new_name) => jpost('/api/rename_dir', {path, new_name}),

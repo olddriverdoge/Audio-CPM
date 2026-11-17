@@ -2,12 +2,12 @@
 const Scenes = (() => {
   const STORE = 'ac3_scenes';
   const LABEL = {
-    browse: '文件浏览', task: '批处理', tree: '目标路径', move: '移动',
+    browse: '文件浏览', task: '批处理', tree: '目标路径',
     meta: '元数据', spectrum: '频谱声谱', log: '日志', play: '播放管理', audio: '音频输出'
   };
   const DEFAULTS = [
     {id: 'builtin-convert', name: '文件转码', desc: '文件选择 · 批处理 · 日志', mods: ['browse', 'task', 'log']},
-    {id: 'builtin-organize', name: '文件整理', desc: '文件选择 · 目标路径 · 移动', mods: ['browse', 'tree', 'move']},
+    {id: 'builtin-organize', name: '文件整理', desc: '文件选择 · 目标路径（移动/复制）', mods: ['browse', 'tree']},
     {id: 'builtin-listen', name: '听歌', desc: '文件选择 · 播放管理', mods: ['browse', 'play']}
   ];
 
@@ -18,7 +18,24 @@ const Scenes = (() => {
   function saveCustom(list) { Store.set(STORE, list); }
   function all() { return DEFAULTS.concat(customs().map(x => Object.assign({}, x, {custom: true}))); }
 
+  const WIN = {
+    browse: 'fw-browse', task: 'fw-task', tree: 'fw-tree', play: 'play-float',
+    audio: 'audio-float', meta: 'meta-float', spectrum: 'spectrum-float', log: 'log-float'
+  };
+
   function esc(s) { return Utils.escapeHtml(String(s == null ? '' : s)); }
+
+  /* 把当前浮窗的位置/尺寸一起存进预设，换场景时原样还原 */
+  function snapshotGeo(mods) {
+    const geo = {};
+    mods.forEach(m => {
+      const id = WIN[m];
+      if (!id) return;
+      const g = Store.get('ac3_geo_' + id, null);
+      if (g && Number.isFinite(Number(g.w)) && Number.isFinite(Number(g.h))) geo[id] = g;
+    });
+    return geo;
+  }
 
   function render() {
     const grid = document.getElementById('sh-grid');
@@ -38,6 +55,8 @@ const Scenes = (() => {
   function apply(s) {
     if (!s) return;
     if (App.closeAllMods) App.closeAllMods();
+    // 先写回几何，再展开：WinMgr 打开时按保存的坐标夹取
+    Object.keys(s.geo || {}).forEach(id => Store.set('ac3_geo_' + id, s.geo[id]));
     s.mods.forEach(m => setTimeout(() => App.openMod(m), 0));
     setTimeout(render, 80);
   }
@@ -48,7 +67,8 @@ const Scenes = (() => {
     const name = prompt('预设名称：', '');
     if (!name) return;
     const list = customs();
-    list.push({id: 'c' + Date.now(), name: name.trim().slice(0, 20), mods: mods});
+    list.push({id: 'c' + Date.now(), name: name.trim().slice(0, 20), mods: mods,
+               geo: snapshotGeo(mods)});
     saveCustom(list);
     render();
     Utils.toast('已保存预设：' + name.trim());
@@ -77,5 +97,5 @@ const Scenes = (() => {
     if (save) save.onclick = saveCurrent;
   }
 
-  return {init, render};
+  return {init, render, saveCurrent};
 })();

@@ -72,7 +72,7 @@ def api_tree(request: Request):
     return J({"path": to_uri(ref), "children": children})
 
 
-def _move_impl(data):
+def _move_impl(data, copy=False):
     src_refs = [parse_ref(p) for p in (data.get('sources') or [])]
     tgt = parse_ref(str(data.get('target') or ''))
     _same_kind(src_refs, tgt)
@@ -132,16 +132,23 @@ def _move_impl(data):
                         os.remove(dst)
                     except Exception:
                         pass
-            shutil.move(src, dst)
+            if copy:
+                if src_is_dir:
+                    shutil.copytree(src, dst)
+                else:
+                    shutil.copy2(src, dst)
+            else:
+                shutil.move(src, dst)
             results.append({"src": src, "dst": dst, "status": "ok"})
             moved += 1
         except Exception as e:
             results.append({"src": src, "dst": dst, "status": "error", "reason": str(e)[:300]})
             failed += 1
-    return {"results": results, "moved": moved, "skipped": skipped, "failed": failed}
+    return {"results": results, "moved": moved, "skipped": skipped, "failed": failed,
+            "op": "copy" if copy else "move"}
 
 
-def _dav_move(src_refs, tgt, mode):
+def _dav_move(src_refs, tgt, mode, copy=False):
     cli = get_dav_client(tgt.source)
     results, moved, skipped, failed = [], 0, 0, 0
     for ref in src_refs:
@@ -172,7 +179,7 @@ def _dav_move(src_refs, tgt, mode):
                         continue
                     except Exception:
                         break
-            cli.move(src, dst)
+            cli.copy(src, dst) if copy else cli.move(src, dst)
             results.append({"src": src, "dst": dst, "status": "ok"})
             moved += 1
         except Exception as e:
@@ -298,6 +305,11 @@ async def api_move(request: Request):
     return J(await run_in_threadpool(_move_impl, data))
 
 
+async def api_copy(request: Request):
+    data = await body(request)
+    return J(await run_in_threadpool(_move_impl, data, True))
+
+
 async def api_mkdir(request: Request):
     data = await body(request)
     return J(await run_in_threadpool(_mkdir_impl, data))
@@ -320,6 +332,7 @@ async def api_delete(request: Request):
 
 routes.append(Route('/api/tree', api_tree))
 routes.append(Route('/api/move', api_move, methods=['POST']))
+routes.append(Route('/api/copy', api_copy, methods=['POST']))
 routes.append(Route('/api/mkdir', api_mkdir, methods=['POST']))
 routes.append(Route('/api/rmdir', api_rmdir, methods=['POST']))
 routes.append(Route('/api/rename_dir', api_rename_dir, methods=['POST']))

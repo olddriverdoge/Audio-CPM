@@ -117,6 +117,7 @@ const App = (() => {
       const track = document.getElementById('browse-track');
       if (track) track.textContent = d.path;
       bv.setData(d);
+      renderFavs();
       updateSelInfo();
       pushRecent(d.path);
       if (typeof Sources !== 'undefined') Sources.rememberPath(d.path);
@@ -214,6 +215,54 @@ const App = (() => {
     } catch (e) {
       Utils.toast('目标目录读取失败: ' + e.message, 'err');
     }
+  }
+
+  /* ---- 文件浏览快捷入口（收藏当前目录） ---- */
+  function favKey() { return 'ac2_favs_' + curSourceId(); }
+  function favs() {
+    const v = Store.get(favKey(), []);
+    return Array.isArray(v) ? v.filter(x => typeof x === 'string' && x) : [];
+  }
+  function saveFavs(list) { Store.set(favKey(), list.slice(0, 12)); }
+  function renderFavs() {
+    const bar = document.getElementById('fav-bar');
+    if (!bar) return;
+    const list = favs();
+    const cur = currentPath;
+    bar.innerHTML = list.map((p, i) =>
+      '<span class="fav-chip' + (p === cur ? ' on' : '') + '" data-fav="' + i + '" title="' +
+      Utils.escapeHtml(p) + '"><b>' + Utils.escapeHtml(treeBaseName(p) || p) + '</b>' +
+      '<i data-fav-del="' + i + '" title="移除">✕</i></span>').join('') +
+      '<button type="button" class="fav-add" id="fav-add" title="收藏当前目录">＋收藏</button>';
+  }
+  function addFavCurrent() {
+    const uri = currentPath;
+    if (!uri) { Utils.toast('先打开一个目录', 'warn'); return; }
+    const list = favs();
+    if (list.indexOf(uri) >= 0) { Utils.toast('已在快捷入口里'); return; }
+    list.push(uri);
+    saveFavs(list);
+    renderFavs();
+    Utils.toast('已收藏：' + (treeBaseName(uri) || uri));
+  }
+  function bindFavs() {
+    const bar = document.getElementById('fav-bar');
+    if (!bar) return;
+    bar.addEventListener('click', e => {
+      const del = e.target.closest('[data-fav-del]');
+      if (del) {
+        e.stopPropagation();
+        const list = favs();
+        list.splice(Number(del.dataset.favDel), 1);
+        saveFavs(list); renderFavs(); return;
+      }
+      if (e.target.closest('#fav-add')) { addFavCurrent(); return; }
+      const chip = e.target.closest('.fav-chip');
+      if (chip) {
+        const p = favs()[Number(chip.dataset.fav)];
+        if (p) loadDir(p).catch(err => Utils.toast('打开失败: ' + (err && err.message || err), 'err'));
+      }
+    });
   }
 
   /* 一键把当前浏览目录加进目标目录（与现有标签去重，直接切过去） */
@@ -457,7 +506,6 @@ const App = (() => {
     MODS.play = {win: 'play-float', fw: playPanel};
     if (typeof createAudioPanel === 'function') audioPanel = createAudioPanel();
     MODS.audio = {win: 'audio-float', fw: audioPanel};
-    MODS.move = {win: 'movebar', fab: 'mv-fab', min: 'mv-min'};
     MODS.meta = {win: 'meta-float', fab: 'meta-fab', min: 'mf-min'};
     MODS.spectrum = {win: 'spectrum-float', fab: 'sf-fab', min: 'sf-min'};
     MODS.log = {win: 'log-float', fab: 'log-fab', min: 'lf-min'};
@@ -468,6 +516,7 @@ const App = (() => {
         const b = e.target.closest('.mod-btn');
         if (!b) return;
         if (b.dataset.scene) { closeAllMods(); return; }
+        if (b.dataset.saveScene) { Scenes.saveCurrent(); return; }
         if (b.dataset.mod) toggleMod(b.dataset.mod);
       });
     }
@@ -556,143 +605,13 @@ const App = (() => {
 
     paintViewButtons();
 
-    /* 移动浮窗：位置/尺寸/置顶由 WinMgr 统一管理（宽度按内容自适应） */
-    const mvBar = document.getElementById('movebar');
-    const mvFab = document.getElementById('mv-fab');
-    const mvMin = document.getElementById('mv-min');
-    let mvOpen = false;
-    function mvToggleOpen() {
-      mvOpen = !mvOpen;
-      mvBar.classList.toggle('hidden', !mvOpen);
-      if (mvFab) mvFab.style.display = 'none';
-    }
-    if (mvFab) mvFab.addEventListener('click', mvToggleOpen);
-    if (mvMin) mvMin.addEventListener('click', () => { if (mvOpen) mvToggleOpen(); });
-    WinMgr.register({id: 'move', win: mvBar, head: 'mv-head', contentSized: true, minW: 140, minH: 52});
-
-    /* 文件浏览：唯一实例 */
-    bv = createBrowseView({
-      container: document.getElementById('view1'),
-      ns: 'process',
-      mode: viewMode(),
-      gridSize: gridSize,
-      folderOrder: 'first',
-      onOpenDir: p => browse(p),
-      onReload: () => browse(currentPath),
-      columns: columns1,
-      clickPlays: true,
-      selectDirs: true,
-      onRowClick: (path, e, rowEl) => playRowClick(path, e, rowEl),
-      onSelectionChange: updateSelInfo,
-      onRender: () => Player.paintRows()
-    });
-
-    if (typeof Logs !== 'undefined') Logs.init();
-    if (typeof createMetaFloat === 'function') metaFloat = createMetaFloat();
-    if (typeof Spectrum !== 'undefined') Spectrum.init();
-    /* 所有浮窗统一：夹在可用区域内 + 点击置顶 + 双指缩放 */
-    WinMgr.register({id: 'meta', win: 'meta-float', head: 'mf-head', resize: 'mf-resize', minW: 240, minH: 180});
-    WinMgr.register({id: 'spectrum', win: 'spectrum-float', head: 'sf-head', resize: 'sf-resize', minW: 200, minH: 130});
-    WinMgr.register({id: 'log', win: 'log-float', head: 'lf-head', resize: 'lf-resize', minW: 220, minH: 140});
-
-    tree = createTreeView({
-      container: document.getElementById('tree'),
-      onSelect: () => MoveMgr.update(),
-      onTreeChanged: () => MoveMgr.update()
-    });
-    const exOne = document.getElementById('tree-expand-one');
-    if (exOne) exOne.addEventListener('click', () => tree.expandOneLevel());
-    const colAll = document.getElementById('tree-collapse-all');
-    if (colAll) colAll.addEventListener('click', () => tree.collapseAll());
-
-    MoveMgr.bind({
-      getSources: () => (bv ? bv.selected() : []),
-      getTarget: () => tree.selected,
-      afterMove: async () => {
-        await browse(currentPath);
-        if (bv) bv.clearSelection();
-        updateSelInfo();
-      }
-    });
-
-    /* 文件浏览搜索 / 选择 */
-    document.getElementById('search-input').addEventListener('input', Utils.debounce(e => {
-      bv.setSearch(e.target.value);
-    }, 140));
-    document.getElementById('btn-selall').onclick = () => bv.selectAllVisible(true);
-    document.getElementById('btn-selclear').onclick = () => bv.clearSelection();
-    document.getElementById('btn-del').onclick = () => bv.deleteSelected();
-
-    /* 批处理：任务 + 预设 */
-    document.querySelectorAll('input[name="task"]').forEach(r => {
-      r.addEventListener('change', () => TaskRunner.syncUI());
-    });
-    document.getElementById('btn-use-cur-dir').onclick = () => {
-      document.getElementById('output-dir').value = currentPath;
-    };
-    document.getElementById('preset-select').addEventListener('change', () => TaskRunner.applyPreset());
-    document.getElementById('btn-save-preset').onclick = () => TaskRunner.saveAsPreset();
-    const pvBtn = document.getElementById('btn-preview-name');
-    if (pvBtn) pvBtn.onclick = () => TaskRunner.previewNames();
-    document.getElementById('btn-del-preset').onclick = () => TaskRunner.deletePreset();
-    document.getElementById('start-btn').onclick = () => { openMod('log'); TaskRunner.start(); };
-    const pickCoverBtn = document.getElementById('btn-pick-cover');
-    if (pickCoverBtn) {
-      pickCoverBtn.onclick = async () => {
-        const p = await FilePicker.pickImage(document.getElementById('cover-path').value.trim() || currentPath);
-        if (p) {
-          document.getElementById('cover-path').value = p;
-          Utils.log('info', '已选择封面: ' + p);
-        }
-      };
-    }
-
-    /* 目标目录多标签 */
-    const tabsEl = document.getElementById('tree-tabs');
-    if (tabsEl) {
-      let tabTimer = null;
-      tabsEl.addEventListener('pointerdown', e => {
-        const b = e.target.closest('.tree-tab[data-i]');
-        if (!b) return;
-        if (tabTimer) clearTimeout(tabTimer);
-        tabTimer = setTimeout(() => {
-          tabTimer = null;
-          const i = Number(b.dataset.i);
-          if (treeRoots.length <= 1) { Utils.toast('至少保留一个目标目录', 'warn'); return; }
-          if (!confirm('移除目标目录标签「' + treeBaseName(treeRoots[i]) + '」？')) return;
-          treeRoots.splice(i, 1);
-          treeActive = Math.max(0, Math.min(treeActive, treeRoots.length - 1));
-          saveTreeRoots(); renderTreeTabs(); activateTreeRoot(treeActive);
-          try { if (navigator.vibrate) navigator.vibrate(20); } catch (_) {}
-        }, 650);
-      });
-      const stopTabTimer = () => { if (tabTimer) { clearTimeout(tabTimer); tabTimer = null; } };
-      ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => tabsEl.addEventListener(t, stopTabTimer));
-      tabsEl.addEventListener('click', e => {
-        if (e.target.closest('#tree-tab-add')) {
-          const def = treeRoots[treeActive] || defaultRootUri();
-          const v = prompt('新增目标目录路径：', def);
-          if (!v) return;
-          const p = v.trim();
-          if (!p) return;
-          const i = treeRoots.indexOf(p);
-          if (i >= 0) { activateTreeRoot(i); return; }
-          treeRoots.push(p);
-          treeActive = treeRoots.length - 1;
-          saveTreeRoots(); renderTreeTabs(); activateTreeRoot(treeActive);
-          return;
-        }
-        const b = e.target.closest('.tree-tab[data-i]');
-        if (b) activateTreeRoot(Number(b.dataset.i));
-      });
-    }
-
     /* 移动条 */
     const conflictSel = document.getElementById('mv-conflict');
     const savedConflict = Store.get(K.conflict, 'skip');
     conflictSel.value = ['skip', 'rename', 'overwrite'].indexOf(savedConflict) >= 0 ? savedConflict : 'skip';
     conflictSel.addEventListener('change', e => Store.set(K.conflict, e.target.value));
-    document.getElementById('mv-btn').onclick = () => MoveMgr.doMove();
+    document.getElementById('mv-btn').onclick = () => MoveMgr.doMove('move');
+    document.getElementById('mv-copy').onclick = () => MoveMgr.doMove('copy');
     document.getElementById('mv-undo').onclick = () => MoveMgr.doUndo();
 
     TaskRunner.syncUI();
@@ -768,7 +687,7 @@ const App = (() => {
   return {
     init, browse, onPlayed, updateMoveBar: () => MoveMgr.update(), isGridView, refreshColumns,
     playNext, playPrev, autoplayNext, autoplayOn, applyPlayMode, playMode, cyclePlayMode, openMod,
-    openMods, closeAllMods, addTargetCurrent,
+    openMods, closeAllMods, addTargetCurrent, addFavCurrent,
     playbackQueueList: () => playbackList().slice(), hifiQueue, toggleMod,
     get path() { return currentPath; },
     selection: () => (bv ? bv.selected() : []),
