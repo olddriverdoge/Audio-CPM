@@ -240,7 +240,6 @@ const App = (() => {
       if (wasClosed && typeof Spectrum !== 'undefined' && Spectrum.setMode) {
         try { Spectrum.setMode('waterfall'); } catch (_) {}
       }
-      if (isGridView()) openMod('play');
     }
   }
 
@@ -283,6 +282,7 @@ const App = (() => {
   function autoplayOn() { return playMode() !== 'order'; }
   function paintAutoplay() { /* 顶部按钮已下架，状态看播放管理浮窗 */ }
   function playNext(wrap) {
+    if (playMode() === 'shuffle') return playRandom();
     const list = playbackList().filter(f => f && f.path);
     if (!list.length) return false;
     let i = list.findIndex(f => f.path === Player.current);
@@ -293,6 +293,7 @@ const App = (() => {
     return true;
   }
   function playPrev() {
+    if (playMode() === 'shuffle') return playRandom();
     const list = playbackList().filter(f => f && f.path);
     if (!list.length) return false;
     let i = list.findIndex(f => f.path === Player.current);
@@ -605,6 +606,8 @@ const App = (() => {
     };
     document.getElementById('preset-select').addEventListener('change', () => TaskRunner.applyPreset());
     document.getElementById('btn-save-preset').onclick = () => TaskRunner.saveAsPreset();
+    const pvBtn = document.getElementById('btn-preview-name');
+    if (pvBtn) pvBtn.onclick = () => TaskRunner.previewNames();
     document.getElementById('btn-del-preset').onclick = () => TaskRunner.deletePreset();
     document.getElementById('start-btn').onclick = () => { openMod('log'); TaskRunner.start(); };
     const pickCoverBtn = document.getElementById('btn-pick-cover');

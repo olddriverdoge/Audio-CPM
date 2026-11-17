@@ -63,6 +63,7 @@ const Api = (() => {
     playbackMode: (repeat, shuffle) => jpost('/api/playback/mode', {repeat, shuffle}),
     playbackSkip: dir => jpost('/api/playback/skip', {dir}),
     audioFx: (op, a, b) => jpost('/api/audio/fx', {op, a, b}),
-    audioInfo: () => jfetch('/api/audio/info')
+    audioInfo: () => jfetch('/api/audio/info'),
+    renamePreview: cfg => jpost('/api/tasks/rename-preview', cfg)
   };
 })();

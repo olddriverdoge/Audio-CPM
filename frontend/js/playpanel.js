@@ -92,7 +92,10 @@ function createPlayPanel() {
     if (!seeking) { seek.value = String(Math.min(p, d || p)); curEl.textContent = fmt(p); }
     const pct = d > 0 ? Math.max(0, Math.min(100, p / d * 100)) : 0;
     waveHi.style.clipPath = 'inset(0 ' + (100 - pct) + '% 0 0)';
-    playBtn.textContent = Player.isPlaying() ? '⏸' : '▶';
+    const on = Player.isPlaying();
+    playBtn.innerHTML = on
+      ? '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>'
+      : '<svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="6,3 20,12 6,21"/></svg>';
     modeBtn.textContent = MODE_LABEL[(App.playMode && App.playMode()) || 'order'] || '顺序';
     const v = Number(vol.value);
     volVal.textContent = Math.round(v * 100) + '%';

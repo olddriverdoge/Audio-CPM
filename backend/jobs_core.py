@@ -225,6 +225,46 @@ def manage_single_tags_v2(input_file: str, name_pattern: Optional[str]) -> str:
     os.rename(input_file, new_name)
     return new_name
 
+def preview_rename(iopath, name_pattern=None, only_files=None, limit=30):
+    """只读预览：按重命名规则算出新旧文件名，不写标签、不动文件。"""
+    exts = MEDIA_EXTS
+    only = expand_only_files(only_files)
+    if only is not None:
+        files = [f for f in only if os.path.splitext(f)[1].lower() in exts]
+    else:
+        files = collect_media_recursive(iopath, exts)
+    items, seen = [], {}
+    for f in files[:max(1, int(limit or 30))]:
+        try:
+            detail = probe_file_detail(f)
+            if detail.get('error'):
+                items.append({'file': f, 'error': detail['error']})
+                continue
+            tags = {k.lower(): v for k, v in (detail.get('tags') or {}).items()}
+            cps = clean_text(tags.get('composer', ''))
+            parent = os.path.basename(os.path.dirname(f))
+            default_label = parent.split(' - ')[0].strip() if ' - ' in parent else ''
+            raw_artist = tags.get('artist', default_label)
+            aats = raw_artist if raw_artist and raw_artist != cps else (default_label or '')
+            base, ext = os.path.splitext(os.path.basename(f))
+            fields = {'artist': cps or tags.get('artist', ''), 'album_artist': aats,
+                      'title': tags.get('title', ''), 'album': tags.get('album', ''),
+                      'composer': cps, 'track': tags.get('track', ''), 'disc': tags.get('disc', ''),
+                      'filename': base, 'year': tags.get('date', '') or tags.get('year', ''),
+                      'genre': tags.get('genre', '')}
+            new_base = render_name_pattern(name_pattern, fields, base)
+            new_name = new_base + ext
+            # 重名会被自动加 _1/_2，预览里提前标出来
+            n = seen.get(new_name.lower(), 0) + 1
+            seen[new_name.lower()] = n
+            if n > 1:
+                new_name = '%s_%d%s' % (new_base, n - 1, ext)
+            items.append({'file': os.path.basename(f), 'new': new_name})
+        except Exception as e:
+            items.append({'file': os.path.basename(f), 'error': short_err(e)})
+    return {'total': len(files), 'shown': len(items), 'items': items}
+
+
 def manage_tags_v2(iopath, format=None, name_pattern=None,
                    only_files=None, progress_cb=None):
     """format 为空表示"所有音频格式"（前端已不再要求选目标格式）。"""

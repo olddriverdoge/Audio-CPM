@@ -111,8 +111,10 @@
     background-repeat:no-repeat;background-size:100% 100%}
   .pf-wave-base{filter:saturate(.55) brightness(.8)}
   .pf-wave-hi{filter:saturate(1.15) brightness(1.15)}
+  /* 进度条只保留波形，原生 range 隐藏（仍可拖动/点击定位） */
   .pf-seek{position:absolute;left:0;right:0;top:0;bottom:0;width:100%;height:100%;margin:0;
-    opacity:.9;background:transparent}
+    opacity:0;background:transparent;-webkit-appearance:none;appearance:none;border:0}
+  .pf-seek::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:26px;background:transparent}
   .pf-wavebox.time-only .pf-wave-base,.pf-wavebox.time-only .pf-wave-hi{display:none}
 
   /* ---------- 音频输出浮窗 ---------- */
@@ -149,3 +151,9 @@
   .af-switch i:before{content:'';position:absolute;left:2px;top:2px;width:12px;height:12px;border-radius:50%;background:#6b7a8c;transition:.15s}
   .af-switch input:checked+i{background:rgba(56,189,248,.25);border-color:rgba(56,189,248,.6)}
   .af-switch input:checked+i:before{left:16px;background:var(--accent)}
+
+  /* 统一线性图标按钮（替代彩色 emoji） */
+  .pb-btn svg,.pf-btn svg,.play-btn svg,.tile-play svg{
+    width:14px;height:14px;fill:currentColor;stroke:none;display:block;margin:0 auto}
+  .pf-btn{display:flex;align-items:center;justify-content:center}
+  .pb-btn{display:flex;align-items:center;justify-content:center}

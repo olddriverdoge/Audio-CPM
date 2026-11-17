@@ -122,6 +122,26 @@ const TaskRunner = (() => {
     const cb = document.getElementById('cancel-btn');
     if (cb) cb.classList.toggle('hidden', !on);
   }
+  async function previewNames() {
+    if (!App.path) { Utils.toast('请先选择目录'); return; }
+    const pattern = document.getElementById('name-pattern').value;
+    if (typeof App.openMod === 'function') App.openMod('log');
+    lg('info', '重命名预览（不改文件）：' + (pattern || '默认格式'));
+    try {
+      const r = await Api.renamePreview({path: App.path, name_pattern: pattern,
+                                          only_files: App.selection(), limit: 30});
+      if (!r || !r.total) { lg('warn', '当前目录没有可重命名的音频文件'); return; }
+      lg('info', '共 ' + r.total + ' 个，预览前 ' + r.shown + ' 个：');
+      (r.items || []).forEach(it => {
+        if (it.error) lg('err', it.file + ' — ' + it.error);
+        else if (it.new === it.file) lg('info', it.file + '（不变）');
+        else lg('ok', it.file + '  →  ' + it.new);
+      });
+    } catch (e) {
+      lg('err', '预览失败: ' + e.message);
+    }
+  }
+
   async function cancel() {
     if (!taskId) return;
     const cb = document.getElementById('cancel-btn');
@@ -131,7 +151,7 @@ const TaskRunner = (() => {
       lg('warn', '已请求取消任务…');
     } catch (e) {
       lg('err', '取消失败: ' + e.message);
-      if (cb) { cb.disabled = false; cb.textContent = '✕ 取消'; }
+      if (cb) { cb.disabled = false; cb.textContent = '取消'; }
     }
   }
   async function checkUnfinished() {
@@ -165,7 +185,7 @@ const TaskRunner = (() => {
     if (evtSource) { evtSource.close(); evtSource = null; }
     setRunning(false);
     const cb = document.getElementById('cancel-btn');
-    if (cb) { cb.disabled = false; cb.textContent = '✕ 取消'; }
+    if (cb) { cb.disabled = false; cb.textContent = '取消'; }
     const bar = document.getElementById('progress-bar');
     bar.classList.remove('indeterminate');
     document.getElementById('progress-status').textContent = '已取消';
@@ -224,7 +244,7 @@ const TaskRunner = (() => {
     if (evtSource) { evtSource.close(); evtSource = null; }
     setRunning(false);
     const cb = document.getElementById('cancel-btn');
-    if (cb) { cb.disabled = false; cb.textContent = '✕ 取消'; }
+    if (cb) { cb.disabled = false; cb.textContent = '取消'; }
     const bar = document.getElementById('progress-bar');
     bar.classList.remove('indeterminate');
     bar.style.width = '100%';
@@ -252,6 +272,6 @@ const TaskRunner = (() => {
     checkUnfinished();
   }
 
-  return {init, syncUI, loadPresets, applyPreset, saveAsPreset, deletePreset, start,
+  return {init, syncUI, loadPresets, applyPreset, saveAsPreset, deletePreset, start, previewNames,
           currentTask, collectConfig, checkUnfinished};
 })();

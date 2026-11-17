@@ -34,7 +34,8 @@ const Player = (() => {
     t = Math.floor(t);
     return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0');
   }
-  function setToggle(playing) { btnToggle.textContent = playing ? '⏸' : '▶'; }
+  const ICONS = {'play': '<svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="6,3 20,12 6,21"/></svg>', 'pause': '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>', 'stop': '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14"/></svg>', 'prev': '<svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="19,4 9,12 19,20"/><rect x="4" y="4" width="3" height="16"/></svg>', 'next': '<svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="5,4 15,12 5,20"/><rect x="17" y="4" width="3" height="16"/></svg>'};
+  function setToggle(playing) { btnToggle.innerHTML = playing ? ICONS.pause : ICONS.play; }
   function hifiAvailable() {
     if (window.__ac2HifiBroken) return false;   // 本会话已确认 HiFi 起不来，别再反复失败
     try {
@@ -119,7 +120,7 @@ const Player = (() => {
       const state = active ? 'on' : 'off';
       if (b.dataset.state === state) return;
       b.dataset.state = state;
-      b.textContent = active ? '⏸' : '▶';
+      b.innerHTML = active ? ICONS.pause : ICONS.play;
       b.title = active ? '暂停' : '播放';
     });
   }

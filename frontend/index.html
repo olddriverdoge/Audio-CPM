@@ -133,6 +133,7 @@
             <label>命名格式</label>
             <input type="text" id="name-pattern" class="path"
                    value="{album_artist} - {title} - {composer} - {album}">
+            <button class="small" id="btn-preview-name" type="button" title="不修改文件，只把预览结果输出到日志">预览</button>
           </div>
           <div class="row">
             <label style="font-size:11.5px">变量</label>
@@ -164,7 +165,7 @@
       <div class="task-foot">
         <div class="row" style="margin:0">
           <button class="primary" id="start-btn" style="min-width:116px">▶ 开始执行</button>
-          <button class="small danger hidden" id="cancel-btn" title="取消当前任务">✕ 取消</button>
+          <button class="small hidden" id="cancel-btn" title="取消当前任务">取消</button>
           <span class="status" id="task-status"></span>
           <span class="spacer"></span>
           <span class="status" id="progress-status">就绪</span>
@@ -220,7 +221,7 @@
   <div class="pb-cover" id="pb-cover" title="暂无封面">
     <span class="ph">♪</span>
   </div>
-  <button type="button" class="pb-btn" id="pb-toggle" title="播放 / 暂停">▶</button>
+  <button type="button" class="pb-btn" id="pb-toggle" title="播放 / 暂停"><svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="6,3 20,12 6,21"/></svg></button>
   <div class="pb-main">
     <div class="pb-title" id="pb-title">未在播放</div>
     <div class="pb-meta" id="pb-meta"></div>
@@ -275,10 +276,10 @@
       <span class="pf-time" id="pf-dur">0:00</span>
     </div>
     <div class="pf-transport">
-      <button type="button" class="pf-btn" id="pf-prev" title="上一首">⏮</button>
-      <button type="button" class="pf-btn pf-main" id="pf-play" title="播放 / 暂停">▶</button>
-      <button type="button" class="pf-btn" id="pf-next" title="下一首">⏭</button>
-      <button type="button" class="pf-btn" id="pf-stop" title="停止">⏹</button>
+      <button type="button" class="pf-btn" id="pf-prev" title="上一首"><svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="19,4 9,12 19,20"/><rect x="4" y="4" width="3" height="16"/></svg></button>
+      <button type="button" class="pf-btn pf-main" id="pf-play" title="播放 / 暂停"><svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="6,3 20,12 6,21"/></svg></button>
+      <button type="button" class="pf-btn" id="pf-next" title="下一首"><svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="5,4 15,12 5,20"/><rect x="17" y="4" width="3" height="16"/></svg></button>
+      <button type="button" class="pf-btn" id="pf-stop" title="停止"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14"/></svg></button>
       <button type="button" class="pf-btn pf-mode" id="pf-mode" title="播放模式：顺序 / 列表循环 / 单曲循环 / 随机">顺序</button>
     </div>
     <div class="pf-volrow">

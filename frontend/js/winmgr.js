@@ -29,10 +29,12 @@ const WinMgr = (() => {
 
   function clampRect(r, minW, minH) {
     const b = bounds();
-    const maxW = Math.max(minW, b.right - b.left);
-    const maxH = Math.max(minH, b.bottom - b.top);
-    r.w = Math.max(minW, Math.min(r.w || maxW, maxW));
-    r.h = Math.max(minH, Math.min(r.h || maxH, maxH));
+    const maxW = Math.max(80, b.right - b.left);
+    const maxH = Math.max(80, b.bottom - b.top);
+    // 横竖屏切换后可用区域可能比窗口最小尺寸还小：这时优先压缩到可视范围
+    const fw = Math.min(minW, maxW), fh = Math.min(minH, maxH);
+    r.w = Math.max(fw, Math.min(r.w || maxW, maxW));
+    r.h = Math.max(fh, Math.min(r.h || maxH, maxH));
     r.x = Math.max(b.left, Math.min(r.x, b.right - r.w));
     r.y = Math.max(b.top, Math.min(r.y, b.bottom - r.h));
     return r;
@@ -100,6 +102,35 @@ const WinMgr = (() => {
     function refresh() {
       if (win.classList.contains('hidden')) return;
       apply();
+    }
+
+    /* 转屏：按当前真实尺寸重新压缩进可视区（不依赖上一方向存下来的几何） */
+    function fit() {
+      if (win.classList.contains('hidden')) return;
+      const b = bounds();
+      const maxW = Math.max(80, b.right - b.left);
+      const maxH = Math.max(80, b.bottom - b.top);
+      if (contentSized) {
+        const w = Math.min(win.offsetWidth || maxW, maxW);
+        const h = Math.min(win.offsetHeight || maxH, maxH);
+        win.style.maxWidth = maxW + 'px';
+        win.style.maxHeight = maxH + 'px';
+        rect = rect || {x: b.left, y: b.top, w: w, h: h};
+        rect.w = w; rect.h = h;
+        rect.x = Math.max(b.left, Math.min(rect.x, b.right - w));
+        rect.y = Math.max(b.top, Math.min(rect.y, b.bottom - h));
+        win.style.left = Math.round(rect.x) + 'px';
+        win.style.top = Math.round(rect.y) + 'px';
+      } else {
+        const cur = measure(win);
+        rect = clampRect({
+          x: (rect || cur).x, y: (rect || cur).y,
+          w: Math.min(cur.w || (rect && rect.w) || maxW, maxW),
+          h: Math.min(cur.h || (rect && rect.h) || maxH, maxH)
+        }, minW, minH);
+        setRect(win, rect);
+      }
+      persist();
     }
 
     /* 点击即置顶 */
@@ -242,6 +273,7 @@ const WinMgr = (() => {
     const ctl = {
       apply,
       refresh,
+      fit,
       raise: () => raise(win),
       get rect() { return rect; }
     };
@@ -250,11 +282,17 @@ const WinMgr = (() => {
   }
 
   /* 播放条出现/消失、转屏：重算并夹住所有已展开窗口 */
-  function reclampAll() {
-    regs.forEach(r => { try { r.refresh(); } catch (_) {} });
+  function reclampAll(force) {
+    regs.forEach(r => { try { (force && r.fit) ? r.fit() : r.refresh(); } catch (_) {} });
   }
-  window.addEventListener('resize', () => setTimeout(reclampAll, 60));
-  window.addEventListener('orientationchange', () => setTimeout(reclampAll, 120));
+  /* 转屏：立即 + 120ms + 350ms 三次，避开 WebView 视口尺寸滞后的窗口期 */
+  function onRotate() { reclampAll(true); setTimeout(() => reclampAll(true), 120); setTimeout(() => reclampAll(true), 350); }
+  window.addEventListener('resize', onRotate);
+  window.addEventListener('orientationchange', onRotate);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', onRotate);
+  if (window.screen && screen.orientation && screen.orientation.addEventListener) {
+    screen.orientation.addEventListener('change', onRotate);
+  }
   document.addEventListener('DOMContentLoaded', () => {
     const pb = document.getElementById('player-bar');
     if (pb) new MutationObserver(() => reclampAll()).observe(pb, {attributes: true, attributeFilter: ['class']});
