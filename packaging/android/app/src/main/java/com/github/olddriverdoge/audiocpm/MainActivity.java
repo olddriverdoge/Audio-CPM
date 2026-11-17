@@ -225,11 +225,19 @@ public class MainActivity extends Activity {
     private void pushInsetsToWeb(int top, int bottom, int left, int right) {
         insetTop = top; insetBottom = bottom; insetLeft = left; insetRight = right;
         if (webView == null) return;
+        /*
+         * insets 是物理像素，CSS 是 dp：必须除以 density 再注入，
+         * 否则在 3x 屏上状态栏留白会是应该的 3 倍（看起来"太宽、很丑"）。
+         */
+        float density = getResources().getDisplayMetrics().density;
+        if (density <= 0) density = 1f;
+        int topDp = Math.round(top / density), bottomDp = Math.round(bottom / density);
+        int leftDp = Math.round(left / density), rightDp = Math.round(right / density);
         String js = "try{var d=document.documentElement.style;"
-                + "d.setProperty('--sat','" + top + "px');"
-                + "d.setProperty('--sab','" + bottom + "px');"
-                + "d.setProperty('--sal','" + left + "px');"
-                + "d.setProperty('--sar','" + right + "px');"
+                + "d.setProperty('--sat','" + topDp + "px');"
+                + "d.setProperty('--sab','" + bottomDp + "px');"
+                + "d.setProperty('--sal','" + leftDp + "px');"
+                + "d.setProperty('--sar','" + rightDp + "px');"
                 + "}catch(e){}";
         webView.evaluateJavascript(js, null);
     }

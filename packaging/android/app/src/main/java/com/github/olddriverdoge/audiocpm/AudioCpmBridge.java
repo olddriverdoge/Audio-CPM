@@ -281,7 +281,14 @@ public class AudioCpmBridge {
         return e > j ? json.substring(j, e) : null;
     }
 
+    /* 90Hz 取数下，帧序号没变就别重复拼 4KB JSON（这是切歌瞬间主线程被 JS 桥拖住的主因之一） */
+    private static volatile String cachedSpectrum = null;
+    private static volatile int cachedSpectrumSeq = -1;
+
     public static String spectrum() {
+        int sq = SpectrumProcessor.getSeq();
+        String c = cachedSpectrum;
+        if (c != null && sq == cachedSpectrumSeq) return c;
         try {
             float[] b = SpectrumProcessor.getBands();
             float[] lv = SpectrumProcessor.getLevels();
@@ -302,7 +309,9 @@ public class AudioCpmBridge {
             sb.append("],\"spec\":[");
             appendFloats(sb, sp);
             sb.append("]}");
-            return sb.toString();
+            cachedSpectrum = sb.toString();
+            cachedSpectrumSeq = sq;
+            return cachedSpectrum;
         } catch (Throwable t) {
             return "{\"ok\":false,\"error\":\"" + esc(String.valueOf(t)) + "\"}";
         }

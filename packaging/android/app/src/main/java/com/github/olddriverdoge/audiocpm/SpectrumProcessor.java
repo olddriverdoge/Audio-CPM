@@ -40,6 +40,19 @@ public class SpectrumProcessor extends BaseAudioProcessor {
     /* 显示参数（前端调节条通过 AudioCpmBridge 下发） */
     private static volatile float dbFloor = -80.0f;   // Y 轴下限：-60 / -80 / -100
     private static volatile float releaseK = 0.12f;   // 回弹（下降）系数：快 .20 / 中 .12 / 慢 .07
+    /** 帧序号：每算出一帧就 +1，桥层用它做 JSON 缓存，避免 90Hz 下重复字符串化。 */
+    private static volatile int seq = 0;
+    public static int getSeq() { return seq; }
+    private static void bump() { seq++; }
+    /** 切歌/停用时把谱系清零，避免把上一首的残影继续画出来。 */
+    public static void clear() {
+        bands = new float[96];
+        levels = new float[96];
+        bars = new float[barCount];
+        linBars = new float[barCount];
+        spec = new float[specCount];
+        bump();
+    }
 
     private final float[] window = new float[FFT_N];
     private final float[] re = new float[FFT_N];
@@ -60,7 +73,12 @@ public class SpectrumProcessor extends BaseAudioProcessor {
         }
     }
 
-    public static void setEnabled(boolean b) { enabled = b; }
+    public static void setEnabled(boolean b) {
+        if (enabled != b) { enabled = b; bump(); }
+        if (!b) { bands = new float[96]; levels = new float[96];
+                  bars = new float[barCount]; linBars = new float[barCount];
+                  spec = new float[specCount]; }
+    }
     public static boolean isEnabled() { return enabled; }
     public static float[] getBands() { return bands.clone(); }
     public static float[] getLevels() { return levels.clone(); }
@@ -98,6 +116,7 @@ public class SpectrumProcessor extends BaseAudioProcessor {
         channels = Math.max(1, inputFormat.channelCount);
         encoding = inputFormat.encoding;
         fill = 0;
+        bump();
         return inputFormat;
     }
 
@@ -109,6 +128,10 @@ public class SpectrumProcessor extends BaseAudioProcessor {
     @Override
     protected void onReset() {
         fill = 0;
+        barPrev = new float[barCount];
+        linPrev = new float[barCount];
+        specPrev = new float[specCount];
+        bump();
         bands = new float[96];
         levels = new float[96];
         bars = new float[barCount];
@@ -302,6 +325,7 @@ public class SpectrumProcessor extends BaseAudioProcessor {
         } else if (spec.length != 0) {
             spec = new float[0];
         }
+        bump();     // 一帧算完，通知桥层可以重新序列化
     }
 
     private static void fft(float[] re, float[] im) {

@@ -1,4 +1,5 @@
   :root{
+    --sat:0px; --sab:0px;
     --bg:#0f1419; --panel:#1a2028; --panel2:#222a34; --border:#2d3748;
     --text:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8; --ok:#22c55e;
     --err:#ef4444; --warn:#f59e0b; --hl:#1e3a52;

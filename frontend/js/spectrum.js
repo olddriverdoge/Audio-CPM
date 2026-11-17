@@ -37,6 +37,10 @@ const Spectrum = (() => {
   let paramsSig = '';                    // 已下发的参数签名（避免每帧 JSON + 桥调用）
   let wfImg = null, wfImgKey = '';       // 复用 ImageData
   let wfRowBin = null, wfRowKey = '';     // 频率→行号映射缓存（避免每帧 BH 次 pow/log）
+  /* 切歌窗口：先把整条数据链停掉（前端取数 + 原生 FFT），等新曲真正开始播放再重新接上。
+     以前是切歌时立刻重启取数，恰好撞上 ExoPlayer 换源/重建 sink 的主线程重活，
+     90Hz 的 JS 桥调用全挤在那一帧，表现就是"整个 app 卡死 + 频谱错乱"。 */
+  let switchTok = 0, switchTimer = 0, suspended = false;
 
   function setState(t) { if (stateEl) stateEl.textContent = t || ''; }
 
@@ -450,6 +454,7 @@ const Spectrum = (() => {
 
   function draw() {
     raf = 0;
+    if (suspended) return;               // 切歌窗口不重绘（等新数据）
     if (!open || !g) return;
     try {
     drawFrame();
@@ -550,8 +555,10 @@ const Spectrum = (() => {
     }
   }
 
-  /* 切歌：底层 ExoPlayer/SpectrumProcessor 重建，旧的谱系作废。
-     清空历史与瀑布后重新下发参数、重启取数，避免"显示错乱，收起再开才正常" */
+  /* 切歌：底层换源，旧谱系整体作废。
+     ① 立刻清空前端所有历史/峰值/瀑布并停掉 rAF + 取数；
+     ② 同时关掉原生 FFT（Api.playbackSpectrum(false)），切歌窗口里不再抢主线程；
+     ③ 等新曲真正在播再重新下发参数并重启数据链（收起状态则完全不碰）。 */
   function onTrackChange() {
     hist = [];
     dataSeq = 0; wfSeq = -1; lastDataAt = performance.now();
@@ -566,13 +573,53 @@ const Spectrum = (() => {
     }
     try { if (wfCtx) { wfCtx.fillStyle = '#000'; wfCtx.fillRect(0, 0, wfW, wfH); } } catch (_) {}
     paramsSig = '';                      // 新 processor 是默认参数，必须重新下发
-    pushParams();
+    if (!open) return;                   // 收起时不重启任何计算
+    suspendForSwitch();
+  }
+
+  function paintSwitchHint() {
+    if (!g) return;
+    try {
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.fillStyle = '#0f1419';
+      g.fillRect(0, 0, canvas.width, canvas.height);
+      g.fillStyle = 'rgba(148,163,184,.75)';
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.font = Math.round(12 * DPR) + 'px ui-monospace, Menlo, monospace';
+      g.fillText('切换中…', canvas.width / 2, canvas.height / 2);
+    } catch (_) {}
+  }
+
+  function suspendForSwitch() {
+    ++switchTok;
+    suspended = true;
+    stopPcmPoll();                        // 前端取数链停掉（pcmTickId 递增）
+    stop();                               // rAF 也停掉，切歌时不重绘
+    try { Api.playbackSpectrum(false); } catch (_) {}   // 原生 FFT 立刻停算
+    setState('切换中…');
+    paintSwitchHint();
+    scheduleResume(switchTok, 700, 0);
+  }
+
+  function scheduleResume(tok, ms, tries) {
+    if (switchTimer) clearTimeout(switchTimer);
+    switchTimer = setTimeout(() => {
+      switchTimer = 0;
+      if (tok !== switchTok || !open || !suspended) return;
+      const playing = (typeof Player.hifiPlaying === 'function') ? !!Player.hifiPlaying() : true;
+      if (!playing && tries < 10) { scheduleResume(tok, 300, tries + 1); return; }
+      resumeStream();
+    }, ms);
+  }
+
+  function resumeStream() {
     if (!open) return;
-    stopped = false; pausedAt = 0;
-    stopPcmPoll();                       // 老链退出（pcmTickId 递增）
+    suspended = false; stopped = false; pausedAt = 0;
+    paramsSig = '';
+    pushParams();
     try { Api.playbackSpectrum(true); } catch (_) {}
     startPcmPoll();
-    if (!raf) start();
+    start();
   }
 
   function start() {
@@ -820,6 +867,8 @@ const Spectrum = (() => {
     if (open) {
       applySize(); applyPos(); if (winCtl) winCtl.apply(); layoutCanvas(); paintTrack(); paintTabs(); paintScene();
       stopped = false; pausedAt = 0;
+      suspended = false; switchTok++;    // 手动展开＝立刻恢复，取消切歌等待
+      paramsSig = '';
       if (core && core.native) startPcmPoll();
       start();
     } else {
@@ -925,5 +974,6 @@ const Spectrum = (() => {
     });
   }
 
-  return {init, toggle, setMode, onTrackChange, get open() { return open; }, get mode() { return mode; }};
+  return {init, toggle, setMode, onTrackChange, resumeStream,
+          get open() { return open; }, get mode() { return mode; }};
 })();

@@ -170,6 +170,6 @@
 /* ---------- 边缘到边缘（Android 15 强制 edge-to-edge）----------
    原生只给底部导航栏留白；顶部 inset 由 Java 注入成 --sat，
    由 header 自己补 padding，让 header 背景铺满状态栏区域（而不是露一条黑边）。 */
-body.app-mode .hdr { padding-top: calc(5px + var(--sat)); }
-body.app-mode .sheet-overlay { padding-top: var(--sat); }
-body.app-mode #menu-overlay { padding-top: var(--sat); }
+body.app-mode .hdr { padding-top: calc(5px + var(--sat, 0px)); }
+body.app-mode .sheet-overlay { padding-top: var(--sat, 0px); }
+body.app-mode #menu-overlay { padding-top: var(--sat, 0px); }

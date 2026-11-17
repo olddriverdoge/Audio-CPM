@@ -205,6 +205,9 @@ function createMetaFloat() {
   const view = createMetaView(document.getElementById('meta3'), {editable: true});
   if (!box || !fab) return {load: () => {}, setEmpty: () => {}};
   let open = false;
+  /* 与频谱/声谱浮窗完全一致的开关语义：展开后按钮隐藏，收起用浮窗自己的"—"，
+     状态以 DOM 的 hidden 为准，避免重复 init 或拖动拦截 click 造成"点了不收"的死状态。 */
+  function shown() { return !box.classList.contains('hidden'); }
 
   function clampX(x) {
     const w = box.offsetWidth || 320;
@@ -244,18 +247,21 @@ function createMetaFloat() {
     Store.set(K.metaPos, {x: Math.round(r.left), y: Math.round(r.top)});
   }
 
-  function toggle() {
-    open = !open;
+  function toggle(force) {
+    open = (typeof force === 'boolean') ? force : !shown();
     if (open) {
       applySize(); applyPos();
       box.classList.remove('hidden');
+      if (fab) fab.style.display = 'none';     // 展开时按钮收起，和频谱/声谱一致
     } else {
+      savePos();                              // 先量再藏（hidden 之后尺寸为 0）
       box.classList.add('hidden');
+      if (fab) fab.style.display = '';
     }
     if (fab) fab.classList.toggle('on', open);
   }
-  if (fab) fab.addEventListener('click', toggle);
-  if (minBtn) minBtn.addEventListener('click', () => { if (open) toggle(); });
+  if (fab) fab.addEventListener('click', () => toggle());
+  if (minBtn) minBtn.addEventListener('click', () => toggle(false));
 
   /* 拖动（头部） */
   if (head) {

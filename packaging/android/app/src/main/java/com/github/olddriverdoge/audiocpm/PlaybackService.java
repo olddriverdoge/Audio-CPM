@@ -88,6 +88,13 @@ public class PlaybackService extends MediaSessionService {
             public void onIsPlayingChanged(boolean isPlaying) {
                 Log.i(TAG, "isPlaying -> " + isPlaying);
             }
+
+            @Override
+            public void onMediaItemTransition(MediaItem mediaItem, int reason) {
+                // 换曲：把谱系清零，前端切歌窗口里取到的是干净的 0，不会画出上一首的残影
+                SpectrumProcessor.clear();
+                Log.i(TAG, "media item transition reason=" + reason);
+            }
         });
         player.setSkipSilenceEnabled(false);
 
