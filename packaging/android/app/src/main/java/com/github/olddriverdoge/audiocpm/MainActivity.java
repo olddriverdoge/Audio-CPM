@@ -103,6 +103,11 @@ public class MainActivity extends Activity {
             public String spectrum() {
                 try { return Ac2Bridge.spectrum(); } catch (Throwable t) { return "{}"; }
             }
+
+            @android.webkit.JavascriptInterface
+            public String setParams(String json) {
+                try { return Ac2Bridge.setParams(json); } catch (Throwable t) { return "{}"; }
+            }
         }, "Ac2Native");
         WebView.setWebContentsDebuggingEnabled(true);
         root.addView(webView, new FrameLayout.LayoutParams(

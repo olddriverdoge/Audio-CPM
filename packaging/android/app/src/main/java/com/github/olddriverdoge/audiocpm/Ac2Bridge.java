@@ -241,6 +241,43 @@ public class Ac2Bridge {
 
     public static void setSpectrumEnabled(boolean enabled) { SpectrumProcessor.setEnabled(enabled); }
 
+    /**
+     * 频谱显示参数：{"floorDb":-80,"release":0.12,"bars":48}
+     * 只做极简解析（三个固定键），避免引入 JSON 依赖。
+     */
+    public static String setParams(String json) {
+        try {
+            if (json != null) {
+                float floor = -80f, rel = 0.12f;
+                int bars = SpectrumProcessor.getBarCount();
+                String f = num(json, "floorDb");
+                if (f != null) floor = Float.parseFloat(f);
+                String r = num(json, "release");
+                if (r != null) rel = Float.parseFloat(r);
+                String b = num(json, "bars");
+                if (b != null) bars = (int) Float.parseFloat(b);
+                SpectrumProcessor.setParams(floor, rel, bars);
+            }
+            return "{\"ok\":true}";
+        } catch (Throwable t) {
+            return "{\"ok\":false,\"error\":\"" + esc(String.valueOf(t)) + "\"}";
+        }
+    }
+
+    private static String num(String json, String key) {
+        String k = "\"" + key + "\":";
+        int i = json.indexOf(k);
+        if (i < 0) return null;
+        int j = i + k.length();
+        int e = j;
+        while (e < json.length()) {
+            char c = json.charAt(e);
+            if ((c >= '0' && c <= '9') || c == '-' || c == '.' || c == '+' || c == 'e' || c == 'E') e++;
+            else break;
+        }
+        return e > j ? json.substring(j, e) : null;
+    }
+
     public static String spectrum() {
         try {
             float[] b = SpectrumProcessor.getBands();

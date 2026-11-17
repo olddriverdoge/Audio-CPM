@@ -25,15 +25,18 @@ public class SpectrumProcessor extends BaseAudioProcessor {
      * 频谱条（48 个对数频段，等倍频程划分，取频段内峰值，快起慢落）。
      * 不是把 96 个线性 bin 做移动平均——那样低频被压成 1~2 根柱子，跟听到的声音对不上。
      */
-    private static final int BARS = 48;
+    private static volatile int barCount = 48;      // 柱数（48/64/96，可在调节条里切）
     private static final double BAR_F0 = 40.0, BAR_F1 = 20000.0;
-    private static volatile float[] bars = new float[BARS];
+    private static volatile float[] bars = new float[barCount];
     /** 线性频段版（X 轴切线性时用），频段宽度按 Hz 等分。 */
-    private static volatile float[] linBars = new float[BARS];
+    private static volatile float[] linBars = new float[barCount];
     private static volatile int sampleRate = 48000;
     private static volatile boolean enabled = false;
     private static volatile int encoding = C.ENCODING_PCM_16BIT;
     private static volatile int channels = 2;
+    /* 显示参数（前端调节条通过 Ac2Bridge 下发） */
+    private static volatile float dbFloor = -80.0f;   // Y 轴下限：-60 / -80 / -100
+    private static volatile float releaseK = 0.12f;   // 回弹（下降）系数：快 .20 / 中 .12 / 慢 .07
 
     private final float[] window = new float[FFT_N];
     private final float[] re = new float[FFT_N];
@@ -41,8 +44,8 @@ public class SpectrumProcessor extends BaseAudioProcessor {
     private final float[] mono = new float[FFT_N];
     private final float[] prev = new float[96];
     private final float[] prevLevels = new float[96];
-    private final float[] barPrev = new float[BARS];
-    private final float[] linPrev = new float[BARS];
+    private float[] barPrev = new float[barCount];
+    private float[] linPrev = new float[barCount];
     private int fill = 0;
 
     public SpectrumProcessor() {
@@ -57,8 +60,21 @@ public class SpectrumProcessor extends BaseAudioProcessor {
     public static boolean isEnabled() { return enabled; }
     public static float[] getBands() { return bands.clone(); }
     public static float[] getLevels() { return levels.clone(); }
-    public static float[] getBars() { return bars.clone(); }
-    public static float[] getLinBars() { return linBars.clone(); }
+    public static float[] getBars() {
+        if (bars.length != barCount) bars = new float[barCount];
+        return bars.clone();
+    }
+    public static float[] getLinBars() {
+        if (linBars.length != barCount) linBars = new float[barCount];
+        return linBars.clone();
+    }
+    /** 调节条下发：dB 下限、回弹系数、柱数。 */
+    public static void setParams(float floorDb, float release, int bars) {
+        dbFloor = Math.max(-120f, Math.min(-20f, floorDb));
+        releaseK = Math.max(0.04f, Math.min(0.5f, release));
+        barCount = Math.max(32, Math.min(96, bars));
+    }
+    public static int getBarCount() { return barCount; }
     public static int getSampleRate() { return sampleRate; }
     /** 排查用：当前输入格式。 */
     public static String describe() {
@@ -85,8 +101,10 @@ public class SpectrumProcessor extends BaseAudioProcessor {
         fill = 0;
         bands = new float[96];
         levels = new float[96];
-        bars = new float[BARS];
-        linBars = new float[BARS];
+        bars = new float[barCount];
+        linBars = new float[barCount];
+        barPrev = new float[barCount];
+        linPrev = new float[barCount];
     }
 
     @Override
@@ -196,10 +214,12 @@ public class SpectrumProcessor extends BaseAudioProcessor {
         final double logF0 = Math.log(BAR_F0);
         final double logSpan = Math.log(BAR_F1) - logF0;
         final double cg = 0.42 * FFT_N;          // Blackman 相干增益
-        float[] outBars = new float[BARS];
-        for (int b = 0; b < BARS; b++) {
-            double f0 = Math.exp(logF0 + logSpan * b / BARS);
-            double f1 = Math.exp(logF0 + logSpan * (b + 1) / BARS);
+        final int n = barCount;
+        if (barPrev.length != n) barPrev = new float[n];
+        float[] outBars = new float[n];
+        for (int b = 0; b < n; b++) {
+            double f0 = Math.exp(logF0 + logSpan * b / n);
+            double f1 = Math.exp(logF0 + logSpan * (b + 1) / n);
             int k0 = Math.max(1, (int) Math.floor(f0 / binHz));
             int k1 = Math.max(k0, (int) Math.ceil(f1 / binHz));
             k1 = Math.min(FFT_N / 2 - 1, k1);
@@ -213,20 +233,21 @@ public class SpectrumProcessor extends BaseAudioProcessor {
             double db = 20.0 * Math.log10(Math.max(amp, 1e-7));
             // 显示范围 0 ~ -80dB（行业常见刻度）：0dB 满幅、-80dB 静音，
             // 不再用 -30dB 当下限（那会把正常的强信号削平）。
-            float v = (float) Math.max(0.0, Math.min(1.0, (db + 80.0) / 80.0));
-            // 快起慢落（约 3:1），上升跟手、下降自然，不会像移动平均那样糊成一片
+            float v = (float) Math.max(0.0, Math.min(1.0, (db - dbFloor) / (-dbFloor)));
+            // 快起慢落（约 3:1），上升跟手、下降自然
             if (v > barPrev[b]) barPrev[b] += (v - barPrev[b]) * 0.55f;
-            else barPrev[b] += (v - barPrev[b]) * 0.12f;
+            else barPrev[b] += (v - barPrev[b]) * releaseK;
             outBars[b] = barPrev[b];
         }
         bars = outBars;
 
         // ---- 同一份 FFT 的线性分档（Hz 等宽），供 X 轴切“线性”时使用 ----
-        float[] outLin = new float[BARS];
+        if (linPrev.length != n) linPrev = new float[n];
+        float[] outLin = new float[n];
         double spanHz = BAR_F1 - BAR_F0;
-        for (int b = 0; b < BARS; b++) {
-            double f0 = BAR_F0 + spanHz * b / BARS;
-            double f1 = BAR_F0 + spanHz * (b + 1) / BARS;
+        for (int b = 0; b < n; b++) {
+            double f0 = BAR_F0 + spanHz * b / n;
+            double f1 = BAR_F0 + spanHz * (b + 1) / n;
             int k0 = Math.max(1, (int) Math.floor(f0 / binHz));
             int k1 = Math.max(k0, (int) Math.ceil(f1 / binHz));
             k1 = Math.min(FFT_N / 2 - 1, k1);
@@ -237,9 +258,9 @@ public class SpectrumProcessor extends BaseAudioProcessor {
             }
             double amp = 2.0 * peak / cg;
             double db = 20.0 * Math.log10(Math.max(amp, 1e-7));
-            float v = (float) Math.max(0.0, Math.min(1.0, (db + 80.0) / 80.0));
+            float v = (float) Math.max(0.0, Math.min(1.0, (db - dbFloor) / (-dbFloor)));
             if (v > linPrev[b]) linPrev[b] += (v - linPrev[b]) * 0.55f;
-            else linPrev[b] += (v - linPrev[b]) * 0.12f;
+            else linPrev[b] += (v - linPrev[b]) * releaseK;
             outLin[b] = linPrev[b];
         }
         linBars = outLin;

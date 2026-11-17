@@ -114,13 +114,21 @@
   .sf-tab:hover{color:var(--text)}
   .sf-tab.active{color:var(--accent);border-color:var(--border);background:var(--panel2)}
   /* 频谱延迟（蓝牙耳机对齐用）：0~500ms */
-  .sf-sub{display:none;align-items:center;gap:6px;padding:0 8px 4px;font-size:10px;
-    color:var(--muted);flex:none}
-  /* 默认收起：长按模块才展开延迟调节 */
-  .sf-sub.show{display:flex;justify-content:flex-start}
-  .sf-x{flex:none;padding:2px 7px;font-size:10px;line-height:1.4;border-radius:6px;
-    border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08);
-    color:var(--fg);cursor:pointer;white-space:nowrap}
-  .sf-x:active{background:rgba(255,255,255,.18)}
-  .sf-sub input[type=range]{flex:1;min-width:0;height:14px;accent-color:var(--accent)}
-  .sf-sub span{min-width:38px;text-align:right;font-variant-numeric:tabular-nums}
+  /* 调节区：默认收起，长按展开；竖向靠左贴边，按场景只显示对应项 */
+  .sf-sub{display:none;position:absolute;left:0;top:31px;bottom:6px;z-index:6;
+    flex-direction:column;align-items:stretch;gap:4px;padding:6px 6px 8px;
+    width:132px;max-width:56%;overflow-y:auto;overflow-x:hidden;
+    background:rgba(10,14,20,.86);border:1px solid rgba(255,255,255,.12);
+    border-radius:8px;font-size:10px;color:var(--muted);
+    -webkit-overflow-scrolling:touch}
+  .sf-sub.show{display:flex}
+  .sf-line{display:flex;flex-direction:column;gap:2px;padding:2px 2px 4px}
+  .sf-line label{font-size:10px;color:var(--muted)}
+  .sf-line input[type=range]{width:100%;height:16px;accent-color:var(--accent)}
+  .sf-line span{text-align:right;font-variant-numeric:tabular-nums;color:var(--fg)}
+  .sf-grp{display:flex;flex-direction:column;gap:3px}
+  .sf-chip{display:block;width:100%;text-align:left;padding:3px 6px;font-size:10px;
+    line-height:1.5;border-radius:6px;border:1px solid rgba(255,255,255,.18);
+    background:rgba(255,255,255,.07);color:var(--fg);cursor:pointer;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis}
+  .sf-chip:active{background:rgba(255,255,255,.2)}
