@@ -141,7 +141,8 @@ const Spectrum = (() => {
     }
     return hist[0];
   }
-  let lastHeal = 0, badFrames = 0;
+  let lastHeal = 0, badFrames = 0, healLogAt = 0;
+  let seekGuardUntil = 0;              // 拖进度条后的保护期：期间不进 idle，避免长定位把 rAF 停掉卡在"缓冲中"
   /* 取数自救：只要"缓冲中"持续超过 1.5s，就重开原生开关 + 重建取数链。
      seek/切歌/息屏任何一条路径把链子弄停（原生 enabled 被关、rAF 链断、tick 换代），这里都能拉回来。 */
   function healStream(reason) {
@@ -152,7 +153,10 @@ const Spectrum = (() => {
     stopPcmPoll();
     startPcmPoll();
     if (!raf) start();
-    try { Utils.log('warn', '频谱取数停摆(' + (reason || '') + ')，已自动重连'); } catch (_) {}
+    if (now - healLogAt > 8000) {
+      healLogAt = now;
+      try { Utils.log('warn', '频谱取数停摆(' + (reason || '') + ')，已自动重连'); } catch (_) {}
+    }
   }
 
   let pcmTickId = 0;
@@ -170,7 +174,11 @@ const Spectrum = (() => {
         if (core && core.native) {
           try {
             const s = window.AudioCpmNative.spectrum();
-            if (s) { applySpectrum(JSON.parse(s)); badFrames = 0; }
+            if (s) {
+              const r = JSON.parse(s);
+              if (r && r.ok === false) { if (++badFrames > 20) { badFrames = 0; healStream('native-error'); } }
+              else { badFrames = 0; applySpectrum(r); }
+            }
           } catch (e) {
             if (++badFrames > 20) { badFrames = 0; healStream('bridge'); }   // 桥调用连续失败：重连
           }
@@ -495,7 +503,8 @@ const Spectrum = (() => {
     const paused = !core || (core.native ? !(Player.hifiPlaying && Player.hifiPlaying()) : Player.audio.paused);
     if (paused) {
       if (!pausedAt) pausedAt = performance.now();
-      if (cfg.stop > 0 && !stopped && performance.now() - pausedAt > cfg.stop * 1000) {
+      if (cfg.stop > 0 && !stopped && performance.now() > seekGuardUntil
+          && performance.now() - pausedAt > cfg.stop * 1000) {
         enterIdle();
         return;
       }
@@ -667,6 +676,7 @@ const Spectrum = (() => {
       if (playing) {
         clearInterval(idleTimer); idleTimer = 0;
         stopped = false; pausedAt = 0;
+        try { Api.playbackSpectrum(true); } catch (_) {}
         startPcmPoll();
         start();
       }
@@ -691,6 +701,7 @@ const Spectrum = (() => {
      以前走 suspendForSwitch 会因 3s 重试超时把频谱永久卡死。 */
   function onSeek() {
     if (!open) return;
+    seekGuardUntil = performance.now() + 12000;
     hist = []; peakVals = []; peakAt = [];
     wfRowKey = ''; wfImgKey = '';
     dataSeq = 0; wfSeq = -1;
