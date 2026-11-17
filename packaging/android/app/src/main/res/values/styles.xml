@@ -9,4 +9,5 @@
         <item name="android:windowLightNavigationBar">false</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
     </style>
+    <color name="ic_launcher_background">#FFFFFF</color>
 </resources>

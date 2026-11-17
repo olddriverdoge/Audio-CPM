@@ -25,6 +25,8 @@
     <application
         android:name=".AudioCpmApp"
         android:label="Audio-CPM"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true"
         android:extractNativeLibs="true"
         android:theme="@style/AudioCpmTheme">
