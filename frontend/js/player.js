@@ -140,7 +140,8 @@ const Player = (() => {
       const artist = String(t.artist || t.album_artist || '').trim();
       const composer = String(t.composer || '').trim();
       const album = String(t.album || '').trim();
-      curInfo = {title, artist: artist || composer, composer, album};
+      curInfo = {title, artist: artist || composer, composer, album,
+        audio: (d && d.audio) ? d.audio : null};
       if (titleEl) { titleEl.textContent = title; titleEl.title = path; }
       if (metaEl) {
         const sub = [artist || composer, album].filter(Boolean).join(' · ');

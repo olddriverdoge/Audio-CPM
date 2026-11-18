@@ -210,17 +210,22 @@ function createAudioPanel() {
       html += row('音源格式', fmtLine(src));
     } else if (src.sampleRate) {
       html += row('音源格式', fmtLine(src) + (info.sourceCodec ? ' · ' + info.sourceCodec : ''));
+      const wr = info.webSampleRate || devRate;
       html += row('实际输出', webMode
-        ? (playing ? '网页内播放（WebView / 系统混音）' : '尚未开始播放')
+        ? (playing ? '网页内播放（WebView / 系统混音' + (wr ? ' · ' + (wr / 1000).toFixed(1) + ' kHz' : '') + '）' : '尚未开始播放')
         : (playing ? '播放中，输出格式尚未就绪' : '尚未开始播放'));
     } else if (webMode) {
-      html += row('音源格式', '读取中 / 未知');
-      html += row('实际输出', playing ? '网页内播放（WebView / 系统混音，采样率由系统决定）' : '尚未开始播放');
+      html += row('音源格式', '读取中 / 未读取到');
+      const wr = info.webSampleRate || devRate;
+      html += row('实际输出', playing
+        ? ('网页内播放（WebView / 系统混音' + (wr ? ' · ' + (wr / 1000).toFixed(1) + ' kHz' : '，采样率由系统决定') + '）')
+        : '尚未开始播放');
     } else {
       html += row('实际输出', playing ? '播放中，未读到格式' : '尚未开始播放');
     }
     if (src.sampleRate && outputReady) html += row('音源格式', fmtLine(src) + (info.sourceCodec ? ' · ' + info.sourceCodec : ''));
     html += row('设备原生采样率', devRate ? (devRate / 1000).toFixed(1) + ' kHz' : '未知');
+    if (webMode && info.webSampleRate) html += row('WebAudio 采样率', (info.webSampleRate / 1000).toFixed(1) + ' kHz');
     if (info.framesPerBuffer) html += row('缓冲', info.framesPerBuffer + ' 帧 · 约 ' + (info.latencyMs || 0) + ' ms');
     if (outputReady) html += row('重采样', isResample ? '是（' + (f.sampleRate / 1000).toFixed(1) + ' → ' + (devRate / 1000).toFixed(1) + ' kHz）' : '否');
     html += row('输出方式', externalMode ? '外部播放器（目标 App）'
@@ -365,8 +370,29 @@ function createAudioPanel() {
     if (hifi) return;
     info.web = !!(typeof Player !== 'undefined' && Player.current);
     if (!info.web) return;
+    // WebAudio 的 AudioContext 采样率能给出 WebDAV 播放链实际使用的处理采样率；
+    // 没有频谱核时退回 AudioManager 的 primary output 采样率。
+    try {
+      const core = window.__ac2WebAudioCore;
+      if (core && core.ctx && core.ctx.sampleRate) info.webSampleRate = core.ctx.sampleRate;
+    } catch (_) {}
+    if (!info.webSampleRate) info.webSampleRate = info.deviceSampleRate || 0;
     const src = info.sourceFormat || {};
     if (src.sampleRate) return;
+    // 先吃播放器已经拿到的元数据，避免同一首曲子重复 probe；WebDAV 的 probe 失败时
+    // 仍能从 Player.meta.audio 显示音源格式。
+    try {
+      const a0 = (Player.meta && Player.meta.audio) || null;
+      if (a0 && a0.sample_rate) {
+        info.sourceFormat = {
+          sampleRate: Number(a0.sample_rate) || 0,
+          channels: Number(a0.channels) || 0,
+          encoding: encFromBits(Number(a0.bits_per_sample) || 0)
+        };
+        if (a0.codec_name) info.sourceCodec = String(a0.codec_name);
+        return;
+      }
+    } catch (_) {}
     const path = Player.current;
     if (!path) return;
     try {
