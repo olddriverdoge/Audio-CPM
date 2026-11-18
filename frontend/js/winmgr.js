@@ -26,6 +26,22 @@ const WinMgr = (() => {
     return CANVAS;
   }
 
+  /* 首次打开模块时的可视落位参考（之后位置由大画布坐标记忆） */
+  function viewportBounds() {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const bar = document.getElementById('modbar') || document.getElementById('scene-bar');
+    const hdr = document.getElementById('app-hdr');
+    const topEl = bar || hdr;
+    const top = (topEl ? Math.round(topEl.getBoundingClientRect().bottom) : 0) + GAP;
+    const pb = document.getElementById('player-bar');
+    let bottom = vh - 6;
+    if (pb && !pb.classList.contains('hidden')) {
+      const t = Math.round(pb.getBoundingClientRect().top);
+      if (t > top + 40) bottom = Math.min(bottom, t - GAP);
+    }
+    return {left: GAP, top, right: vw - GAP, bottom};
+  }
+
   function clampRect(r, minW, minH) {
     const b = bounds();
     const z = uiScale();
@@ -92,7 +108,12 @@ const WinMgr = (() => {
         rect = clampRect({...saved}, minW, minH);
       } else {
         const m = measure(win);
-        rect = clampRect(remeasure || m, minW, minH);
+        const vb = viewportBounds();
+        const r = remeasure || m;
+        // 首次打开时至少落在 header 下方；已有画布坐标在 saved 分支里保持自由。
+        r.x = Math.max(vb.left, r.x || vb.left);
+        r.y = Math.max(vb.top, r.y || vb.top);
+        rect = clampRect(r, minW, minH);
       }
       if (contentSized) {
         win.style.left = Math.round(rect.x) + 'px';
