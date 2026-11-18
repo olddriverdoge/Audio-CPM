@@ -20,6 +20,39 @@ function createAudioPanel() {
     return Api.audioFx(op, a || 0, b || 0).catch(() => ({ok: false}));
   }
 
+  function bindPlayCfg() {
+    const modeEl = document.getElementById('cfg-playmode');
+    const pkgEl = document.getElementById('cfg-player');
+    const actEl = document.getElementById('cfg-activity');
+    const hintEl = document.getElementById('cfg-hint');
+    const saveBtn = document.getElementById('af-cfg-save');
+    if (!modeEl || !pkgEl || !actEl) return;
+    function hint(msg) { if (hintEl) hintEl.textContent = msg || ''; }
+    function paint() {
+      modeEl.value = (Store.get(K.playMode, 'web') === 'system') ? 'system' : 'web';
+      const savedPkg = Store.get(K.playerPkg, null);
+      pkgEl.value = (savedPkg === null || savedPkg === undefined) ? 'com.maxmpz.audioplayer' : String(savedPkg || '');
+      actEl.value = String(Store.get(K.playerAct, '') || '');
+      hint(Store.get(K.playerAct, '') ? '当前使用 Activity 直连' : '');
+    }
+    function save() {
+      const mode = modeEl.value === 'system' ? 'system' : 'web';
+      const pkg = pkgEl.value.trim();
+      const act = actEl.value.trim();
+      if (pkg && !/^[A-Za-z0-9._]+$/.test(pkg)) { hint('包名只能包含字母、数字、点、下划线'); return; }
+      if (act && !/^[A-Za-z0-9._]+\/[A-Za-z0-9._$]+$/.test(act)) { hint('Activity 格式应为：包名/Activity'); return; }
+      Store.set(K.playMode, mode);
+      Store.set(K.playerPkg, pkg);
+      Store.set(K.playerAct, act);
+      hint(mode === 'system' ? ('已保存：系统播放器 ' + (act || pkg || '系统选择')) : '已保存：网页内播放');
+      Utils.toast(mode === 'web' ? '已切换为网页内播放' : '已切换为系统播放器');
+      Utils.log('info', '播放方式: ' + (mode === 'web' ? '网页内' : ('系统播放器 ' + (act || pkg || '系统选择'))));
+    }
+    if (saveBtn) saveBtn.addEventListener('click', save);
+    modeEl.addEventListener('change', () => hint(modeEl.value === 'system' ? '保存后生效：外部播放器模式' : '保存后生效：网页内播放'));
+    paint();
+  }
+
   function applyAll() {
     fx('eq', cfg.eqOn ? 1 : 0);
     if (Array.isArray(cfg.bands) && info && info.fx && info.fx.ok) {
@@ -164,11 +197,32 @@ function createAudioPanel() {
     });
   }
 
+  function renderInfoFail(reason) {
+    const isAndroid = !!(window.AUDIOCPM_CAPS && window.AUDIOCPM_CAPS.android);
+    body.innerHTML = '<div class="detail-empty" style="text-align:left;line-height:1.8">' +
+      (isAndroid
+        ? '音频输出信息暂时没有读到。<br>播放本身不受影响（仍可正常出声）；原因已写入「日志」模块。'
+        : '当前是网页/桌面模式，没有原生音频输出；音效与输出信息仅在 App 内可用。') +
+      (reason ? '<br><span style="color:#7d8b9c;font-size:10.5px">' + Utils.escapeHtml(String(reason).slice(0, 160)) + '</span>' : '') +
+      '<div style="margin-top:8px"><button type="button" class="small" id="af-info-retry">重试</button></div></div>';
+    if (trackEl) trackEl.textContent = isAndroid ? '信息读取失败' : '不可用';
+    const retry = document.getElementById('af-info-retry');
+    if (retry) retry.addEventListener('click', () => load());
+  }
+
   async function load() {
-    try { info = await Api.audioInfo(); } catch (_) { info = {ok: false}; }
+    let reason = '';
+    for (let i = 0; i < 3; i++) {
+      try {
+        const r = await Api.audioInfo();
+        if (r && r.ok) { info = r; break; }
+        reason = (r && (r.error || r.detail)) || 'audioInfo 返回 ok=false';
+      } catch (e) { reason = (e && e.message) || String(e); }
+      if (i < 2) await new Promise(res => setTimeout(res, 320 * (i + 1)));
+    }
     if (!info || !info.ok) {
-      body.innerHTML = '<div class="detail-empty">桌面/网页模式没有原生音频输出，音效与输出信息仅在 App 内可用。</div>';
-      if (trackEl) trackEl.textContent = '不可用';
+      try { Utils.log('err', '音频信息读取失败: ' + (reason || '未知'), 'workbench'); } catch (_) {}
+      renderInfoFail(reason);
       return;
     }
     if (trackEl) {
@@ -179,6 +233,7 @@ function createAudioPanel() {
     applyAll();
   }
 
+  bindPlayCfg();
   fw.onToggle(open => { if (open) load(); });
   return fw;
 }

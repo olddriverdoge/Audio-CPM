@@ -244,6 +244,34 @@
     <span class="mf-track" id="af-track">未播放</span>
     <button type="button" class="sf-btn" id="af-min" title="收起">—</button>
   </div>
+  <div class="af-playcfg" id="af-playcfg">
+    <div class="af-sec-h"><span>外部播放器</span><em>系统播放器模式 / ↗ 使用</em></div>
+    <div class="row" style="display:block">
+      <label for="cfg-playmode" style="display:block;margin-bottom:3px">播放方式</label>
+      <select id="cfg-playmode" style="width:100%">
+        <option value="web">网页内播放（可拖动进度，不弹播放器）</option>
+        <option value="system">系统播放器（跳转 App，可指定包名）</option>
+      </select>
+    </div>
+    <div class="row" style="display:block;margin-top:8px">
+      <label for="cfg-player" style="display:block;margin-bottom:3px">播放器包名（系统播放器模式使用）</label>
+      <input type="text" id="cfg-player" class="path" style="width:100%"
+             placeholder="com.maxmpz.audioplayer">
+    </div>
+    <div class="row" style="display:block;margin-top:8px">
+      <label for="cfg-activity" style="display:block;margin-bottom:3px">Activity（可选，优先于包名）</label>
+      <input type="text" id="cfg-activity" style="width:100%"
+             placeholder="com.maxmpz.audioplayer/.MainActivity">
+    </div>
+    <p class="hint" style="margin:8px 0 0">
+      网页内播放由后端流式提供音频，进度/暂停/音量都在页面内控制，不会拉起外部 App。
+      只有切到「系统播放器」模式或点播放条上的 ↗ 才会拉起 App。
+    </p>
+    <p class="hint" id="cfg-hint" style="margin:4px 0 0"></p>
+    <div class="row" style="margin-top:6px;justify-content:flex-end">
+      <button type="button" class="small primary" id="af-cfg-save">保存播放设置</button>
+    </div>
+  </div>
   <div class="af-body" id="af-body"><div class="detail-empty">正在读取音频输出信息…</div></div>
   <b class="fw-resize" id="af-resize" title="拖动调整大小（或双指捏合）"></b>
 </div>
@@ -335,28 +363,7 @@
 <div id="sheet-overlay" class="sheet-overlay hidden">
   <div class="sheet" id="player-sheet">
     <h3 style="font-size:13px">设置</h3>
-    <div class="row" style="display:block">
-      <label for="cfg-playmode" style="display:block;margin-bottom:3px">播放方式</label>
-      <select id="cfg-playmode" style="width:100%">
-        <option value="web">网页内播放（可拖动进度，不弹播放器）</option>
-        <option value="system">系统播放器（跳转 App，可指定包名）</option>
-      </select>
-    </div>
-    <div class="row" style="display:block;margin-top:8px">
-      <label for="cfg-player" style="display:block;margin-bottom:3px">播放器包名（系统播放器模式使用）</label>
-      <input type="text" id="cfg-player" class="path" style="width:100%"
-             placeholder="com.maxmpz.audioplayer">
-    </div>
-    <div class="row" style="display:block;margin-top:8px">
-      <label for="cfg-activity" style="display:block;margin-bottom:3px">Activity（可选，优先于包名）</label>
-      <input type="text" id="cfg-activity" style="width:100%"
-             placeholder="com.maxmpz.audioplayer/.MainActivity">
-    </div>
-    <p class="hint" style="margin:8px 0 0">
-      网页内播放由后端流式提供音频，进度/暂停/音量都在页面内控制，不会拉起外部 App。
-      只有切到「系统播放器」模式或点播放条上的 ↗ 才会拉起 App。
-    </p>
-    <p class="hint" id="cfg-hint" style="margin:4px 0 0"></p>
+
 
     <div style="border-top:1px solid var(--border);margin:12px 0 0"></div>
     <h3 style="font-size:13px;margin:10px 0 4px">存储源（本地 / WebDAV）</h3>
@@ -403,8 +410,7 @@
       换浏览器或清缓存后打开页面自动恢复。
     </p>
     <div class="row" style="margin-top:10px;justify-content:flex-end">
-      <button type="button" class="small" id="cfg-reset">恢复默认</button>
-      <button type="button" class="small" id="cfg-cancel">取消</button>
+      <button type="button" class="small" id="cfg-cancel">关闭</button>
       <button type="button" class="primary small" id="cfg-save">保存</button>
     </div>
   </div>

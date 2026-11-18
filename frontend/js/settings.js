@@ -21,11 +21,7 @@ const Settings = (() => {
     const cs = document.getElementById('cols-sheet');
     if (cs) cs.classList.add('hidden');
     const ps = document.getElementById('player-sheet');
-    if (ps) ps.classList.remove('hidden');   // 列编辑打开过后播放设置页可能还挂在 hidden 上，不显式还原就只剩灰屏
-    document.getElementById('cfg-playmode').value = playMode();
-    document.getElementById('cfg-player').value = playerPkg();
-    document.getElementById('cfg-activity').value = playerActivity();
-    hint(playerActivity() ? '当前使用 Activity 直连' : '');
+    if (ps) ps.classList.remove('hidden');
     document.getElementById('sheet-overlay').classList.remove('hidden');
     if (typeof UiCfg !== 'undefined') UiCfg.refresh();
   }
@@ -33,29 +29,16 @@ const Settings = (() => {
     document.getElementById('sheet-overlay').classList.add('hidden');
   }
   function save() {
-    const mode = document.getElementById('cfg-playmode').value === 'system' ? 'system' : 'web';
-    const pkg = document.getElementById('cfg-player').value.trim();
-    const act = document.getElementById('cfg-activity').value.trim();
-    if (pkg && !/^[A-Za-z0-9._]+$/.test(pkg)) { hint('包名只能包含字母、数字、点、下划线'); return; }
-    if (act && !/^[A-Za-z0-9._]+\/[A-Za-z0-9._$]+$/.test(act)) { hint('Activity 格式应为：包名/Activity'); return; }
-    Store.set(K.playMode, mode);
-    Store.set(K.playerPkg, pkg);
-    Store.set(K.playerAct, act);
+    // 这里只负责关闭设置页；播放器配置在「音频输出」模块内保存
     close();
-    Utils.toast(mode === 'web' ? '已切换为网页内播放' : '已切换为系统播放器');
-    Utils.log('info', '播放方式: ' + (mode === 'web' ? '网页内' : ('系统播放器 ' + (act || pkg || '系统选择'))));
   }
-  function reset() {
-    document.getElementById('cfg-playmode').value = 'web';
-    document.getElementById('cfg-player').value = DEFAULT_PKG;
-    document.getElementById('cfg-activity').value = '';
-    hint('已恢复默认：网页内播放，点保存生效');
-  }
+  function reset() {}
   function init() {
     document.getElementById('btn-player-cfg').onclick = open;
     document.getElementById('cfg-save').onclick = save;
     document.getElementById('cfg-cancel').onclick = close;
-    document.getElementById('cfg-reset').onclick = reset;
+    const rst = document.getElementById('cfg-reset');
+    if (rst) rst.onclick = reset;
     document.getElementById('sheet-overlay').addEventListener('click', e => {
       if (e.target.id === 'sheet-overlay') close();
     });

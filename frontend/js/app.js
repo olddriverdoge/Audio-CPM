@@ -618,6 +618,10 @@ const App = (() => {
       onTreeChanged: () => MoveMgr.update()
     });
     metaFloat = createMetaFloat();
+    /* 元数据 / 频谱 / 日志：同样交给 WinMgr，标题拖动、双指缩放、点击置顶一致 */
+    WinMgr.register({id: 'meta-float', win: 'meta-float', head: 'mf-head', resize: 'mf-resize', minW: 240, minH: 160});
+    WinMgr.register({id: 'spectrum-float', win: 'spectrum-float', head: 'sf-head', resize: 'sf-resize', minW: 240, minH: 140});
+    WinMgr.register({id: 'log-float', win: 'log-float', head: 'lf-head', resize: 'lf-resize', minW: 240, minH: 160});
 
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') Settings.close();

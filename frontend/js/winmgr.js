@@ -14,7 +14,7 @@ const WinMgr = (() => {
   /* 可用区域：header + modbar 之下，播放条（可见时）之上，左右留 6px */
   function bounds() {
     const vw = window.innerWidth, vh = window.innerHeight;
-    const bar = document.getElementById('modbar');
+    const bar = document.getElementById('modbar') || document.getElementById('scene-bar');
     const hdr = document.getElementById('app-hdr');
     const topEl = bar || hdr;
     const top = (topEl ? Math.round(topEl.getBoundingClientRect().bottom) : 0) + GAP;
@@ -223,6 +223,7 @@ const WinMgr = (() => {
         if (ptrs.size >= 2) return;
         if (!rect) apply();
         raise(win);
+        ptrs.set(e.pointerId, {x: e.clientX, y: e.clientY});
         drag0 = {x: e.clientX, y: e.clientY, rx: rect.x, ry: rect.y};
         mode = 'drag';
         try { head.setPointerCapture(e.pointerId); } catch (_) {}

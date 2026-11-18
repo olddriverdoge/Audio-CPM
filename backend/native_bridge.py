@@ -6,7 +6,10 @@ Java: com.github.olddriverdoge.audiocpm.AudioCpmBridge
   open: 外部播放器 Intent + content://
 """
 import json
+import logging
 import os
+
+logger = logging.getLogger('ac2.native')
 
 _open_external = None
 _has_all = None
@@ -147,11 +150,18 @@ def audio_fx(op, a=0, b=0):
 
 def audio_info():
     if not _playback:
-        return {'ok': False, 'error': 'not_supported'}
+        logger.warning('audio_info: native playback bridge not registered')
+        return {'ok': False, 'error': 'not_supported', 'playback_available': False,
+                'bridge_available': available()}
     try:
-        return _playback['audio_info']()
+        r = _playback['audio_info']()
+        if isinstance(r, dict):
+            r.setdefault('playback_available', True)
+            return r
+        return {'ok': False, 'error': 'bad native response', 'raw': str(r)[:300]}
     except Exception as e:
-        return {'ok': False, 'error': str(e)[:300]}
+        logger.exception('audio_info failed')
+        return {'ok': False, 'error': str(e)[:300], 'playback_available': True}
 
 
 def playback_state():
