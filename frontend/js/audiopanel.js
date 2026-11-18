@@ -59,14 +59,23 @@ function createAudioPanel() {
 
   function applyAll() {
     fx('eq', cfg.eqOn ? 1 : 0);
-    if (Array.isArray(cfg.bands) && info && info.fx && info.fx.ok) {
-      cfg.bands.forEach((lv, i) => fx('band', lv, i));
+    // EQ 关闭时不要再单独发送频段/前级；它们属于同一条 EQ 链路，
+    // 否则界面显示“关闭”，拖动推子却仍会改变声音。
+    if (cfg.eqOn) {
+      if (Array.isArray(cfg.bands) && info && info.fx && info.fx.ok) {
+        cfg.bands.forEach((lv, i) => fx('band', lv, i));
+      }
+      fx('preamp', Math.round((cfg.preamp || 0) * 100));
     }
     fx('treble', cfg.treble || 0);
     fx('bass', cfg.bass || 0);
     fx('virt', cfg.virt || 0);
-    fx('preamp', Math.round((cfg.preamp || 0) * 100));
     if (cfg.speed && cfg.speed !== 1) fx('speed', Math.round(cfg.speed * 100));
+  }
+
+  function paintEqSwitch() {
+    const sw = document.getElementById('af-eq-on');
+    if (sw) sw.checked = !!cfg.eqOn;
   }
 
   function row(label, value) {
@@ -142,14 +151,27 @@ function createAudioPanel() {
   function bind() {
     const eqOn = document.getElementById('af-eq-on');
     if (eqOn) eqOn.addEventListener('change', () => {
-      cfg.eqOn = eqOn.checked; save(); fx('eq', cfg.eqOn ? 1 : 0);
+      cfg.eqOn = !!eqOn.checked; save();
+      fx('eq', cfg.eqOn ? 1 : 0);
+      if (cfg.eqOn) {
+        if (Array.isArray(cfg.bands) && info && info.fx && info.fx.ok) {
+          cfg.bands.forEach((lv, i) => fx('band', lv, i));
+        }
+        fx('preamp', Math.round((cfg.preamp || 0) * 100));
+      }
     });
     document.querySelectorAll('.af-chip[data-preset]').forEach(b => {
       b.addEventListener('click', () => {
         const p = Number(b.dataset.preset);
         cfg.preset = p;
         if (p !== 5) { cfg.bands = null; fx('preset', p); }
+        // “关闭”预设必须真的关掉 EQ；原来的实现只把增益归零，
+        // EQ 仍处于开启状态，所以拖频段/前级还会影响输出。
+        cfg.eqOn = p !== 0;
         save();
+        fx('eq', cfg.eqOn ? 1 : 0);
+        if (cfg.eqOn) fx('preamp', Math.round((cfg.preamp || 0) * 100));
+        paintEqSwitch();
         document.querySelectorAll('.af-chip[data-preset]').forEach(x => x.classList.toggle('on', x === b));
         render();
       });
@@ -168,7 +190,9 @@ function createAudioPanel() {
         cfg.bands[i] = Number(sl.value);
         save();
         clearTimeout(t);
-        t = setTimeout(() => fx('band', Number(sl.value), i), 60);
+        if (cfg.eqOn) {
+          t = setTimeout(() => fx('band', Number(sl.value), i), 60);
+        }
       });
     });
     const pre = document.getElementById('af-preamp');
@@ -178,7 +202,8 @@ function createAudioPanel() {
         if (v) v.textContent = fmtDb(Number(pre.value));
       });
       pre.addEventListener('change', () => {
-        cfg.preamp = Number(pre.value); save(); fx('preamp', Math.round(cfg.preamp * 100));
+        cfg.preamp = Number(pre.value); save();
+        if (cfg.eqOn) fx('preamp', Math.round(cfg.preamp * 100));
       });
     }
     const trebleOn = document.getElementById('af-treble-on');

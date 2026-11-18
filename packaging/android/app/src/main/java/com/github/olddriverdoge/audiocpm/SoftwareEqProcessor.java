@@ -178,7 +178,8 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
     private float virtWidth = 0f;
 
     private float processSample(int ch, float x) {
-        float v = x * preampLin;
+        // 前级增益属于 EQ 链路；关闭 EQ 时必须连前级一起旁路。
+        float v = enabled ? x * preampLin : x;
         if (enabled) {
             float[] zz1 = z1[ch], zz2 = z2[ch];
             for (int i = 0; i < BANDS; i++) {

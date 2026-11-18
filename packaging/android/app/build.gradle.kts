@@ -11,8 +11,8 @@ android {
         applicationId = "com.github.olddriverdoge.audiocpm"
         minSdk = 24
         targetSdk = 35
-        versionCode = 44
-        versionName = "0.3.14"
+        versionCode = 45
+        versionName = "0.3.15"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
 
