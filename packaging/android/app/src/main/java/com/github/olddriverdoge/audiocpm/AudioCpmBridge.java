@@ -84,10 +84,14 @@ public class AudioCpmBridge {
                 sb.append(",\"framesPerBuffer\":").append(frames);
                 sb.append(",\"latencyMs\":").append(rate > 0 ? (int) Math.round(frames * 1000.0 / rate) : 0);
             } catch (Throwable ignored) {}
-            sb.append(",\"format\":").append(SpectrumProcessor.describe());
-            sb.append(",\"fx\":").append(AudioFx.info());
-            ExoPlayer p = PlaybackService.getPlayer();
-            if (p != null) sb.append(",\"speed\":").append(p.getPlaybackParameters().speed);
+            try { sb.append(",\"format\":").append(SpectrumProcessor.describe()); }
+            catch (Throwable t) { sb.append(",\"format\":{\"sampleRate\":0,\"channels\":0,\"encoding\":0,\"enabled\":false}"); }
+            try { sb.append(",\"fx\":").append(AudioFx.info()); }
+            catch (Throwable t) { sb.append(",\"fx\":{\"ok\":false,\"error\":\"").append(esc(String.valueOf(t))).append("\"}"); }
+            try {
+                ExoPlayer p = PlaybackService.getPlayer();
+                if (p != null) sb.append(",\"speed\":").append(p.getPlaybackParameters().speed);
+            } catch (Throwable ignored) {}
             sb.append('}');
             return sb.toString();
         } catch (Throwable t) {
