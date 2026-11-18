@@ -1,73 +1,101 @@
-# packaging/ —— App 打包工程（p4a + FFmpeg）
+# packaging/ —— Android 打包工程与文档归档
 
-> 业务代码在仓库根（`backend/`、`frontend/`），本目录只放打包物。
-> 完整交接说明见 [../APP_PACKAGING_HANDOFF.md](../APP_PACKAGING_HANDOFF.md)。
+本目录放 Android 构建工程、打包脚本和历史技术文档。业务代码仍在仓库根：
+
+- `backend/`：Python/Starlette 后端
+- `frontend/`：WebView 前端
+- `ac_web.py`：本地/桌面运行入口
+
+当前实际构建路线是 **Gradle + Chaquopy**，不再使用 p4a 作为主构建。`docs/` 下的 p4a、WebToApp 文档是历史评估记录，只用于追溯决策，不代表当前工程。
 
 ## 目录
 
-```
+```text
 packaging/
-├── p4a/
-│   ├── main.py            启动器：env / 日志 / 权限 / nativeLibraryDir
-│   ├── buildozer.spec     构建配置（ffmpeg recipe、targetSdk 28、arm64）
-│   └── README.md
 ├── android/
-│   ├── java/com/example/ac2/AudioCpmBridge.java   原生桥（波形/Intent/权限；目前是骨架）
-│   └── AndroidManifest.append.md             FileProvider / queries / 权限片段
-├── ci/build-apk.yml       GitHub Actions 构建（复制到仓库根 .github/workflows/）
-├── preflight.sh           打包前自检（编译/服务/端口/回归）
-└── tests/                 12+ 套 jsdom 回归（打 APK 前先在 Termux 跑通）
+│   ├── app/                    Android 应用模块
+│   ├── ffmpeg/                  音频专用 FFmpeg 构建脚本与产物
+│   ├── build.gradle.kts         根构建配置
+│   └── app/build.gradle.kts     版本号、Chaquopy、签名、前端/Python staging
+├── docs/                        历史方案、交接、接口文档
+├── tests/                       前端回归脚本
+├── ci/                          旧版 CI 参考
+├── preflight.sh                 打包前自检
+└── README.md                    本文件
 ```
 
-## 本机（Termux）不能直接构建
+## 构建 APK
 
-Termux 里没有 JDK / Android SDK / NDK / Gradle；官方 `aapt2` 是 x86_64 二进制，aarch64 Termux 跑不了。
-**构建必须用 PC / WSL / CI**，本机只负责开发与回归。
+### GitHub Actions（推荐）
 
-## 构建路径 A：GitHub Actions（推荐）
+工作流：`.github/workflows/build-gradle.yml`
 
-1. 把 `audio_manager/` 作为独立仓库推到 GitHub（当前它在一个更大的仓库里，CI 不会识别子目录的 workflow）。
-2. 复制 workflow：
+1. 打开仓库 Actions 页面；
+2. 选择 `build-audio-cpm`；
+3. `Run workflow`，分支选 `main`；
+4. 构建完成后下载 `audio-cpm-apk` artifact。
+
+构建会先编译音频专用 FFmpeg，再执行 `gradle assembleDebug`。首次构建约 15–30 分钟，命中缓存后更快。
+
+### 本地构建
+
+环境要求：
+
+- JDK 17
+- Android SDK 35 / Build Tools 35.0.0
+- Gradle 8.10.2
+- Android NDK（仅重新编译 FFmpeg 时需要）
+
+步骤：
 
 ```bash
-mkdir -p .github/workflows
-cp packaging/ci/build-apk.yml .github/workflows/build-apk.yml
-git add .github && git commit -m "ci: build apk" && git push
+cd packaging/android
+gradle assembleDebug --no-daemon
 ```
 
-3. 在 Actions 里点 `build-apk` → `Run workflow`（或推 `v*` tag）。
-4. 产物：`ac2-apk` artifact（`packaging/p4a/bin/ac2-0.1-arm64-v8a-debug.apk`）。
-5. 首次 40~90 分钟（Python + FFmpeg + SDL 全部编译）；之后命中 `~/.buildozer` 缓存会快一些。
+如果 FFmpeg 产物尚未生成，需要先按 `packaging/android/ffmpeg/build_ffmpeg_android.sh` 编译，并把 `libffmpegbin.so` 放到：
 
-## 构建路径 B：PC / WSL
+```text
+packaging/android/app/src/main/jniLibs/arm64-v8a/
+```
+
+产物：
+
+```text
+packaging/android/app/build/outputs/apk/debug/Audio-CPM-debug.apk
+```
+
+对外发布时建议重命名为 `Audio-CPM-<versionName>.apk`，不要带 `debug` 字样。
+
+## 版本号
+
+修改 `packaging/android/app/build.gradle.kts`：
+
+```kotlin
+versionCode = 47
+versionName = "0.4.0"
+```
+
+每次发版同时递增 `versionCode`。构建完成后可在 GitHub Release 上传重命名后的 APK。
+
+## 打包前自检
 
 ```bash
-# Ubuntu 22.04+ / WSL2
-sudo apt install -y git zip unzip openjdk-17-jdk python3-pip autoconf libtool \
-  pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo6 cmake libffi-dev libssl-dev
-pip install buildozer cython
-
-cd packaging/p4a
-buildozer -v android debug
-# 产物：bin/ac2-0.1-arm64-v8a-debug.apk
+bash packaging/preflight.sh
 ```
 
-## 构建前（Termux 上先跑）
+前端回归脚本在 `packaging/tests/`，覆盖文件浏览、播放、任务、频谱、元数据排序、数据源等场景。测试依赖见 `packaging/tests/package.json`。
 
-```bash
-bash packaging/preflight.sh     # py_compile + 服务 200 + 端口一致 + 12 套回归
-```
+## 文档索引
 
-当前基线：12/12 PASS。
+| 文档 | 内容 |
+|---|---|
+| [docs/HANDOVER.md](docs/HANDOVER.md) | 代码结构、接口契约、运行方式、排障 |
+| [docs/APP_PACKAGING_HANDOFF.md](docs/APP_PACKAGING_HANDOFF.md) | 打包交接、验收项、风险 |
+| [docs/OFFLINE_APP_PLAN_V3.md](docs/OFFLINE_APP_PLAN_V3.md) | 离线 App 业务层方案（波形/AIFF/元数据/WebDAV） |
+| [docs/OFFLINE_APP_PLAN_V2.md](docs/OFFLINE_APP_PLAN_V2.md) | 离线方案 v2 存档 |
+| [docs/APP_PACKAGING_AND_WEBDAV_PLAN.md](docs/APP_PACKAGING_AND_WEBDAV_PLAN.md) | FFmpeg/WebDAV 旧方案存档 |
+| [docs/P4A_MIGRATION_PLAN.md](docs/P4A_MIGRATION_PLAN.md) | p4a 迁移评估存档 |
+| [docs/PACKAGING_OPTIONS_WEBTOAPP_P4A.md](docs/PACKAGING_OPTIONS_WEBTOAPP_P4A.md) | WebToApp / p4a 壳选型对比存档 |
 
-## 已知缺口
-
-- `AudioCpmBridge.java` 仍是骨架：`peaks()` 返回 not implemented → 波形会回退到 ffmpeg（p4a 的 `libffmpegbin.so`，需 ffbin 定位成功）；`open()` 返回 not implemented → app 内系统播放器暂不可用。首版可先验证「浏览/播放/元数据/波形(ffmpeg)/转码」。
-- `fullscreen = 1`：WebView 的全屏按钮（`requestFullscreen`）依赖 p4a 的 PythonActivity 是否实现 `WebChromeClient.onShowCustomView`，未验证；前端 CSS 布局本身可用。
-- targetSdk 28：侧载可用、`/sdcard` 走旧权限模型；不能上 Google Play。
-- `p4a.branch = develop`：首次构建成功后建议锁 commit，保证可复现。
-
-## 相关文档
-
-- [../APP_PACKAGING_HANDOFF.md](../APP_PACKAGING_HANDOFF.md)：待办/验收/风险
-- [../P4A_MIGRATION_PLAN.md](../P4A_MIGRATION_PLAN.md)：p4a 事实与 FFmpeg 集成
+项目介绍、功能列表和快速开始见仓库根 [README.md](../README.md)。

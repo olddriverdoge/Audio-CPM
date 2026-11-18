@@ -186,7 +186,7 @@ async def stream(path: str, request: Request):
 
 - FLAC / MP3 / M4A(AAC) / OGG / OPUS → Kotlin `AudioCpmWave.peaks(path, buckets)`，用 `MediaExtractor` + `MediaCodec` 解码，按 `presentationTimeUs` 分桶，返回每桶峰值（0~1，未归一化）；
 - WAV / AIFF（转 WAV 后）→ **纯 Python** 解析 PCM（标准库 `wave` + `array`，8:1 抽样），原因：Android 的 WAV/raw 解码器对 24-bit/float 支持不稳定，纯 Python 反而更可控；
-- Python 侧统一做现有归一化（20% 分位拉伸，与 [backend/waveform.py](backend/waveform.py) 一致）→ 视觉与 Termux 版完全一致；
+- Python 侧统一做现有归一化（20% 分位拉伸，与 [backend/waveform.py](../../backend/waveform.py) 一致）→ 视觉与 Termux 版完全一致；
 - 缓存 key/格式不变：`md5(v2|uri|mtime|size|buckets)` → `$AC2_DATA_DIR/cache/wave/*.json`，内存 LRU 60 条（沿用）。
 
 ### 2.2 MediaCodec 桥实现（Kotlin，约 150 行）
@@ -322,7 +322,7 @@ def peaks_android(path: str, buckets: int) -> list:
 - **封面**：FLAC `pictures` / ID3 `APIC` / MP4 `covr` / OGG `METADATA_BLOCK_PICTURE`；列表优先同目录图片，内嵌图按需取；**不做服务端缩放**，返回原图 + 前端 CSS 缩放（缓存按真实 MIME 存扩展名）；
 - **标签写入**：仅本地；`copy → 改 → 校验 → os.replace`（保留原文件直到成功）；不支持/校验失败则不动原文件；
 - **检查标签 / 整理标签**：本地可用（mutagen 扫描 + 文件改名），WebDAV 不做；
-- **字段归一化**：复用 [backend/ffmpeg.py](backend/ffmpeg.py) 的 `clean_text`（注意它现在放在 ffmpeg.py，不是 jobs_core.py）。
+- **字段归一化**：复用 [backend/ffmpeg.py](../../backend/ffmpeg.py) 的 `clean_text`（注意它现在放在 ffmpeg.py，不是 jobs_core.py）。
 
 ---
 

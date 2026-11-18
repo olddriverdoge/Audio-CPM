@@ -5,7 +5,7 @@
 - `ac_web.py`：12 行启动入口，只 `from backend.cli import main`
 - `backend/`：`config` / `meta`（全 mutagen，无 ffprobe）/ `aiff`（纯 Python 转 WAV）/ `ffbin`（ffmpeg 定位）/ `ffmpeg` / `jobs_core` / `jobs` / `presets` / `waveform` / `simple`（Starlette 工具）/ `storage/`（本地+WebDAV）/ `app` / `cli` + `routers/`（browse、tags、tasks、media、fs、ui、storage）；框架是 **Starlette**（不是 FastAPI）；读标签/写标签都走 mutagen，AIFF 播放走纯 Python，FFmpeg 只用于转码/波形
 - `frontend/`：`index.html` + `css/`（6 个）+ `js/`（20 个），经典脚本按序加载、IIFE 命名空间、零构建；配置在 `uicfg.js`（`ac2_ui_config.json`），数据源在 `sources.js`（`ac2_storage.json`）
-- 交接与接口清单见 [HANDOVER.md](HANDOVER.md)
+- 交接与接口清单见 [packaging/docs/HANDOVER.md](packaging/docs/HANDOVER.md)
 
 改动定位：
 

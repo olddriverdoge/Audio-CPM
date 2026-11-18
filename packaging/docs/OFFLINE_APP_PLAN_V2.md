@@ -70,15 +70,15 @@
 | ID | 债务 | 现状（代码位置） | 对 app | 对 WebDAV | 改法 | 优先级 |
 |---|---|---|---|---|---|---|
 | T1 | `path` = 本地绝对路径 | 全后端 + 前端 localStorage | 可用但 `/sdcard` 受限 | **不成立** | 引入 `PathRef` URI（`local:` / `dav:<id>:`) + StorageProvider | P0 |
-| T2 | 配置写项目根目录 | [config.py](backend/config.py)、[ui_api.py](backend/routers/ui_api.py) | **只读崩溃** | 同左 | `AC2_DATA_DIR` 环境变量，默认回退旧行为 | P0 |
-| T3 | 前端硬编码 `/sdcard/ADM`、`/sdcard` | [app.js](frontend/js/app.js) 218/568/601/613 | 目录不存在 | 无意义 | 新增 `/api/roots`，前端动态取根；localStorage 按数据源分键 | P0 |
-| T4 | 元数据依赖 ffprobe | [ffmpeg.py](backend/ffmpeg.py)、[browse_api.py](backend/routers/browse_api.py)、[media_api.py](backend/routers/media_api.py) | **无 ffmpeg** | 需下载整文件 | 新 `meta.py`：mutagen 优先，ffprobe 回退（服务端/Pro） | P0 |
-| T5 | 系统播放器依赖 `am`/`file://` | [media_api.py](backend/routers/media_api.py) | 无 am | 无本地文件 | 前端隐藏入口/灰置；后端保留接口但 app 内返回 not_supported | P0 |
-| T6 | 任务只支持 ffmpeg 批处理，无传输任务/取消 | [jobs.py](backend/jobs.py)、[jobs_core.py](backend/jobs_core.py) | 上传下载需要 | 同左 | 新增 `TransferTask`（copy/move 4 模式）+ 取消 | P1 |
+| T2 | 配置写项目根目录 | [config.py](../../backend/config.py)、[ui_api.py](../../backend/routers/) | **只读崩溃** | 同左 | `AC2_DATA_DIR` 环境变量，默认回退旧行为 | P0 |
+| T3 | 前端硬编码 `/sdcard/ADM`、`/sdcard` | [app.js](../../frontend/js/app.js) 218/568/601/613 | 目录不存在 | 无意义 | 新增 `/api/roots`，前端动态取根；localStorage 按数据源分键 | P0 |
+| T4 | 元数据依赖 ffprobe | [ffmpeg.py](../../backend/ffmpeg.py)、[browse_api.py](../../backend/routers/browse_api.py)、[media_api.py](../../backend/routers/media_api.py) | **无 ffmpeg** | 需下载整文件 | 新 `meta.py`：mutagen 优先，ffprobe 回退（服务端/Pro） | P0 |
+| T5 | 系统播放器依赖 `am`/`file://` | [media_api.py](../../backend/routers/media_api.py) | 无 am | 无本地文件 | 前端隐藏入口/灰置；后端保留接口但 app 内返回 not_supported | P0 |
+| T6 | 任务只支持 ffmpeg 批处理，无传输任务/取消 | [jobs.py](../../backend/jobs.py)、[jobs_core.py](../../backend/jobs_core.py) | 上传下载需要 | 同左 | 新增 `TransferTask`（copy/move 4 模式）+ 取消 | P1 |
 | T7 | 无权限/只读模型 | 全后端（无鉴权） | 需存储权限 | 需 WebDAV 授权 | 本地：MANAGE_EXTERNAL_STORAGE；远端：连接级 `readonly` + 403 降级 | P0 |
 | T8 | ffmpeg-only 功能没有开关 | 前端按钮写死 | 会点了报错 | 同左 | `/api/capabilities` 下发，前端按能力隐藏 | P1 |
 | T9 | 无鉴权 | 全后端 | 本地 127.0.0.1 尚可 | 局域网危险 | 启动时随机 token，壳注入 + 前端带上 | P1 |
-| T10 | FastAPI + pydantic 在 Chaquopy 不可用 | [app.py](backend/app.py)、[models.py](backend/models.py) | **装不上** | — | 全量迁 Starlette（推荐）或双适配器 | P0（打包前） |
+| T10 | FastAPI + pydantic 在 Chaquopy 不可用 | [app.py](../../backend/app.py)、[models.py](../../backend/models.py) | **装不上** | — | 全量迁 Starlette（推荐）或双适配器 | P0（打包前） |
 | T11 | 配置无 schema/版本 | `ac2_ui_config.json` | 升级易丢 | 同左 | `schema_version` + 迁移函数 + `/api/version` | P2 |
 | T12 | 缺 pytest/CI，回归靠临时 jsdom | — | 打包风险 | 同左 | pytest（算法/元数据）+ 现有 jsdom + CI | P1 |
 

@@ -57,14 +57,14 @@ while (true) {
 
 | # | 文件/位置 | 现状 | 改法 | 原因 |
 |---|---|---|---|---|
-| 1 | [backend/config.py](backend/config.py) 6-21 | `SCRIPT_DIR` 写配置/缓存 | 新增 `DATA_DIR = os.environ.get("AC2_DATA_DIR") or SCRIPT_DIR`；`PRESETS_FILE`/`UI_CONFIG_FILE`/`COVER_CACHE_DIR` 基于 `DATA_DIR` | p4a 的 app 目录可能只读；配置要写 `filesDir` |
+| 1 | [backend/config.py](../../backend/config.py) 6-21 | `SCRIPT_DIR` 写配置/缓存 | 新增 `DATA_DIR = os.environ.get("AC2_DATA_DIR") or SCRIPT_DIR`；`PRESETS_FILE`/`UI_CONFIG_FILE`/`COVER_CACHE_DIR` 基于 `DATA_DIR` | p4a 的 app 目录可能只读；配置要写 `filesDir` |
 | 2 | 同上 | `DEFAULT_ROOT="/sdcard/ADM"` | 改为 `os.environ.get("AC2_ROOT") or "/sdcard/ADM"`；不存在时回退 `~` | app 内路径/权限不同；WebDAV 后还要多根 |
-| 3 | [backend/ffmpeg.py](backend/ffmpeg.py) 12-21、95-119、121-155、157-163 | 硬编码 `'ffmpeg'`/`'ffprobe'` | 定义 `FFMPEG = os.environ.get("AC2_FFMPEG_BIN", "ffmpeg")`、`FFPROBE = ...`；所有调用替换；`execute` 支持传入 `env`（给 `LD_LIBRARY_PATH`） | app 内二进制在 nativeLibraryDir/私有目录，不在 PATH |
-| 4 | [backend/cli.py](backend/cli.py) 11-20 | argparse 读 `--host/--port` | 默认值改读 `AC2_HOST`/`AC2_PORT`；保留命令行参数 | app 启动器用 env 注入，不传 argv |
-| 5 | [backend/app.py](backend/app.py) 10-26 | FastAPI + `StaticFiles` | **迁到 Starlette**（见 P0-8）；`StaticFiles(directory=FRONTEND_DIR)` 不变 | p4a 装不上 pydantic-core；FastAPI 不可用 |
-| 6 | [backend/models.py](backend/models.py) | 9 个 pydantic 模型 | 改 `dataclass`/手写校验函数；路由里 `await request.json()` 后校验 | 同上 |
-| 7 | [backend/routers/](backend/routers/) 6 个文件 | FastAPI `APIRouter`/`Query`/`Body`/`HTTPException` | 改 Starlette `Router`/`Route`、`request.query_params`、`JSONResponse`；SSE 用 `StreamingResponse` | 同上 |
-| 8 | [frontend/js/app.js](frontend/js/app.js) 218/568/601/613 | 硬编码 `/sdcard/ADM`、`/sdcard` | 改为从 `/api/roots` 取默认根（或 `AC2_ROOT` 注入的接口）；至少加 fallback | app 内 `/sdcard/ADM` 可能不存在 |
+| 3 | [backend/ffmpeg.py](../../backend/ffmpeg.py) 12-21、95-119、121-155、157-163 | 硬编码 `'ffmpeg'`/`'ffprobe'` | 定义 `FFMPEG = os.environ.get("AC2_FFMPEG_BIN", "ffmpeg")`、`FFPROBE = ...`；所有调用替换；`execute` 支持传入 `env`（给 `LD_LIBRARY_PATH`） | app 内二进制在 nativeLibraryDir/私有目录，不在 PATH |
+| 4 | [backend/cli.py](../../backend/cli.py) 11-20 | argparse 读 `--host/--port` | 默认值改读 `AC2_HOST`/`AC2_PORT`；保留命令行参数 | app 启动器用 env 注入，不传 argv |
+| 5 | [backend/app.py](../../backend/app.py) 10-26 | FastAPI + `StaticFiles` | **迁到 Starlette**（见 P0-8）；`StaticFiles(directory=FRONTEND_DIR)` 不变 | p4a 装不上 pydantic-core；FastAPI 不可用 |
+| 6 | [backend/models.py](../../backend/models.py) | 9 个 pydantic 模型 | 改 `dataclass`/手写校验函数；路由里 `await request.json()` 后校验 | 同上 |
+| 7 | [backend/routers/](../../backend/routers/) 6 个文件 | FastAPI `APIRouter`/`Query`/`Body`/`HTTPException` | 改 Starlette `Router`/`Route`、`request.query_params`、`JSONResponse`；SSE 用 `StreamingResponse` | 同上 |
+| 8 | [frontend/js/app.js](../../frontend/js/app.js) 218/568/601/613 | 硬编码 `/sdcard/ADM`、`/sdcard` | 改为从 `/api/roots` 取默认根（或 `AC2_ROOT` 注入的接口）；至少加 fallback | app 内 `/sdcard/ADM` 可能不存在 |
 | 9 | 新增 `packaging/p4a/main.py` | — | 设 env（`AC2_DATA_DIR`/`AC2_FFMPEG_BIN`/`AC2_PORT`）→ `from backend.cli import main` → `main()` | p4a 的入口约定 |
 | 10 | 新增 `packaging/p4a/buildozer.spec` | — | `requirements = python3,starlette,uvicorn,httpx,mutagen,ffmpeg`；`android.api=28`；`android.port=8000`；`source.dir=../..`；`source.exclude_dirs=.git,__pycache__,...` | p4a 构建配置 |
 | 11 | 新增 `requirements-app.txt` | — | 锁纯 Python 依赖（starlette/uvicorn/httpx/mutagen + 间接依赖） | 保证 Termux 与 app 一致 |
@@ -73,9 +73,9 @@ while (true) {
 
 | # | 位置 | 改法 |
 |---|---|---|
-| 12 | [backend/routers/fs_api.py](backend/routers/fs_api.py) 12-13、[media_api.py](backend/routers/media_api.py) 14 | `PUBLIC_PREFIXES`/`FORBIDDEN_ROOTS` 改读 `AC2_ROOT`；p4a + targetSdk 28 下可直接 `/sdcard` |
-| 13 | [media_api.py](backend/routers/media_api.py) 52-85 | `/api/play`（am）在 app 内不可用；p4a 用 Intent/FileProvider 需要 Java 模板改造；首版可返回 `not_supported`，保留本地播放 |
-| 14 | [backend/jobs.py](backend/jobs.py) / SSE | Starlette 的 `StreamingResponse` 写法与 FastAPI 一致；注意 `asyncio.get_event_loop()` 在 p4a 的主线程可能没有 loop → 用 `asyncio.get_running_loop()` 或线程队列轮询 |
+| 12 | [backend/routers/fs_api.py](../../backend/routers/fs_api.py) 12-13、[media_api.py](../../backend/routers/media_api.py) 14 | `PUBLIC_PREFIXES`/`FORBIDDEN_ROOTS` 改读 `AC2_ROOT`；p4a + targetSdk 28 下可直接 `/sdcard` |
+| 13 | [media_api.py](../../backend/routers/media_api.py) 52-85 | `/api/play`（am）在 app 内不可用；p4a 用 Intent/FileProvider 需要 Java 模板改造；首版可返回 `not_supported`，保留本地播放 |
+| 14 | [backend/jobs.py](../../backend/jobs.py) / SSE | Starlette 的 `StreamingResponse` 写法与 FastAPI 一致；注意 `asyncio.get_event_loop()` 在 p4a 的主线程可能没有 loop → 用 `asyncio.get_running_loop()` 或线程队列轮询 |
 | 15 | 权限 | `buildozer.spec` 声明 `READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE`；`main.py` 里 `android.permissions.request_permissions`（p4a 的 `android` 模块）；targetSdk 28 仍走旧存储权限模型 |
 | 16 | 静态资源 | p4a 的 `--private` 目录会复制 `frontend/`；确认 `FRONTEND_DIR` 解析正确（`__file__` 所在目录） |
 | 17 | 端口 | `buildozer.spec` 的 `android.port` 必须与 `main.py` 的 `AC2_PORT` 一致；否则白屏 |

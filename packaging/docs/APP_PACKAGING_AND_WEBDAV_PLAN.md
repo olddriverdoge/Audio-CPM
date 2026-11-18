@@ -43,9 +43,9 @@ uvicorn ── FastAPI app（单进程，单用户，无鉴权）
    └─ StaticFiles      frontend/（零构建：index.html + 6 CSS + 19 JS）
 ```
 
-- 入口 [ac_web.py](ac_web.py)（12 行）→ [backend/cli.py](backend/cli.py) → uvicorn。
-- 前端经典脚本按序加载、IIFE 命名空间、无打包器；所有请求走相对路径 `/api/*`（[frontend/js/api.js](frontend/js/api.js)），同源部署。
-- 配置持久化：`ac2_presets.json`、`ac2_ui_config.json` 写在项目根；封面/缩略图/波形缓存在 `$TMPDIR`（[backend/config.py](backend/config.py)、[backend/waveform.py](backend/waveform.py)）。
+- 入口 [ac_web.py](../../ac_web.py)（12 行）→ [backend/cli.py](../../backend/cli.py) → uvicorn。
+- 前端经典脚本按序加载、IIFE 命名空间、无打包器；所有请求走相对路径 `/api/*`（[frontend/js/api.js](../../frontend/js/api.js)），同源部署。
+- 配置持久化：`ac2_presets.json`、`ac2_ui_config.json` 写在项目根；封面/缩略图/波形缓存在 `$TMPDIR`（[backend/config.py](../../backend/config.py)、[backend/waveform.py](../../backend/waveform.py)）。
 - 部署：`run.sh` 用 setsid + nohup 常驻，PID/日志在项目根。
 
 ### 1.2 四条主要链路
@@ -61,14 +61,14 @@ uvicorn ── FastAPI app（单进程，单用户，无鉴权）
 
 | 层 | 文件 | 行数 | 角色 |
 |---|---|---|---|
-| 入口 | [ac_web.py](ac_web.py)、[backend/cli.py](backend/cli.py)、[backend/app.py](backend/app.py) | 61 | 启动/装配/静态挂载 |
-| 配置 | [backend/config.py](backend/config.py) | 21 | 根目录、扩展名、缓存目录 |
-| FFmpeg | [backend/ffmpeg.py](backend/ffmpeg.py) | 163 | `execute`、`probe_file_detail`、进度解析、递归收集 |
-| 任务 | [backend/jobs_core.py](backend/jobs_core.py) | 283 | 4 类批量任务 + 单文件标签编辑 |
-| 调度 | [backend/jobs.py](backend/jobs.py) | 40 | tasks 字典 + 线程 + Queue |
-| 波形 | [backend/waveform.py](backend/waveform.py) | 88 | 解码 + 分桶 + 双缓存 |
-| 路由 | [backend/routers/](backend/routers/) 6 个文件 | 626 | browse / fs / media / tags / tasks / ui |
-| 前端 | [frontend/](frontend/)（index.html 382 + JS 约 3.4k + CSS 约 0.5k） | 4300 | 两页单页应用，19 个 IIFE 模块 |
+| 入口 | [ac_web.py](../../ac_web.py)、[backend/cli.py](../../backend/cli.py)、[backend/app.py](../../backend/app.py) | 61 | 启动/装配/静态挂载 |
+| 配置 | [backend/config.py](../../backend/config.py) | 21 | 根目录、扩展名、缓存目录 |
+| FFmpeg | [backend/ffmpeg.py](../../backend/ffmpeg.py) | 163 | `execute`、`probe_file_detail`、进度解析、递归收集 |
+| 任务 | [backend/jobs_core.py](../../backend/jobs_core.py) | 283 | 4 类批量任务 + 单文件标签编辑 |
+| 调度 | [backend/jobs.py](../../backend/jobs.py) | 40 | tasks 字典 + 线程 + Queue |
+| 波形 | [backend/waveform.py](../../backend/waveform.py) | 88 | 解码 + 分桶 + 双缓存 |
+| 路由 | [backend/routers/](../../backend/routers/) 6 个文件 | 626 | browse / fs / media / tags / tasks / ui |
+| 前端 | [frontend/](../../frontend/)（index.html 382 + JS 约 3.4k + CSS 约 0.5k） | 4300 | 两页单页应用，19 个 IIFE 模块 |
 
 ### 1.4 当前架构的 8 个隐含假设（后续改造的根因）
 
@@ -76,12 +76,12 @@ uvicorn ── FastAPI app（单进程，单用户，无鉴权）
 |---|---|---|---|---|
 | 1 | `path` 是本地绝对路径，直接 `os.*`/ffmpeg | 全后端 + 前端 localStorage | 除 `/sdcard` 外可用 | **失效**，需 URI/后端标识 |
 | 2 | 文件系统低延迟，可随时 `stat`/`rename`/`remove` | browse / fs / jobs_core | 可用 | 需远端 API + 本地物化 |
-| 3 | 系统 PATH 里有 `ffmpeg`/`ffprobe` 可执行文件 | [backend/ffmpeg.py](backend/ffmpeg.py) | **不可 exec**（见 §2.2） | 可用（本地缓存文件） |
-| 4 | 只操作 `/sdcard`、`/storage/emulated/0` 白名单 | [fs_api.py](backend/routers/fs_api.py)、[media_api.py](backend/routers/media_api.py) | 需运行时权限/SAF | 改为“远端根内”约束 |
-| 5 | 系统播放器 = `am start -d file://...` | [media_api.py](backend/routers/media_api.py) | **无 am 命令**，且 file:// 被禁 | **无本地文件** |
-| 6 | 项目根目录可写（预设/UI 配置） | [config.py](backend/config.py)、[ui_api.py](backend/routers/ui_api.py) | APK 内只读，**启动即失败** | 同左 |
+| 3 | 系统 PATH 里有 `ffmpeg`/`ffprobe` 可执行文件 | [backend/ffmpeg.py](../../backend/ffmpeg.py) | **不可 exec**（见 §2.2） | 可用（本地缓存文件） |
+| 4 | 只操作 `/sdcard`、`/storage/emulated/0` 白名单 | [fs_api.py](../../backend/routers/fs_api.py)、[media_api.py](../../backend/routers/media_api.py) | 需运行时权限/SAF | 改为“远端根内”约束 |
+| 5 | 系统播放器 = `am start -d file://...` | [media_api.py](../../backend/routers/media_api.py) | **无 am 命令**，且 file:// 被禁 | **无本地文件** |
+| 6 | 项目根目录可写（预设/UI 配置） | [config.py](../../backend/config.py)、[ui_api.py](../../backend/routers/) | APK 内只读，**启动即失败** | 同左 |
 | 7 | 单用户、无鉴权、只绑 127.0.0.1 | 全后端 | 需随机 token（WebView 同源仍可） | 需 token + WebDAV 凭据 |
-| 8 | 默认根硬编码 `/sdcard/ADM` | [frontend/js/app.js](frontend/js/app.js)（218/568/601/613 行） | 目录不存在 | 无意义 |
+| 8 | 默认根硬编码 `/sdcard/ADM` | [frontend/js/app.js](../../frontend/js/app.js)（218/568/601/613 行） | 目录不存在 | 无意义 |
 
 > 这 8 条就是“打包”和“WebDAV”两件事的共同改造清单。**建议先改 6、8、3 的抽象，再动 1**，否则两件事会互相踩。
 
@@ -198,7 +198,7 @@ Chaquopy 17 起 pip 只装 binary wheel，而 **pydantic-core 没有 Android whe
 | httpx | — | ✓ 纯 Python | WebDAV 客户端 |
 | pillow | 不用 | — | — |
 
-Starlette 迁移工作量：路由声明、请求体解析、HTTPException、SSE、StaticFiles 都有对应物，现有约 20 个端点的请求体都很简单（[models.py](backend/models.py) 只有 45 行），**0.5~1 天**可以迁完并保持接口形状。**建议：app 版与 Termux 版共用同一套路由函数，用一个 `webapp` 兼容层屏蔽 FastAPI/Starlette 差异**，避免维护两份。
+Starlette 迁移工作量：路由声明、请求体解析、HTTPException、SSE、StaticFiles 都有对应物，现有约 20 个端点的请求体都很简单（[models.py](../../backend/models.py) 只有 45 行），**0.5~1 天**可以迁完并保持接口形状。**建议：app 版与 Termux 版共用同一套路由函数，用一个 `webapp` 兼容层屏蔽 FastAPI/Starlette 差异**，避免维护两份。
 
 > 另一个做法是给 pydantic-core 自建 Android wheel（Chaquopy 支持本地 wheel）。不建议：Rust 交叉编译 + 16 KB 对齐 + 升级维护，成本远高于 Starlette 化。
 
@@ -206,7 +206,7 @@ Starlette 迁移工作量：路由声明、请求体解析、HTTPException、SSE
 
 | 项 | 现状 | app 内改法 |
 |---|---|---|
-| 可写目录 | `SCRIPT_DIR` 写预设/配置 | 读 `os.environ["HOME"]`（Chaquopy 指向 `filesDir`）或壳注入 `AC2_DATA_DIR`；[config.py](backend/config.py) 改一处 |
+| 可写目录 | `SCRIPT_DIR` 写预设/配置 | 读 `os.environ["HOME"]`（Chaquopy 指向 `filesDir`）或壳注入 `AC2_DATA_DIR`；[config.py](../../backend/config.py) 改一处 |
 | 临时文件 | `tempfile.gettempdir()` | 显式设到 `cacheDir`，避免 Android 上不可写 |
 | 默认根 | `/sdcard/ADM` | 新增 `GET /api/roots`：内部目录 +（可选）SAF 导入目录 + WebDAV 绑定；前端删掉硬编码 |
 | 存储权限 | Termux 已授权 | Android 13+ 需 `READ_MEDIA_AUDIO`；全盘要 `MANAGE_EXTERNAL_STORAGE`（侧载可用，Play 敏感）。**首版建议只做内部目录 + WebDAV，绕开权限** |
@@ -354,12 +354,12 @@ jobs:
 
 | 模块 | 依赖 | 行数 |
 |---|---|---|
-| [browse_api.py](backend/routers/browse_api.py) | `os.listdir`/`stat`/`isfile` | 64 |
-| [fs_api.py](backend/routers/fs_api.py) | `shutil.move`/`os.mkdir`/`os.rmdir`/`os.rename`/`rmtree` | 193 |
-| [media_api.py](backend/routers/media_api.py) | `FileResponse`、ffmpeg 提取、`os.path.getmtime/getsize` | 139 |
-| [jobs_core.py](backend/jobs_core.py) | 输入/输出/临时文件全为本地路径，`os.replace` 原子替换 | 283 |
-| [waveform.py](backend/waveform.py) | 本地文件解码 + `os.stat` 指纹 | 88 |
-| [ffmpeg.py](backend/ffmpeg.py) | 本地路径直接喂给 ffmpeg | 163 |
+| [browse_api.py](../../backend/routers/browse_api.py) | `os.listdir`/`stat`/`isfile` | 64 |
+| [fs_api.py](../../backend/routers/fs_api.py) | `shutil.move`/`os.mkdir`/`os.rmdir`/`os.rename`/`rmtree` | 193 |
+| [media_api.py](../../backend/routers/media_api.py) | `FileResponse`、ffmpeg 提取、`os.path.getmtime/getsize` | 139 |
+| [jobs_core.py](../../backend/jobs_core.py) | 输入/输出/临时文件全为本地路径，`os.replace` 原子替换 | 283 |
+| [waveform.py](../../backend/waveform.py) | 本地文件解码 + `os.stat` 指纹 | 88 |
+| [ffmpeg.py](../../backend/ffmpeg.py) | 本地路径直接喂给 ffmpeg | 163 |
 | 前端 | `path` 字符串、localStorage 路径、硬编码 `/sdcard/ADM`；`player.js` 直接拼 `/api/stream`、`taskrunner.js` 直接拼 SSE URL（不走 api.js） | app.js / player.js / taskrunner.js |
 
 ### 4.2 目标架构：Storage 抽象 + 物化层 + 派生缓存

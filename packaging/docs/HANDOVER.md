@@ -1,8 +1,8 @@
 # Audio-CPM 交接文档
 
-- 入口文件：[ac_web.py](ac_web.py)（12 行，只负责启动）
-- 后端：[backend/](backend/)（配置 / ffmpeg / 任务 / 路由 / 波形，按职责分模块）
-- 前端：[frontend/](frontend/)（`index.html` + `css/` 6 个 + `js/` 16 个，无构建）
+- 入口文件：[ac_web.py](../../ac_web.py)（12 行，只负责启动）
+- 后端：[backend/](../../backend/)（配置 / ffmpeg / 任务 / 路由 / 波形，按职责分模块）
+- 前端：[frontend/](../../frontend/)（`index.html` + `css/` 6 个 + `js/` 16 个，无构建）
 - 文档更新时间：2026-11-15
 - 运行形态：Termux / Android 本地 FastAPI 服务 + 浏览器单页应用
 - 分发形态：整个目录（后端包 + 静态前端），启动命令不变
