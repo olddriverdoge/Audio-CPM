@@ -321,6 +321,41 @@ function createAudioPanel() {
     } catch (_) {}
   }
 
+  let refreshTimer = 0, lastInfoKey = '';
+
+  function paintTrack() {
+    if (!trackEl || !info) return;
+    const f = info.format || {};
+    const src = info.sourceFormat || {};
+    const fmt = (f.sampleRate && f.configured !== false) ? ((f.sampleRate / 1000).toFixed(1) + 'k · ' + encName(f.encoding)) : '';
+    const sfmt = (src.sampleRate ? ((src.sampleRate / 1000).toFixed(1) + 'k · ' + encName(src.encoding)) : '');
+    trackEl.textContent = info.playing
+      ? (fmt || sfmt || ((typeof I18n !== 'undefined') ? I18n.t(info.web ? '网页播放中' : '播放中') : (info.web ? '网页播放中' : '播放中')))
+      : (info.pending ? ((typeof I18n !== 'undefined') ? I18n.t('待播放') : '待播放')
+        : (fmt || sfmt || ((typeof I18n !== 'undefined') ? I18n.t('未播放') : '未播放')));
+  }
+
+  function infoKey() {
+    const f = (info && info.format) || {};
+    const src = (info && info.sourceFormat) || {};
+    return [!!(info && info.playing), !!(info && info.web), !!(info && info.pending),
+      f.sampleRate || 0, f.configured !== false, src.sampleRate || 0].join('|');
+  }
+
+  // 定时轻刷新：面板打开期间播放/暂停会变化，不能只在打开时读一次，否则一直显示“未播放”。
+  // 只有播放状态或格式变化才重绘，避免每 1.5 秒重建 EQ 推子、打断拖动。
+  async function refresh() {
+    try {
+      const r = await Api.audioInfo();
+      if (!r || !r.ok) return;
+      info = r;
+      await enrichWebInfo(info);
+      paintTrack();
+      const key = infoKey();
+      if (key !== lastInfoKey) { lastInfoKey = key; render(); }
+    } catch (_) {}
+  }
+
   async function load() {
     let reason = '';
     info = null;
@@ -338,16 +373,7 @@ function createAudioPanel() {
       return;
     }
     await enrichWebInfo(info);
-    if (trackEl) {
-      const f = info.format || {};
-      const src = info.sourceFormat || {};
-      const fmt = (f.sampleRate && f.configured !== false) ? ((f.sampleRate / 1000).toFixed(1) + 'k · ' + encName(f.encoding)) : '';
-      const sfmt = (src.sampleRate ? ((src.sampleRate / 1000).toFixed(1) + 'k · ' + encName(src.encoding)) : '');
-      trackEl.textContent = info.playing
-        ? (fmt || sfmt || ((typeof I18n !== 'undefined') ? I18n.t(info.web ? '网页播放中' : '播放中') : (info.web ? '网页播放中' : '播放中')))
-        : (info.pending ? ((typeof I18n !== 'undefined') ? I18n.t('待播放') : '待播放')
-          : (fmt || sfmt || ((typeof I18n !== 'undefined') ? I18n.t('未播放') : '未播放')));
-    }
+    paintTrack();
     const f = info.format || {};
     if (info.playing && !info.web && (!f.sampleRate || f.configured === false)) {
       try {
@@ -359,11 +385,21 @@ function createAudioPanel() {
         }), 'workbench');
       } catch (_) {}
     }
+    lastInfoKey = infoKey();
     render();
     applyAll();
   }
 
   bindPlayCfg();
-  fw.onToggle(open => { if (open) load(); });
+  fw.onToggle(open => {
+    if (open) {
+      load();
+      clearInterval(refreshTimer);
+      refreshTimer = setInterval(refresh, 1500);
+    } else {
+      clearInterval(refreshTimer);
+      refreshTimer = 0;
+    }
+  });
   return fw;
 }

@@ -93,6 +93,7 @@ function createPlayPanel() {
     if (d > 0) { durEl.textContent = fmt(d); seek.max = String(d); }
     if (!seeking) { seek.value = String(Math.min(p, d || p)); curEl.textContent = fmt(p); }
     const pct = d > 0 ? Math.max(0, Math.min(100, p / d * 100)) : 0;
+    waveBox.style.setProperty('--pf-pct', pct + '%');
     waveHi.style.clipPath = 'inset(0 ' + (100 - pct) + '% 0 0)';
     const on = Player.isPlaying();
     playBtn.innerHTML = on

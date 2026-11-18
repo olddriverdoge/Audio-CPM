@@ -123,6 +123,14 @@
     opacity:0;background:transparent;-webkit-appearance:none;appearance:none;border:0}
   .pf-seek::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:26px;background:transparent}
   .pf-wavebox.time-only .pf-wave-base,.pf-wavebox.time-only .pf-wave-hi{display:none}
+  /* WebDAV 等无波形场景：播放管理也要有传统进度条，不能像底部旧样式一样只剩空框 */
+  .pf-wavebox.time-only{
+    background:linear-gradient(90deg,
+      var(--accent) 0%,
+      var(--accent) var(--pf-pct,0%),
+      rgba(56,189,248,.18) var(--pf-pct,0%),
+      rgba(56,189,248,.18) 100%);
+  }
 
   /* ---------- 音频输出浮窗 ---------- */
   .audio-float{position:fixed;right:10px;bottom:96px;z-index:330;width:330px;height:470px;
