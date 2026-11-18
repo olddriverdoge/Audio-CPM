@@ -23,8 +23,17 @@
     <select id="source-select" class="small" title="数据源（本地 / WebDAV）"
             style="max-width:150px"></select>
     <span class="spacer"></span>
+    <button type="button" class="small hdr-btn" id="btn-hand" title="锁定工作台：只允许双指缩放" aria-pressed="false">
+      <svg class="hand-ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+           stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M18 11V6a2 2 0 0 0-4 0v5"/>
+        <path d="M14 10V4a2 2 0 0 0-4 0v6"/>
+        <path d="M10 10.5V6a2 2 0 0 0-4 0v8"/>
+        <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>
+      </svg><span class="b-lbl">锁定</span>
+    </button>
     <button type="button" class="small" id="btn-fullscreen" title="全屏">⛶</button>
-    <button type="button" class="small hdr-btn" id="btn-player-cfg" title="设置（数据源 / 工作台缩放）"><span class="b-ico">⚙</span><span class="b-lbl">设置</span></button>
+    <button type="button" class="small hdr-btn" id="btn-player-cfg" title="设置（数据源）"><span class="b-ico">⚙</span><span class="b-lbl">设置</span></button>
   </header>
 
   <!-- 顶部只放场景（模块选择在右下角的模块坞） -->
@@ -361,23 +370,13 @@
 </div>
 
 <div id="toast-wrap"></div>
+<div id="ui-lock" class="ui-lock hidden" aria-hidden="true"></div>
 <div id="menu-overlay" class="hidden"><div id="ctx-menu" class="ctx-menu"></div></div>
 
 <div id="sheet-overlay" class="sheet-overlay hidden">
   <div class="sheet" id="player-sheet">
     <h3 style="font-size:13px">设置</h3>
-    <div class="ui-scale-row">
-      <label for="ui-scale">工作台缩放</label>
-      <select id="ui-scale">
-        <option value="0.8">80%</option>
-        <option value="0.9">90%</option>
-        <option value="1" selected>100%</option>
-        <option value="1.1">110%</option>
-        <option value="1.2">120%</option>
-        <option value="1.25">125%</option>
-      </select>
-      <span class="hint" id="ui-scale-hint">仅缩放模块窗，位置不变</span>
-    </div>
+
 
 
     <div style="border-top:1px solid var(--border);margin:12px 0 0"></div>

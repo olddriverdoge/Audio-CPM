@@ -12,7 +12,7 @@ const WinMgr = (() => {
   function px(v, d) { return Number.isFinite(Number(v)) ? Number(v) : d; }
   function uiScale() {
     const v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-scale'));
-    return Number.isFinite(v) && v > 0.4 && v < 2.5 ? v : 1;
+    return Number.isFinite(v) && v >= 0.5 && v <= 3.005 ? v : 1;
   }
 
   /* 可用区域：header + modbar 之下，播放条（可见时）之上，左右留 6px */
@@ -33,10 +33,11 @@ const WinMgr = (() => {
 
   function clampRect(r, minW, minH) {
     const b = bounds();
+    const z = uiScale();
     const maxW = Math.max(80, b.right - b.left);
     const maxH = Math.max(80, b.bottom - b.top);
-    // 横竖屏切换后可用区域可能比窗口最小尺寸还小：这时优先压缩到可视范围
-    const fw = Math.min(minW, maxW), fh = Math.min(minH, maxH);
+    // 最小尺寸也按工作台缩放，50% 时窗口才能真正缩小
+    const fw = Math.min(minW * z, maxW), fh = Math.min(minH * z, maxH);
     r.w = Math.max(fw, Math.min(r.w || maxW, maxW));
     r.h = Math.max(fh, Math.min(r.h || maxH, maxH));
     r.x = Math.max(b.left, Math.min(r.x, b.right - r.w));
@@ -70,7 +71,7 @@ const WinMgr = (() => {
     const win = typeof opts.win === 'string' ? document.getElementById(opts.win) : opts.win;
     const head = typeof opts.head === 'string' ? document.getElementById(opts.head) : opts.head;
     const resize = opts.resize ? (typeof opts.resize === 'string' ? document.getElementById(opts.resize) : opts.resize) : null;
-    if (!win) return {apply() {}, raise() {}, get rect() { return null; }};
+    if (!win) return {apply() {}, raise() {}, sync() {}, get rect() { return null; }};
     const minW = opts.minW || 240, minH = opts.minH || 160;
     const contentSized = !!opts.contentSized;      // 宽度按内容（如移动条），不写死 w/h
     const geoKey = 'ac3_geo_' + (opts.id || win.id);
@@ -79,12 +80,15 @@ const WinMgr = (() => {
     function readGeo() {
       const g = Store.get(geoKey, null);
       if (!g || !Number.isFinite(Number(g.w)) || !Number.isFinite(Number(g.h))) return null;
-      return {x: Number(g.x), y: Number(g.y), w: Number(g.w), h: Number(g.h)};
+      // 几何尺寸按 100% 逻辑尺寸存，缩放后按当前 z 还原成视觉尺寸
+      const z = uiScale();
+      return {x: Number(g.x), y: Number(g.y), w: Number(g.w) * z, h: Number(g.h) * z};
     }
     function persist() {
       if (!rect) return;
+      const z = uiScale();
       Store.set(geoKey, {x: Math.round(rect.x), y: Math.round(rect.y),
-                         w: Math.round(rect.w), h: Math.round(rect.h)});
+                         w: Math.round(rect.w / z), h: Math.round(rect.h / z)});
     }
     function apply(remeasure) {
       const saved = readGeo();
@@ -108,6 +112,11 @@ const WinMgr = (() => {
     function refresh() {
       if (win.classList.contains('hidden')) return;
       apply();
+    }
+    /* 缩放后只同步内部 rect（视觉坐标），不重写宽高 */
+    function sync() {
+      if (win.classList.contains('hidden')) return;
+      rect = measure(win);
     }
 
     /* 转屏：按当前真实尺寸重新压缩进可视区（不依赖上一方向存下来的几何） */
@@ -282,6 +291,7 @@ const WinMgr = (() => {
     const ctl = {
       apply,
       refresh,
+      sync,
       fit,
       raise: () => raise(win),
       get rect() { return rect; }
@@ -308,5 +318,6 @@ const WinMgr = (() => {
   });
 
   function reapplyAll() { regs.forEach(r => { try { r.refresh(); } catch (_) {} }); }
-  return {register, raise, reclampAll, reapplyAll, bounds};
+  function syncRects() { regs.forEach(r => { try { r.sync(); } catch (_) {} }); }
+  return {register, raise, reclampAll, reapplyAll, syncRects, bounds};
 })();

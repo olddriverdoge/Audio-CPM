@@ -389,17 +389,86 @@ const App = (() => {
     const c = String(v || '').split('-')[0].toLowerCase();
     return c === 'aiff' ? 'aif' : c;
   };
-  function setUiScale(value, persist) {
+  const UI_SCALE_MIN = 0.5, UI_SCALE_MAX = 3.0;
+  function applyUiScale(value) {
     let s = Number(value);
     if (!Number.isFinite(s)) s = 1;
-    s = Math.max(0.8, Math.min(1.25, s));
+    s = Math.max(UI_SCALE_MIN, Math.min(UI_SCALE_MAX, s));
     document.documentElement.style.setProperty('--ui-scale', String(s));
     window.AUDIOCPM_UI_SCALE = s;
-    if (persist) Store.set(K.uiScale, s);
-    try { WinMgr.reclampAll(true); } catch (_) {}
     return s;
   }
+  function setUiScale(value, persist) {
+    const s = applyUiScale(value);
+    if (persist) Store.set(K.uiScale, s);
+    try { WinMgr.syncRects(); } catch (_) {}
+    return s;
+  }
+  function previewUiScale(value) { return applyUiScale(value); }
+  function commitUiScale(value) { return setUiScale(value, true); }
   function currentUiScale() { return Number(window.AUDIOCPM_UI_SCALE || 1); }
+
+  /* 手形锁定：遮住 header 以下所有模块，禁止单指点击，只保留双指缩放 */
+  function initHandLock() {
+    const hand = document.getElementById('btn-hand');
+    const lock = document.getElementById('ui-lock');
+    const hdr = document.getElementById('app-hdr');
+    if (!hand || !lock || !hdr) return;
+    let locked = false, pinch = null;
+    function positionLock() {
+      lock.style.top = Math.round(hdr.getBoundingClientRect().bottom) + 'px';
+    }
+    function dist(touches) {
+      const dx = touches[0].clientX - touches[1].clientX;
+      const dy = touches[0].clientY - touches[1].clientY;
+      return Math.max(1, Math.sqrt(dx * dx + dy * dy));
+    }
+    function finishPinch(e) {
+      if (!pinch) return;
+      if (e && e.touches && e.touches.length >= 2) return;
+      const s = currentUiScale();
+      pinch = null;
+      commitUiScale(s);
+      if (e && e.cancelable) e.preventDefault();
+    }
+    function setLocked(on) {
+      locked = !!on;
+      hand.classList.toggle('on', locked);
+      hand.setAttribute('aria-pressed', locked ? 'true' : 'false');
+      hand.title = locked ? '解锁工作台（当前只允许双指缩放）' : '锁定工作台：只允许双指缩放';
+      const lbl = hand.querySelector('.b-lbl');
+      if (lbl) lbl.textContent = locked ? '解锁' : '锁定';
+      if (locked) {
+        positionLock();
+        lock.classList.remove('hidden');
+        lock.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('ui-locked');
+        Utils.toast('工作台已锁定：双指缩放 50%–300%');
+      } else {
+        finishPinch(null);
+        lock.classList.add('hidden');
+        lock.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('ui-locked');
+        Utils.toast('工作台已解锁');
+      }
+    }
+    hand.addEventListener('click', () => setLocked(!locked));
+    window.addEventListener('resize', () => { if (locked) positionLock(); });
+    window.addEventListener('orientationchange', () => { if (locked) setTimeout(positionLock, 120); });
+    lock.addEventListener('touchstart', e => {
+      if (e.touches.length !== 2) { pinch = null; return; }
+      e.preventDefault();
+      pinch = {d: dist(e.touches), scale: currentUiScale()};
+    }, {passive: false});
+    lock.addEventListener('touchmove', e => {
+      if (!pinch || e.touches.length < 2) return;
+      e.preventDefault();
+      const ratio = dist(e.touches) / pinch.d;
+      previewUiScale(pinch.scale * ratio);
+    }, {passive: false});
+    lock.addEventListener('touchend', finishPinch, {passive: false});
+    lock.addEventListener('touchcancel', finishPinch, {passive: false});
+  }
 
   async function applyCapabilities() {
     let caps = null;
@@ -694,6 +763,7 @@ const App = (() => {
 
     setUiScale(Store.get(K.uiScale, 1), false);
     initMods();
+    initHandLock();
     if (typeof SceneStore !== 'undefined') SceneStore.init();
     applyPlayMode();
 
@@ -762,7 +832,7 @@ const App = (() => {
   return {
     init, browse, onPlayed, updateMoveBar: () => MoveMgr.update(), isGridView, refreshColumns,
     playNext, playPrev, autoplayNext, autoplayOn, applyPlayMode, playMode, cyclePlayMode,
-    openModule, openModules, closeAllModules, openMod: openModule, setUiScale, currentUiScale, addTargetCurrent, addFavCurrent,
+    openModule, openModules, closeAllModules, openMod: openModule, setUiScale, previewUiScale, commitUiScale, currentUiScale, addTargetCurrent, addFavCurrent,
     playbackQueueList: () => playbackList().slice(), hifiQueue, toggleModule,
     get path() { return currentPath; },
     selection: () => (bv ? bv.selected() : []),
