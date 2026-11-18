@@ -60,6 +60,8 @@ const Api = (() => {
     playbackSkip: dir => jpost('/api/playback/skip', {dir}),
     audioFx: (op, a, b) => jpost('/api/audio/fx', {op, a, b}),
     audioInfo: () => jfetch('/api/audio/info'),
+    audioDevices: () => jfetch('/api/audio/devices'),
+    setAudioDevice: id => jpost('/api/audio/device', {id: Number(id) || 0}),
     renamePreview: cfg => jpost('/api/tasks/rename-preview', cfg)
   };
 })();

@@ -15,7 +15,7 @@ const K = {
   targetPath:'ac2_target_path',
   s2SortBy:'ac2_s2_sort_by', s2SortOrder:'ac2_s2_sort_order',
   playerPkg:'ac2_player_pkg', playerAct:'ac2_player_activity',
-  playMode:'ac2_play_mode',
+  playMode:'ac2_play_mode', audioDevice:'ac3_audio_device',
   s2ViewMode:'ac2_s2_view_mode', moveCollapsed:'ac2_movebar_collapsed',
   metaCollapsed:'ac2_meta_collapsed', meta1Collapsed:'ac2_meta1_collapsed', columns:'ac2_columns',
   columns2:'ac2_columns_s2',

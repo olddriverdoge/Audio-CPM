@@ -58,6 +58,67 @@ function createAudioPanel() {
     paint();
   }
 
+
+  const DEVICE_TYPES = {
+    usb_device: 'USB DAC', usb_headset: 'USB 耳机', wired_headphones: '有线耳机',
+    wired_headset: '有线耳麦', bluetooth_a2dp: '蓝牙', bluetooth_sco: '蓝牙通话',
+    ble_headset: 'BLE 耳机', ble_speaker: 'BLE 音箱', speaker: '扬声器', earpiece: '听筒',
+    hdmi: 'HDMI', hdmi_arc: 'HDMI ARC', hdmi_earc: 'HDMI eARC', line_analog: '模拟线路',
+    line_digital: '数字线路', other: '其他'
+  };
+  function deviceLabel(d) {
+    const type = DEVICE_TYPES[d.type] || d.type || '设备';
+    const name = String(d.name || '').trim();
+    const rates = Array.isArray(d.sampleRates) ? d.sampleRates : [];
+    const maxRate = rates.length ? Math.max.apply(null, rates) : 0;
+    return type + (name ? ' · ' + name : '') + (maxRate ? ' · ' + (maxRate / 1000).toFixed(1) + 'kHz' : '');
+  }
+
+  function bindRoute() {
+    const sel = document.getElementById('af-device');
+    const hintEl = document.getElementById('af-device-hint');
+    if (!sel) return;
+    function hint(msg) { if (hintEl) hintEl.textContent = msg || ''; }
+    async function loadDevices() {
+      try {
+        const r = await Api.audioDevices();
+        if (!Array.isArray(r)) { hint('设备列表读取失败'); return; }
+        const saved = Number(Store.get(K.audioDevice, 0)) || 0;
+        const opts = ['<option value="0">系统默认</option>'].concat(r.map(d =>
+          '<option value="' + Number(d.id) + '">' + Utils.escapeHtml(deviceLabel(d)) + '</option>'));
+        sel.innerHTML = opts.join('');
+        sel.value = (r.some(d => Number(d.id) === saved) || saved === 0) ? String(saved) : '0';
+        const cur = r.find(d => !!d.preferred) || null;
+        hint(cur ? ('当前：' + deviceLabel(cur)) : '当前：系统默认');
+        if (saved && !r.some(d => Number(d.id) === saved)) {
+          // 设备拔掉了：UI 回到默认，但不清用户的选择，插回后仍可恢复。
+          hint('上次选择的设备未连接，当前使用系统默认');
+        }
+      } catch (e) {
+        hint('设备列表读取失败: ' + ((e && e.message) || e));
+      }
+    }
+    sel.addEventListener('change', async () => {
+      const id = Number(sel.value) || 0;
+      try {
+        const r = await Api.setAudioDevice(id);
+        if (r && r.ok) {
+          Store.set(K.audioDevice, id);
+          const d = Array.from(sel.options).find(o => Number(o.value) === id);
+          hint('已切换：' + (id ? (d ? d.textContent : ('设备 ' + id)) : '系统默认'));
+          Utils.log('info', '输出设备: ' + (id ? String(id) : '系统默认'), 'workbench');
+        } else {
+          hint('切换失败: ' + ((r && r.error) || '设备不可用'));
+          loadDevices();
+        }
+      } catch (e) {
+        hint('切换失败: ' + ((e && e.message) || e));
+      }
+    });
+    loadDevices();
+    return loadDevices;
+  }
+
   function applyAll() {
     fx('eq', cfg.eqOn ? 1 : 0);
     // EQ 关闭时不要再单独发送频段/前级；它们属于同一条 EQ 链路，
@@ -391,9 +452,11 @@ function createAudioPanel() {
   }
 
   bindPlayCfg();
+  const reloadDevices = bindRoute();
   fw.onToggle(open => {
     if (open) {
       load();
+      if (reloadDevices) reloadDevices();
       clearInterval(refreshTimer);
       refreshTimer = setInterval(refresh, 1500);
     } else {

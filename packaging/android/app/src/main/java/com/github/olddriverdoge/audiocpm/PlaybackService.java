@@ -5,6 +5,8 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
+import android.media.AudioDeviceInfo;
+import android.media.AudioManager;
 import android.content.Intent;
 import android.os.Build;
 import android.util.Log;
@@ -38,6 +40,7 @@ public class PlaybackService extends MediaSessionService {
     private static volatile MediaSession session;
     private static volatile String lastError = "";
     private static volatile int audioSessionId = 0;
+    private static volatile int preferredDeviceId = 0;
 
     /** 频谱旁路：挂在 AudioSink 上只读 PCM，不改音频数据 */
     private final SpectrumProcessor spectrum = new SpectrumProcessor();
@@ -45,6 +48,33 @@ public class PlaybackService extends MediaSessionService {
     private final SoftwareEqProcessor softwareEq = new SoftwareEqProcessor();
 
     public static ExoPlayer getPlayer() { return player; }
+    public static int getPreferredDeviceId() { return preferredDeviceId; }
+
+    /** DAC / USB / 有线输出路由：只改 ExoPlayer 的 preferred device，不改变解码和 EQ 链路。 */
+    public static boolean setPreferredDevice(int id) {
+        preferredDeviceId = Math.max(0, id);
+        return applyPreferredDevice();
+    }
+
+    private static boolean applyPreferredDevice() {
+        ExoPlayer p = player;
+        if (p == null) return false;
+        if (preferredDeviceId <= 0) {
+            p.setPreferredAudioDevice(null);
+            return true;
+        }
+        try {
+            AudioManager am = (AudioManager) AudioCpmApp.get().getSystemService(Context.AUDIO_SERVICE);
+            if (am == null) return false;
+            for (AudioDeviceInfo d : am.getDevices(AudioManager.GET_DEVICES_OUTPUTS)) {
+                if (d.getId() == preferredDeviceId) {
+                    p.setPreferredAudioDevice(d);
+                    return true;
+                }
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
     public static String getLastError() { return lastError; }
     public static int getAudioSessionId() { return audioSessionId; }
 
@@ -69,6 +99,7 @@ public class PlaybackService extends MediaSessionService {
             }
         };
         player = new ExoPlayer.Builder(this, renderers).build();
+        applyPreferredDevice();
         // 不接管音频焦点：旧 p4a 版就是默认行为；接管后一旦焦点被别的应用拿走会直接暂停。
         player.setAudioAttributes(new AudioAttributes.Builder()
                 .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)

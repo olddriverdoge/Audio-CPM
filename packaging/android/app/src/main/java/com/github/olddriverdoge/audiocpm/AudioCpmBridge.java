@@ -1,6 +1,8 @@
 package com.github.olddriverdoge.audiocpm;
 
 import android.content.ComponentName;
+import android.media.AudioDeviceInfo;
+import android.media.AudioManager;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
@@ -88,6 +90,67 @@ public class AudioCpmBridge {
         return "{\"sampleRate\":0,\"channels\":0,\"encoding\":0}";
     }
 
+    private static String deviceTypeName(int type) {
+        switch (type) {
+            case AudioDeviceInfo.TYPE_BUILTIN_SPEAKER: return "speaker";
+            case AudioDeviceInfo.TYPE_BUILTIN_EARPIECE: return "earpiece";
+            case AudioDeviceInfo.TYPE_WIRED_HEADSET: return "wired_headset";
+            case AudioDeviceInfo.TYPE_WIRED_HEADPHONES: return "wired_headphones";
+            case AudioDeviceInfo.TYPE_LINE_ANALOG: return "line_analog";
+            case AudioDeviceInfo.TYPE_LINE_DIGITAL: return "line_digital";
+            case AudioDeviceInfo.TYPE_BLUETOOTH_A2DP: return "bluetooth_a2dp";
+            case AudioDeviceInfo.TYPE_BLUETOOTH_SCO: return "bluetooth_sco";
+            case AudioDeviceInfo.TYPE_USB_DEVICE: return "usb_device";
+            case AudioDeviceInfo.TYPE_USB_HEADSET: return "usb_headset";
+            case AudioDeviceInfo.TYPE_HDMI: return "hdmi";
+            case AudioDeviceInfo.TYPE_HDMI_ARC: return "hdmi_arc";
+            case AudioDeviceInfo.TYPE_HDMI_EARC: return "hdmi_earc";
+            case AudioDeviceInfo.TYPE_BLE_HEADSET: return "ble_headset";
+            case AudioDeviceInfo.TYPE_BLE_SPEAKER: return "ble_speaker";
+            case AudioDeviceInfo.TYPE_BLE_BROADCAST: return "ble_broadcast";
+            default: return "other";
+        }
+    }
+
+    /** 可用输出设备：USB DAC / 有线 / 蓝牙 / 扬声器。只返回 sink 设备。 */
+    public static String audioDevices() {
+        try {
+            AudioManager am = (AudioManager) AudioCpmApp.get().getSystemService(Context.AUDIO_SERVICE);
+            if (am == null) return "[]";
+            StringBuilder sb = new StringBuilder("[");
+            boolean first = true;
+            for (AudioDeviceInfo d : am.getDevices(AudioManager.GET_DEVICES_OUTPUTS)) {
+                if (!d.isSink()) continue;
+                if (!first) sb.append(',');
+                first = false;
+                sb.append("{\"id\":").append(d.getId())
+                        .append(",\"type\":\"").append(deviceTypeName(d.getType()))
+                        .append("\",\"name\":\"").append(esc(d.getProductName() == null ? "" : d.getProductName().toString()))
+                        .append("\",\"sampleRates\":[");
+                int[] rates = d.getSampleRates();
+                for (int i = 0; i < rates.length; i++) { if (i > 0) sb.append(','); sb.append(rates[i]); }
+                sb.append("],\"channels\":[");
+                int[] ch = d.getChannelCounts();
+                for (int i = 0; i < ch.length; i++) { if (i > 0) sb.append(','); sb.append(ch[i]); }
+                sb.append("],\"preferred\":").append(d.getId() == PlaybackService.getPreferredDeviceId()).append('}');
+            }
+            sb.append(']');
+            return sb.toString();
+        } catch (Throwable t) {
+            return "{\"ok\":false,\"error\":\"" + esc(String.valueOf(t)) + "\"}";
+        }
+    }
+
+    /** 选择输出设备；id=0 表示系统默认。 */
+    public static String setAudioDevice(final int id) {
+        try {
+            boolean ok = PlaybackService.setPreferredDevice(id);
+            return "{\"ok\":" + ok + ",\"id\":" + Math.max(0, id) + "}";
+        } catch (Throwable t) {
+            return "{\"ok\":false,\"error\":\"" + esc(String.valueOf(t)) + "\"}";
+        }
+    }
+
     /** 输出信息：设备原生采样率/缓冲 + ExoPlayer 实际 PCM 格式 + 音源格式 + 效果状态 */
     public static String audioInfo() {
         try {
@@ -110,7 +173,8 @@ public class AudioCpmBridge {
             try {
                 ExoPlayer p = PlaybackService.getPlayer();
                 if (p != null) {
-                    sb.append(",\"player\":true");
+                    sb.append(",\"preferredDeviceId\":").append(PlaybackService.getPreferredDeviceId());
+            sb.append(",\"player\":true");
                     sb.append(",\"playing\":").append(p.isPlaying());
                     sb.append(",\"playbackState\":").append(p.getPlaybackState());
                     sb.append(",\"sourceFormat\":").append(sourceFormat(p));

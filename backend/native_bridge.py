@@ -71,6 +71,8 @@ def register() -> bool:
             'skip': lambda d: _call('skip', int(d)),
             'audio_fx': lambda op, a, b: _call('fx', str(op), int(a), int(b)),
             'audio_info': lambda: _call('audioInfo'),
+            'devices': lambda: _call('audioDevices'),
+            'set_device': lambda id: _call('setAudioDevice', int(id or 0)),
         }
     except Exception:
         _playback = None
@@ -154,6 +156,24 @@ SOFTWARE_FX_FALLBACK = {
     'freqs': [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
     'levels': [0] * 10, 'treble': True, 'bass': True, 'virt': True, 'session': -1,
 }
+
+
+def audio_devices():
+    if not _playback:
+        return []
+    try:
+        return _playback['devices']()
+    except Exception as e:
+        return {'ok': False, 'error': str(e)[:300]}
+
+
+def set_audio_device(device_id):
+    if not _playback:
+        return {'ok': False, 'error': 'not_supported'}
+    try:
+        return _playback['set_device'](device_id)
+    except Exception as e:
+        return {'ok': False, 'error': str(e)[:300]}
 
 
 def audio_info():

@@ -270,6 +270,8 @@
   .af-playcfg{padding:8px 10px;border-bottom:1px solid var(--border);
     background:rgba(17,24,32,.6)}
   .af-playcfg .row{margin-top:5px!important}
+  .af-route{padding-bottom:6px;border-bottom:1px dashed rgba(255,255,255,.08);margin-bottom:6px}
+  .af-route select{width:100%}
   .af-playcfg label{font-size:10.5px;color:#9fb0c2;margin-bottom:2px!important}
   .af-playcfg select,.af-playcfg input{font-size:11px;padding:4px 6px}
 
