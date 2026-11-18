@@ -146,7 +146,13 @@ function createAudioPanel() {
 
   function render() {
     if (!info) return;
-    const f = info.format || {};
+    const rawF = info.format || {};
+    const aa = info.aaudio || {};
+    // 原生 AAudio 在部分 ROM 上会先于 SpectrumProcessor 报告格式；用 AAudio 的实际流参数补足，
+    // 避免“播放中但未读到格式”。
+    const f = (rawF.sampleRate ? rawF : (aa.sampleRate ? {
+      sampleRate: aa.sampleRate, channels: aa.channels, encoding: aa.encoding, configured: true
+    } : rawF));
     const d = info.fx || {};
     const devRate = info.deviceSampleRate || 0;
     const src = info.sourceFormat || {};
@@ -229,13 +235,18 @@ function createAudioPanel() {
     if (info.framesPerBuffer) html += row('缓冲', info.framesPerBuffer + ' 帧 · 约 ' + (info.latencyMs || 0) + ' ms');
     if (outputReady) html += row('重采样', isResample ? '是（' + (f.sampleRate / 1000).toFixed(1) + ' → ' + (devRate / 1000).toFixed(1) + ' kHz）' : '否');
     html += row('输出方式', externalMode ? '外部播放器（目标 App）'
-      : (webMode ? '网页内播放（WebView / 系统混音）' : '共享混音（ExoPlayer）'));
+      : (webMode ? '网页内播放（WebView / 系统混音）'
+        : (aa.active ? 'AAudio 独占（ExoPlayer）'
+          : (aa.error ? '共享混音（AAudio 不可用）' : '共享混音（ExoPlayer）'))));
     if (externalMode) {
       html += '<div class="af-na">外部播放器模式下，解码与输出由目标播放器负责；本应用只能确认播放请求已发送，读不到它的实际采样率/位深。需要精确输出信息请切回网页内播放。</div>';
     } else if (webMode) {
       html += '<div class="af-na">网页内播放由 WebView 解码，实际输出采样率/位深由系统混音决定，无法精确读取；上面的音源格式来自当前文件探测。EQ/音效在网页播放链路不会经过原生 PCM 旁路。</div>';
     } else {
-      html += '<div class="af-na">EQ 与音效在 PCM 链路上处理，不依赖系统 AudioEffect，因此不会出现“设备不支持”。独占/bit-perfect 需自写 AAudio 输出，仍是共享混音；DSD 走 PCM 转换后播放。</div>';
+      html += '<div class="af-na">EQ 与音效在 PCM 链路上处理，不依赖系统 AudioEffect，因此不会出现“设备不支持”。'
+        + (aa.active ? '当前使用 AAudio exclusive，实际参数以硬件协商为准；设备拒绝时会自动回退共享混音。'
+          : '当前为共享混音；AAudio exclusive 不可用时自动回退。')
+        + 'DSD 走 PCM 转换后播放。</div>';
     }
     html += '</div>';
 
@@ -431,8 +442,10 @@ function createAudioPanel() {
   function infoKey() {
     const f = (info && info.format) || {};
     const src = (info && info.sourceFormat) || {};
+    const aa = (info && info.aaudio) || {};
     return [!!(info && info.playing), !!(info && info.web), !!(info && info.pending),
-      f.sampleRate || 0, f.configured !== false, src.sampleRate || 0].join('|');
+      f.sampleRate || 0, f.configured !== false, src.sampleRate || 0,
+      !!aa.active, aa.sampleRate || 0, info && info.deviceSampleRate || 0].join('|');
   }
 
   // 定时轻刷新：面板打开期间播放/暂停会变化，不能只在打开时读一次，否则一直显示“未播放”。

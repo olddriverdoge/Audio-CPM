@@ -3,6 +3,7 @@ package com.github.olddriverdoge.audiocpm;
 import android.content.ComponentName;
 import android.media.AudioDeviceInfo;
 import android.media.AudioManager;
+import android.media.AudioTrack;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
@@ -164,6 +165,18 @@ public class AudioCpmBridge {
                 String fp = am == null ? null : am.getProperty(android.media.AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER);
                 int rate = sr == null ? 0 : Integer.parseInt(sr);
                 int frames = fp == null ? 0 : Integer.parseInt(fp);
+                // 部分 ROM 不提供 PROPERTY_OUTPUT_SAMPLE_RATE（返回空串），
+                // 用 AudioTrack 的原生输出采样率做兜底，避免面板一直显示“未知”。
+                if (rate <= 0) {
+                    try { rate = AudioTrack.getNativeOutputSampleRate(AudioManager.STREAM_MUSIC); } catch (Throwable ignored) {}
+                }
+                if (frames <= 0 && rate > 0) {
+                    try {
+                        int minBytes = AudioTrack.getMinBufferSize(rate, android.media.AudioFormat.CHANNEL_OUT_STEREO,
+                                android.media.AudioFormat.ENCODING_PCM_16BIT);
+                        if (minBytes > 0) frames = minBytes / 4; // 16bit stereo = 4 bytes/frame
+                    } catch (Throwable ignored) {}
+                }
                 sb.append(",\"deviceSampleRate\":").append(rate);
                 sb.append(",\"framesPerBuffer\":").append(frames);
                 sb.append(",\"latencyMs\":").append(rate > 0 ? (int) Math.round(frames * 1000.0 / rate) : 0);
@@ -185,6 +198,7 @@ public class AudioCpmBridge {
                     sb.append(",\"player\":false,\"playing\":false,\"playbackState\":-1");
                     sb.append(",\"sourceFormat\":{\"sampleRate\":0,\"channels\":0,\"encoding\":0}");
                 }
+                sb.append(",\"aaudio\":").append(AaudioAudioSink.describe());
             } catch (Throwable t) {
                 sb.append(",\"player\":false,\"playing\":false,\"playbackState\":-1");
                 sb.append(",\"sourceFormat\":{\"sampleRate\":0,\"channels\":0,\"encoding\":0}");

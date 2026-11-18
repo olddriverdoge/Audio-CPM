@@ -82,7 +82,7 @@ jobs:
         run: |
           SDKM=$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | head -1)
           yes | "$SDKM" --licenses >/dev/null 2>&1 || true
-          "$SDKM" "platforms;android-35" "build-tools;35.0.0"
+          "$SDKM" "platforms;android-35" "build-tools;35.0.0" "cmake;3.22.1" "ndk;27.0.12077973"
 
       - name: Download ffmpeg binary
         uses: actions/download-artifact@v4

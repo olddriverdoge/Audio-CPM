@@ -25,10 +25,23 @@ android {
         applicationId = "com.github.olddriverdoge.audiocpm$packageSuffix"
         minSdk = 24
         targetSdk = 35
-        versionCode = 53
-        versionName = "0.4.6"
+        versionCode = 54
+        versionName = "0.4.7"
         ndk { abiFilters += listOf("arm64-v8a") }
+        externalNativeBuild {
+            cmake {
+                arguments += listOf("-DANDROID_PLATFORM=android-26")
+                cppFlags += "-std=c++17"
+            }
+        }
     }
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

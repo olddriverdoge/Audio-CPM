@@ -93,11 +93,14 @@ public class PlaybackService extends MediaSessionService {
             @Override
             protected AudioSink buildAudioSink(Context context, boolean enableFloatOutput,
                                                boolean enableAudioTrackPlaybackParams) {
-                return new DefaultAudioSink.Builder(context)
+                DefaultAudioSink shared = new DefaultAudioSink.Builder(context)
                         .setAudioProcessors(new AudioProcessor[]{PlaybackService.this.spectrum, PlaybackService.this.softwareEq})
                         .setEnableFloatOutput(enableFloatOutput)
                         .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
                         .build();
+                // AAudio exclusive 优先；设备/ROM 拒绝时 AaudioAudioSink 会自动用 shared 回退。
+                return new AaudioAudioSink(context, shared,
+                        new AudioProcessor[]{PlaybackService.this.spectrum, PlaybackService.this.softwareEq});
             }
         };
         player = new ExoPlayer.Builder(this, renderers).build();
