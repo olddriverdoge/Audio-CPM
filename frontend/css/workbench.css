@@ -148,6 +148,9 @@
   .af-slider{flex:1 1 auto;min-width:0;accent-color:var(--accent);height:18px}
   .af-vslider{flex:0 0 auto;width:22px;height:208px;writing-mode:vertical-lr;direction:rtl;
     accent-color:var(--accent);padding:0;margin:0}
+  /* EQ 关闭时推子禁用：不再抢触摸，模块可以正常上下滑动 */
+  .af-bands.off .af-vslider,.af-pre.off .af-slider{opacity:.45;pointer-events:none}
+  .af-slider:disabled{pointer-events:none}
   .af-pre{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:10.5px;color:var(--muted)}
   .af-fx{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);margin:4px 0}
   .af-fx>span:first-of-type{flex:0 0 64px}

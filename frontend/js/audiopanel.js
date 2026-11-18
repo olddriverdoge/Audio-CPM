@@ -12,6 +12,7 @@ function createAudioPanel() {
   const PRESET_NAMES = ['关闭', '流行', '古典', '摇滚', '人声', '自定义'];
   const fmtDb = v => (v > 0 ? '+' : '') + Number(v || 0) + 'dB';
   const encName = e => (e === 4 ? '32-bit 浮点' : e === 21 ? '24-bit' : e === 22 ? '32-bit' : e === 3 ? '8-bit' : e === 0 ? '编码未知' : '16-bit');
+  const encFromBits = b => (b === 24 ? 21 : b === 32 ? 22 : b === 8 ? 3 : 2);
   let cfg = Store.get('ac3_audio_cfg', {}) || {};
   if (Array.isArray(cfg.bands)) {
     cfg.bands = cfg.bands.map(v => Math.max(-2000, Math.min(2000, Number(v) || 0)));
@@ -88,10 +89,11 @@ function createAudioPanel() {
     const d = info.fx || {};
     const devRate = info.deviceSampleRate || 0;
     const src = info.sourceFormat || {};
+    const externalMode = Store.get(K.playMode, 'web') === 'system';
+    const webMode = !externalMode && !!(typeof Player !== 'undefined' && Player.current && !Player.hifiActive());
     const playing = !!info.playing;
     const outputReady = !!f.sampleRate && f.configured !== false;
     const isResample = devRate > 0 && f.sampleRate && f.sampleRate !== devRate;
-    const externalMode = Store.get(K.playMode, 'web') === 'system';
     const fmtLine = (o) => {
       if (!o || !o.sampleRate) return '';
       return (o.sampleRate / 1000).toFixed(1) + ' kHz · ' + encName(o.encoding) + ' · ' + (o.channels || 0) + 'ch';
@@ -106,18 +108,19 @@ function createAudioPanel() {
       html += '<div class="af-presets">' + PRESET_NAMES.map((n, i) =>
         '<button type="button" class="af-chip' + ((cfg.preset || 0) === i ? ' on' : '') +
         '" data-preset="' + i + '">' + n + '</button>').join('') + '</div>';
-      html += '<div class="af-bands">';
+      html += '<div class="af-bands' + (cfg.eqOn ? '' : ' off') + '">';
       (d.freqs || []).forEach((hz, i) => {
         let lv = Array.isArray(cfg.bands) && cfg.bands[i] != null ? cfg.bands[i] : (d.levels ? d.levels[i] : 0);
         lv = Math.max(Number(d.minLevel ?? -2000), Math.min(Number(d.maxLevel ?? 2000), Number(lv) || 0));
         const label = hz >= 1000 ? (hz / 1000) + 'k' : hz + '';
         html += '<div class="af-band"><span class="af-db">' + (lv / 100).toFixed(1) + '</span>' +
           '<input type="range" class="af-slider af-vslider" data-band="' + i + '" min="' + d.minLevel +
-          '" max="' + d.maxLevel + '" value="' + lv + '" step="50" aria-label="' + label + 'Hz">' +
+          '" max="' + d.maxLevel + '" value="' + lv + '" step="50" aria-label="' + label + 'Hz"' +
+          (cfg.eqOn ? '' : ' disabled') + '>' +
           '<span class="af-f">' + label + '</span></div>';
       });
       html += '</div>';
-      html += '<div class="af-pre"><span>前级增益</span><input type="range" class="af-slider" id="af-preamp" min="-20" max="20" step="0.5" value="' + (cfg.preamp || 0) + '"><span class="af-db" id="af-preamp-v">' + fmtDb(cfg.preamp || 0) + '</span></div>';
+      html += '<div class="af-pre' + (cfg.eqOn ? '' : ' off') + '"><span>前级增益</span><input type="range" class="af-slider" id="af-preamp" min="-20" max="20" step="0.5" value="' + (cfg.preamp || 0) + '"' + (cfg.eqOn ? '' : ' disabled') + '><span class="af-db" id="af-preamp-v">' + fmtDb(cfg.preamp || 0) + '</span></div>';
     } else {
       html += '<div class="af-na">EQ 参数读取失败，可尝试关掉再打开本模块</div>';
     }
@@ -140,22 +143,31 @@ function createAudioPanel() {
 
     /* ---- 输出信息 ---- */
     html += '<div class="af-sec"><div class="af-sec-h"><span>输出信息</span></div>';
-    html += row('播放状态', playing ? '播放中' : (externalMode ? '外部播放器模式' : '未播放'));
+    html += row('播放状态', playing ? (webMode ? '网页播放中' : '播放中') : (externalMode ? '外部播放器模式' : (webMode ? '网页内未播放' : '未播放')));
     if (outputReady) {
       html += row('实际输出', fmtLine(f));
-    } else if (src.sampleRate) {
       html += row('音源格式', fmtLine(src));
-      html += row('实际输出', playing ? '播放中，输出格式尚未就绪' : '尚未开始播放');
+    } else if (src.sampleRate) {
+      html += row('音源格式', fmtLine(src) + (info.sourceCodec ? ' · ' + info.sourceCodec : ''));
+      html += row('实际输出', webMode
+        ? (playing ? '网页内播放（WebView / 系统混音）' : '尚未开始播放')
+        : (playing ? '播放中，输出格式尚未就绪' : '尚未开始播放'));
+    } else if (webMode) {
+      html += row('音源格式', '读取中 / 未知');
+      html += row('实际输出', playing ? '网页内播放（WebView / 系统混音，采样率由系统决定）' : '尚未开始播放');
     } else {
       html += row('实际输出', playing ? '播放中，未读到格式' : '尚未开始播放');
     }
-    if (src.sampleRate && outputReady) html += row('音源格式', fmtLine(src));
+    if (src.sampleRate && outputReady) html += row('音源格式', fmtLine(src) + (info.sourceCodec ? ' · ' + info.sourceCodec : ''));
     html += row('设备原生采样率', devRate ? (devRate / 1000).toFixed(1) + ' kHz' : '未知');
     if (info.framesPerBuffer) html += row('缓冲', info.framesPerBuffer + ' 帧 · 约 ' + (info.latencyMs || 0) + ' ms');
     if (outputReady) html += row('重采样', isResample ? '是（' + (f.sampleRate / 1000).toFixed(1) + ' → ' + (devRate / 1000).toFixed(1) + ' kHz）' : '否');
-    html += row('输出方式', externalMode ? '外部播放器（目标 App）' : '共享混音（ExoPlayer）');
+    html += row('输出方式', externalMode ? '外部播放器（目标 App）'
+      : (webMode ? '网页内播放（WebView / 系统混音）' : '共享混音（ExoPlayer）'));
     if (externalMode) {
       html += '<div class="af-na">外部播放器模式下，解码与输出由目标播放器负责；本应用只能确认播放请求已发送，读不到它的实际采样率/位深。需要精确输出信息请切回网页内播放。</div>';
+    } else if (webMode) {
+      html += '<div class="af-na">网页内播放由 WebView 解码，实际输出采样率/位深由系统混音决定，无法精确读取；上面的音源格式来自当前文件探测。EQ/音效在网页播放链路不会经过原生 PCM 旁路。</div>';
     } else {
       html += '<div class="af-na">EQ 与音效在 PCM 链路上处理，不依赖系统 AudioEffect，因此不会出现“设备不支持”。独占/bit-perfect 需自写 AAudio 输出，仍是共享混音；DSD 走 PCM 转换后播放。</div>';
     }
@@ -176,6 +188,8 @@ function createAudioPanel() {
         }
         fx('preamp', Math.round((cfg.preamp || 0) * 100));
       }
+      // 关闭时立即把推子置为 disabled，触摸事件不再被滑杆吃掉，页面可以正常上下滚。
+      render();
     });
     document.querySelectorAll('.af-chip[data-preset]').forEach(b => {
       b.addEventListener('click', () => {
@@ -276,6 +290,37 @@ function createAudioPanel() {
     if (retry) retry.addEventListener('click', () => load());
   }
 
+  async function enrichWebInfo(info) {
+    const external = Store.get(K.playMode, 'web') === 'system';
+    let hifi = false;
+    try { hifi = !!(typeof Player !== 'undefined' && Player.hifiActive && Player.hifiActive()); } catch (_) {}
+    if (external || hifi) return;
+    info.web = !!(typeof Player !== 'undefined' && Player.current);
+    if (!info.web) return;
+    try { info.playing = !!Player.isPlaying(); } catch (_) {}
+    const src = info.sourceFormat || {};
+    if (src.sampleRate) return;
+    const path = Player.current;
+    if (!path) return;
+    try {
+      // 网页/WebDAV 播放没有原生 ExoPlayer 的 sourceFormat；从当前文件探测一次，
+      // 只用于展示“音源格式”。4 秒超时就放弃，不能把输出面板拖住。
+      const d = await Promise.race([
+        Api.probe(path),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('probe timeout')), 4000))
+      ]);
+      const a = (d && d.audio) || {};
+      if (a.sample_rate) {
+        info.sourceFormat = {
+          sampleRate: Number(a.sample_rate) || 0,
+          channels: Number(a.channels) || 0,
+          encoding: encFromBits(Number(a.bits_per_sample) || 0)
+        };
+      }
+      if (a.codec_name) info.sourceCodec = String(a.codec_name);
+    } catch (_) {}
+  }
+
   async function load() {
     let reason = '';
     info = null;
@@ -292,16 +337,19 @@ function createAudioPanel() {
       renderInfoFail(reason);
       return;
     }
+    await enrichWebInfo(info);
     if (trackEl) {
       const f = info.format || {};
+      const src = info.sourceFormat || {};
       const fmt = (f.sampleRate && f.configured !== false) ? ((f.sampleRate / 1000).toFixed(1) + 'k · ' + encName(f.encoding)) : '';
+      const sfmt = (src.sampleRate ? ((src.sampleRate / 1000).toFixed(1) + 'k · ' + encName(src.encoding)) : '');
       trackEl.textContent = info.playing
-        ? (fmt || ((typeof I18n !== 'undefined') ? I18n.t('播放中') : '播放中'))
+        ? (fmt || sfmt || ((typeof I18n !== 'undefined') ? I18n.t(info.web ? '网页播放中' : '播放中') : (info.web ? '网页播放中' : '播放中')))
         : (info.pending ? ((typeof I18n !== 'undefined') ? I18n.t('待播放') : '待播放')
-          : (fmt || ((typeof I18n !== 'undefined') ? I18n.t('未播放') : '未播放')));
+          : (fmt || sfmt || ((typeof I18n !== 'undefined') ? I18n.t('未播放') : '未播放')));
     }
     const f = info.format || {};
-    if (info.playing && (!f.sampleRate || f.configured === false)) {
+    if (info.playing && !info.web && (!f.sampleRate || f.configured === false)) {
       try {
         Utils.log('warn', '音频输出信息未就绪: ' + JSON.stringify({
           playing: info.playing,
