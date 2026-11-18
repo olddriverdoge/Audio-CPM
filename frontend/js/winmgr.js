@@ -170,6 +170,13 @@ const WinMgr = (() => {
 
     function onWinDown(e) {
       if (e.pointerType === 'mouse') return;
+      // 新的一次单指手势开始时，清掉上一次可能没收到 pointerup 的残留触点。
+      // 否则残留触点 + 当前单指会被算成“双指”，把拖动误判成缩放。
+      if (e.isPrimary && ptrs.size > 0) {
+        ptrs.clear();
+        if (mode === 'drag' || mode === 'pinch') mode = null;
+        drag0 = null; pinch0 = null;
+      }
       ptrs.set(e.pointerId, {x: e.clientX, y: e.clientY});
       if (ptrs.size === 2) {
         try { win.setPointerCapture(e.pointerId); } catch (_) {}
@@ -214,17 +221,24 @@ const WinMgr = (() => {
       }
     }
     function onWinUp(e) {
+      // 只处理本窗口正在跟踪的触点；文档级兜底 pointerup 也会调用它
+      if (!ptrs.has(e.pointerId)) return;
       ptrs.delete(e.pointerId);
       if (ptrs.size === 0) {
         if (mode === 'drag' || mode === 'pinch') persist();
         if (opts.onRectChange) { try { opts.onRectChange(rect); } catch (_) {} }
-        mode = null; drag0 = null; pinch0 = null;
+        mode = null; drag0 = null; pinch0 = null; rz0 = null;
       } else if (ptrs.size === 1 && mode === 'pinch') {
         // 双指变单指：结束这次捏合，避免跳变
         persist();
         mode = null; pinch0 = null;
       }
     }
+    // 手指可能在浮窗外抬起（如正文滚动后滑出窗口），窗口自身收不到 pointerup，
+    // 这里在 document 上兜底清理，避免残留触点把下一次单指拖动误判成缩放。
+    const docUp = e => onWinUp(e);
+    document.addEventListener('pointerup', docUp, true);
+    document.addEventListener('pointercancel', docUp, true);
     win.addEventListener('pointerdown', onWinDown, true);
     win.addEventListener('pointermove', onWinMove, true);
     win.addEventListener('pointerup', onWinUp, true);
@@ -283,7 +297,12 @@ const WinMgr = (() => {
 
     /* 打开 / 收起：打开时夹一次并置顶 */
     const obs = new MutationObserver(() => {
-      if (!win.classList.contains('hidden')) { apply(); raise(win); }
+      if (!win.classList.contains('hidden')) {
+        apply(); raise(win);
+      } else {
+        // 收起时手指可能还在屏上；清掉手势状态，避免下次单指拖动被旧触点干扰。
+        ptrs.clear(); mode = null; drag0 = null; pinch0 = null; rz0 = null;
+      }
     });
     obs.observe(win, {attributes: true, attributeFilter: ['class']});
 
