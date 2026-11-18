@@ -146,7 +146,7 @@
   .af-f{width:auto;flex:0 0 auto;text-align:center;font-variant-numeric:tabular-nums;font-size:9px}
   .af-db{width:auto;flex:0 0 auto;text-align:center;color:var(--muted);font-variant-numeric:tabular-nums;font-size:9px}
   .af-slider{flex:1 1 auto;min-width:0;accent-color:var(--accent);height:18px}
-  .af-vslider{flex:0 0 auto;width:22px;height:104px;writing-mode:vertical-lr;direction:rtl;
+  .af-vslider{flex:0 0 auto;width:22px;height:208px;writing-mode:vertical-lr;direction:rtl;
     accent-color:var(--accent);padding:0;margin:0}
   .af-pre{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:10.5px;color:var(--muted)}
   .af-fx{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);margin:4px 0}

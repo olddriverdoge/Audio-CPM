@@ -164,7 +164,9 @@ def audio_info():
             logger.info('audio_info: playback bridge not ready, returning software EQ fallback')
             return {'ok': True, 'pending': True, 'playback_available': False,
                     'bridge_available': True, 'mode': 'software',
-                    'deviceSampleRate': 0, 'format': {}, 'fx': dict(SOFTWARE_FX_FALLBACK)}
+                    'player': False, 'playing': False, 'playbackState': -1,
+                    'deviceSampleRate': 0, 'format': {}, 'sourceFormat': {},
+                    'fx': dict(SOFTWARE_FX_FALLBACK)}
         logger.warning('audio_info: native playback bridge not registered')
         return {'ok': False, 'error': 'not_supported', 'playback_available': False,
                 'bridge_available': available()}
@@ -179,7 +181,9 @@ def audio_info():
         if available():
             fb = {'ok': True, 'pending': True, 'playback_available': True,
                   'bridge_available': True, 'mode': 'software',
-                  'deviceSampleRate': 0, 'format': {}, 'fx': dict(SOFTWARE_FX_FALLBACK),
+                  'player': True, 'playing': False, 'playbackState': -1,
+                  'deviceSampleRate': 0, 'format': {}, 'sourceFormat': {},
+                  'fx': dict(SOFTWARE_FX_FALLBACK),
                   'warning': str(e)[:120]}
             return fb
         return {'ok': False, 'error': str(e)[:300], 'playback_available': True}

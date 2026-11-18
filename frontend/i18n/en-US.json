@@ -447,5 +447,13 @@
   "网络错误: {msg}": "Network error: {msg}",
   "音频流": "Audio stream",
   "封面": "Cover",
-  "编码": "Codec"
+  "编码": "Codec",
+  "播放中": "Playing",
+  "外部播放器模式": "External player mode",
+  "音源格式": "Source format",
+  "播放状态": "Playback status",
+  "播放中，输出格式尚未就绪": "Playing; output format not ready",
+  "播放中，未读到格式": "Playing; format unavailable",
+  "外部播放器（目标 App）": "External player (target app)",
+  "外部播放器模式下，解码与输出由目标播放器负责；本应用只能确认播放请求已发送，读不到它的实际采样率/位深。需要精确输出信息请切回网页内播放。": "In external-player mode, decoding and output are handled by the target player. This app can only confirm that the play request was sent and cannot read its actual sample rate/bit depth. Switch back to in-app playback for exact output details."
 }

@@ -11,9 +11,12 @@ import android.os.Looper;
 import android.provider.Settings;
 import android.util.Log;
 
+import androidx.media3.common.C;
+import androidx.media3.common.Format;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.Player;
 import androidx.media3.common.PlaybackParameters;
+import androidx.media3.common.Tracks;
 import androidx.media3.exoplayer.ExoPlayer;
 
 import java.io.File;
@@ -69,7 +72,23 @@ public class AudioCpmBridge {
         return AudioFx.apply(op, a, b);
     }
 
-    /** 输出信息：设备原生采样率/缓冲 + ExoPlayer 实际 PCM 格式 + 效果状态 */
+    /** 当前音源轨道格式（ExoPlayer 已识别到的原始格式，不代表 AudioSink 最终输出格式）。 */
+    private static String sourceFormat(ExoPlayer p) {
+        try {
+            Tracks tracks = p.getCurrentTracks();
+            for (Tracks.Group group : tracks.getGroups()) {
+                if (group.getType() != C.TRACK_TYPE_AUDIO || !group.isSelected()) continue;
+                Format f = group.getTrackFormat(0);
+                return "{\"sampleRate\":" + Math.max(0, f.sampleRate)
+                        + ",\"channels\":" + Math.max(0, f.channelCount)
+                        + ",\"encoding\":" + Math.max(0, f.pcmEncoding) + "}";
+            }
+        } catch (Throwable ignored) {
+        }
+        return "{\"sampleRate\":0,\"channels\":0,\"encoding\":0}";
+    }
+
+    /** 输出信息：设备原生采样率/缓冲 + ExoPlayer 实际 PCM 格式 + 音源格式 + 效果状态 */
     public static String audioInfo() {
         try {
             StringBuilder sb = new StringBuilder("{\"ok\":true");
@@ -90,8 +109,20 @@ public class AudioCpmBridge {
             catch (Throwable t) { sb.append(",\"fx\":{\"ok\":false,\"error\":\"").append(esc(String.valueOf(t))).append("\"}"); }
             try {
                 ExoPlayer p = PlaybackService.getPlayer();
-                if (p != null) sb.append(",\"speed\":").append(p.getPlaybackParameters().speed);
-            } catch (Throwable ignored) {}
+                if (p != null) {
+                    sb.append(",\"player\":true");
+                    sb.append(",\"playing\":").append(p.isPlaying());
+                    sb.append(",\"playbackState\":").append(p.getPlaybackState());
+                    sb.append(",\"sourceFormat\":").append(sourceFormat(p));
+                    sb.append(",\"speed\":").append(p.getPlaybackParameters().speed);
+                } else {
+                    sb.append(",\"player\":false,\"playing\":false,\"playbackState\":-1");
+                    sb.append(",\"sourceFormat\":{\"sampleRate\":0,\"channels\":0,\"encoding\":0}");
+                }
+            } catch (Throwable t) {
+                sb.append(",\"player\":false,\"playing\":false,\"playbackState\":-1");
+                sb.append(",\"sourceFormat\":{\"sampleRate\":0,\"channels\":0,\"encoding\":0}");
+            }
             sb.append('}');
             return sb.toString();
         } catch (Throwable t) {

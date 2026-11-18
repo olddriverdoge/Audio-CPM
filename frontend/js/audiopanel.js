@@ -11,7 +11,7 @@ function createAudioPanel() {
   const trackEl = document.getElementById('af-track');
   const PRESET_NAMES = ['关闭', '流行', '古典', '摇滚', '人声', '自定义'];
   const fmtDb = v => (v > 0 ? '+' : '') + Number(v || 0) + 'dB';
-  const encName = e => (e === 4 ? '32-bit 浮点' : e === 21 ? '24-bit' : e === 22 ? '32-bit' : e === 3 ? '8-bit' : '16-bit');
+  const encName = e => (e === 4 ? '32-bit 浮点' : e === 21 ? '24-bit' : e === 22 ? '32-bit' : e === 3 ? '8-bit' : e === 0 ? '编码未知' : '16-bit');
   let cfg = Store.get('ac3_audio_cfg', {}) || {};
   if (Array.isArray(cfg.bands)) {
     cfg.bands = cfg.bands.map(v => Math.max(-2000, Math.min(2000, Number(v) || 0)));
@@ -87,7 +87,15 @@ function createAudioPanel() {
     const f = info.format || {};
     const d = info.fx || {};
     const devRate = info.deviceSampleRate || 0;
+    const src = info.sourceFormat || {};
+    const playing = !!info.playing;
+    const outputReady = !!f.sampleRate && f.configured !== false;
     const isResample = devRate > 0 && f.sampleRate && f.sampleRate !== devRate;
+    const externalMode = Store.get(K.playMode, 'web') === 'system';
+    const fmtLine = (o) => {
+      if (!o || !o.sampleRate) return '';
+      return (o.sampleRate / 1000).toFixed(1) + ' kHz · ' + encName(o.encoding) + ' · ' + (o.channels || 0) + 'ch';
+    };
     let html = '';
 
     /* ---- EQ ---- */
@@ -132,16 +140,25 @@ function createAudioPanel() {
 
     /* ---- 输出信息 ---- */
     html += '<div class="af-sec"><div class="af-sec-h"><span>输出信息</span></div>';
-    if (f.sampleRate) {
-      html += row('实际输出', (f.sampleRate / 1000).toFixed(1) + ' kHz · ' + encName(f.encoding) + ' · ' + (f.channels || 0) + 'ch');
+    html += row('播放状态', playing ? '播放中' : (externalMode ? '外部播放器模式' : '未播放'));
+    if (outputReady) {
+      html += row('实际输出', fmtLine(f));
+    } else if (src.sampleRate) {
+      html += row('音源格式', fmtLine(src));
+      html += row('实际输出', playing ? '播放中，输出格式尚未就绪' : '尚未开始播放');
     } else {
-      html += row('实际输出', '尚未开始播放');
+      html += row('实际输出', playing ? '播放中，未读到格式' : '尚未开始播放');
     }
+    if (src.sampleRate && outputReady) html += row('音源格式', fmtLine(src));
     html += row('设备原生采样率', devRate ? (devRate / 1000).toFixed(1) + ' kHz' : '未知');
     if (info.framesPerBuffer) html += row('缓冲', info.framesPerBuffer + ' 帧 · 约 ' + (info.latencyMs || 0) + ' ms');
-    html += row('重采样', isResample ? '是（' + (f.sampleRate / 1000).toFixed(1) + ' → ' + (devRate / 1000).toFixed(1) + ' kHz）' : '否');
-    html += row('输出方式', '共享混音（ExoPlayer）');
-    html += '<div class="af-na">EQ 与音效在 PCM 链路上处理，不依赖系统 AudioEffect，因此不会出现“设备不支持”。独占/bit-perfect 需自写 AAudio 输出，仍是共享混音；DSD 走 PCM 转换后播放。</div>';
+    if (outputReady) html += row('重采样', isResample ? '是（' + (f.sampleRate / 1000).toFixed(1) + ' → ' + (devRate / 1000).toFixed(1) + ' kHz）' : '否');
+    html += row('输出方式', externalMode ? '外部播放器（目标 App）' : '共享混音（ExoPlayer）');
+    if (externalMode) {
+      html += '<div class="af-na">外部播放器模式下，解码与输出由目标播放器负责；本应用只能确认播放请求已发送，读不到它的实际采样率/位深。需要精确输出信息请切回网页内播放。</div>';
+    } else {
+      html += '<div class="af-na">EQ 与音效在 PCM 链路上处理，不依赖系统 AudioEffect，因此不会出现“设备不支持”。独占/bit-perfect 需自写 AAudio 输出，仍是共享混音；DSD 走 PCM 转换后播放。</div>';
+    }
     html += '</div>';
 
     if (dynamic) dynamic.innerHTML = html;
@@ -277,8 +294,22 @@ function createAudioPanel() {
     }
     if (trackEl) {
       const f = info.format || {};
-      trackEl.textContent = info.pending ? ((typeof I18n !== 'undefined') ? I18n.t('待播放') : '待播放')
-        : (f.sampleRate ? ((f.sampleRate / 1000).toFixed(1) + 'k · ' + encName(f.encoding)) : ((typeof I18n !== 'undefined') ? I18n.t('未播放') : '未播放'));
+      const fmt = (f.sampleRate && f.configured !== false) ? ((f.sampleRate / 1000).toFixed(1) + 'k · ' + encName(f.encoding)) : '';
+      trackEl.textContent = info.playing
+        ? (fmt || ((typeof I18n !== 'undefined') ? I18n.t('播放中') : '播放中'))
+        : (info.pending ? ((typeof I18n !== 'undefined') ? I18n.t('待播放') : '待播放')
+          : (fmt || ((typeof I18n !== 'undefined') ? I18n.t('未播放') : '未播放')));
+    }
+    const f = info.format || {};
+    if (info.playing && (!f.sampleRate || f.configured === false)) {
+      try {
+        Utils.log('warn', '音频输出信息未就绪: ' + JSON.stringify({
+          playing: info.playing,
+          format: f,
+          sourceFormat: info.sourceFormat || {},
+          player: info.player
+        }), 'workbench');
+      } catch (_) {}
     }
     render();
     applyAll();

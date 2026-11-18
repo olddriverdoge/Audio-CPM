@@ -447,5 +447,13 @@
   "网络错误: {msg}": "Netzwerkfehler: {msg}",
   "音频流": "Audiostream",
   "封面": "Cover",
-  "编码": "Codec"
+  "编码": "Codec",
+  "播放中": "Wird wiedergegeben",
+  "外部播放器模式": "Externer Player-Modus",
+  "音源格式": "Quellformat",
+  "播放状态": "Wiedergabestatus",
+  "播放中，输出格式尚未就绪": "Wiedergabe läuft; Ausgabeformat noch nicht bereit",
+  "播放中，未读到格式": "Wiedergabe läuft; Format nicht verfügbar",
+  "外部播放器（目标 App）": "Externer Player (Ziel-App)",
+  "外部播放器模式下，解码与输出由目标播放器负责；本应用只能确认播放请求已发送，读不到它的实际采样率/位深。需要精确输出信息请切回网页内播放。": "Im externen Player-Modus übernehmen die Ziel-App Dekodierung und Ausgabe. Diese App kann nur bestätigen, dass die Wiedergabeanfrage gesendet wurde, und kann die tatsächliche Abtastrate/Bittiefe nicht auslesen. Für genaue Ausgabedetails bitte zur In-App-Wiedergabe zurückkehren."
 }
