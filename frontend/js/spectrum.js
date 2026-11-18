@@ -745,7 +745,9 @@ const Spectrum = (() => {
     switchTimer = setTimeout(() => {
       switchTimer = 0;
       if (tok !== switchTok || !open || !suspended) return;
-      const playing = (typeof Player.hifiPlaying === 'function') ? !!Player.hifiPlaying() : true;
+      // 不要只用 hifiPlaying：WebDAV 是 WebView 播放，hifi 标志可能还是上一首的缓存值，
+      // 会误判为“已播放”或一直等不到，导致声谱卡在“切换中…”。
+      const playing = (typeof Player.isPlaying === 'function') ? !!Player.isPlaying() : true;
       // 以前 10×300ms(≈3s) 就放弃：往后拖进度时 ExoPlayer 定位+续读常超过 3s，
       // 一旦放弃频谱就永久停在"切换中…"，只能收起重开。改成持续等待（≈20s 上限）。
       if (!playing && tries < 50) { scheduleResume(tok, 400, tries + 1); return; }

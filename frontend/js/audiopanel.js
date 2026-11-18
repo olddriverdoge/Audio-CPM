@@ -353,12 +353,18 @@ function createAudioPanel() {
 
   async function enrichWebInfo(info) {
     const external = Store.get(K.playMode, 'web') === 'system';
+    if (external) return;
+    // Player 的实际播放状态优先：原生桥的 playing 可能滞后一帧，不能让它把正在播放判成“未播放”。
+    try {
+      if (typeof Player !== 'undefined' && Player.isPlaying) {
+        info.playing = !!Player.isPlaying();
+      }
+    } catch (_) {}
     let hifi = false;
     try { hifi = !!(typeof Player !== 'undefined' && Player.hifiActive && Player.hifiActive()); } catch (_) {}
-    if (external || hifi) return;
+    if (hifi) return;
     info.web = !!(typeof Player !== 'undefined' && Player.current);
     if (!info.web) return;
-    try { info.playing = !!Player.isPlaying(); } catch (_) {}
     const src = info.sourceFormat || {};
     if (src.sampleRate) return;
     const path = Player.current;
