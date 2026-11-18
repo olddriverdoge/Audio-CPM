@@ -51,7 +51,7 @@ Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativeOpen(
         return 0;
     }
     AAudioStreamBuilder *builder = nullptr;
-    AAudioResult r = AAudio_createStreamBuilder(&builder);
+    auto r = AAudio_createStreamBuilder(&builder);
     if (r != AAUDIO_OK || builder == nullptr) {
         setError("AAudio_createStreamBuilder failed: " + std::to_string(r));
         return 0;
@@ -59,11 +59,9 @@ Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativeOpen(
     AAudioStreamBuilder_setDirection(builder, AAUDIO_DIRECTION_OUTPUT);
     AAudioStreamBuilder_setSharingMode(builder, AAUDIO_SHARING_MODE_EXCLUSIVE);
     AAudioStreamBuilder_setPerformanceMode(builder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
-    AAudioStreamBuilder_setFormat(builder, static_cast<AAudioFormat>(format));
+    AAudioStreamBuilder_setFormat(builder, static_cast<decltype(AAUDIO_FORMAT_PCM_I16)>(format));
     AAudioStreamBuilder_setChannelCount(builder, channels);
     AAudioStreamBuilder_setSampleRate(builder, sampleRate);
-    AAudioStreamBuilder_setUsage(builder, AAUDIO_USAGE_MEDIA);
-    AAudioStreamBuilder_setContentType(builder, AAUDIO_CONTENT_TYPE_MUSIC);
     if (deviceId > 0) AAudioStreamBuilder_setDeviceId(builder, deviceId);
     if (bufferFrames > 0) AAudioStreamBuilder_setBufferCapacityInFrames(builder, bufferFrames);
 
@@ -77,7 +75,8 @@ Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativeOpen(
 
     int actualRate = AAudioStream_getSampleRate(stream);
     int actualCh = AAudioStream_getChannelCount(stream);
-    int actualFmt = static_cast<int>(AAudioStream_getFormat(stream));
+    auto actualFmtValue = AAudioStream_getFormat(stream);
+    int actualFmt = static_cast<int>(actualFmtValue);
     if (actualRate != sampleRate || actualCh != channels || actualFmt != format) {
         std::string msg = "AAudio actual mismatch: " + std::to_string(actualRate) + "/" +
                           std::to_string(actualCh) + "/" + std::to_string(actualFmt) +
@@ -106,7 +105,7 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativeStart(JNIEnv *, jclass, jlong handle) {
     Sink *s = sinkOf(handle);
     if (!s) return;
-    AAudioResult r = AAudioStream_requestStart(s->stream);
+    auto r = AAudioStream_requestStart(s->stream);
     if (r != AAUDIO_OK) {
         setError("AAudio start failed: " + std::to_string(r));
         LOGW("start failed %d", r);
@@ -187,11 +186,9 @@ extern "C" JNIEXPORT jlong JNICALL
 Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativePositionUs(JNIEnv *, jclass, jlong handle) {
     Sink *s = sinkOf(handle);
     if (!s) return -1;
-    AAudioTimestamp ts{};
-    AAudioResult r = AAudioStream_getTimestamp(s->stream, CLOCK_MONOTONIC, &ts);
-    int64_t frames;
-    if (r == AAUDIO_OK) frames = ts.framePosition;
-    else frames = AAudioStream_getFramesWritten(s->stream);
+    // 不使用 AAudioTimestamp：部分 NDK 版本的 timestamp 类型/API 级别不稳定。
+    // framesWritten 足够支撑 Media3 的进度和 seek 恢复。
+    int64_t frames = AAudioStream_getFramesWritten(s->stream);
     int64_t rel = frames - s->baseFrames;
     if (rel < 0) rel = 0;
     return static_cast<jlong>(rel * 1000000LL / s->sampleRate);
