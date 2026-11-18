@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dialog_ok">ОК</string>
+    <string name="dialog_confirm">ОК</string>
+    <string name="dialog_cancel">Отмена</string>
+    <string name="file_access_title">Требуется доступ к файлам</string>
+    <string name="file_access_message">Audio-CPM нужен доступ к музыкальным файлам во внутреннем хранилище. На следующем экране включите «Разрешить доступ ко всем файлам»; иначе будут видны только папки, а не треки.</string>
+    <string name="file_access_grant">Разрешить</string>
+    <string name="file_access_later">Позже</string>
+    <string name="notif_title">Уведомления выключены</string>
+    <string name="notif_message">Без уведомлений элементы управления воспроизведением не появятся в шторке и на экране блокировки. Включите уведомления для приложения в настройках системы.</string>
+    <string name="notif_settings">Открыть настройки</string>
+    <string name="notif_known">Понятно</string>
+    <string name="channel_playback">Управление воспроизведением</string>
+    <string name="action_prev">Предыдущий</string>
+    <string name="action_pause">Пауза</string>
+    <string name="action_play">Воспроизвести</string>
+    <string name="action_next">Следующий</string>
+</resources>

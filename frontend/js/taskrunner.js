@@ -23,11 +23,11 @@ const TaskRunner = (() => {
     catch (e) { taskPresets = {presets: {}}; }
     if (!taskPresets || typeof taskPresets.presets !== 'object') taskPresets = {presets: {}};
     const sel = document.getElementById('preset-select');
-    sel.innerHTML = '<option value="">— 手动配置 —</option>';
+    sel.innerHTML = '<option value="">' + ((typeof I18n !== 'undefined') ? I18n.t('— 手动配置 —') : '— 手动配置 —') + '</option>';
     for (const name of Object.keys(taskPresets.presets)) {
       const o = document.createElement('option');
       o.value = name;
-      o.textContent = name;
+      o.textContent = (typeof I18n !== 'undefined') ? I18n.t(name) : name;
       sel.appendChild(o);
     }
   }

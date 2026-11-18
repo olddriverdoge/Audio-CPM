@@ -4,16 +4,16 @@ const Api = (() => {
   async function jfetch(url, opts) {
     let r;
     try { r = await fetch(url, opts); }
-    catch (e) { throw new Error('网络错误: ' + e.message); }
+    catch (e) { throw new Error(I18n.tr('网络错误: {msg}', {msg: e.message})); }
     if (!r.ok) {
       let text = '';
       try { text = await r.text(); } catch (_) {}
       let msg = text;
       try { const j = JSON.parse(text); msg = j.detail || j.message || text; } catch (_) {}
-      throw new Error((msg || ('HTTP ' + r.status)).slice(0, 300));
+      throw new Error(I18n.tr((msg || ('HTTP ' + r.status)).slice(0, 300)));
     }
     try { return await r.json(); }
-    catch (e) { throw new Error('响应解析失败'); }
+    catch (e) { throw new Error(I18n.tr('响应解析失败')); }
   }
   const jpost = (url, body) => jfetch(url, {
     method: 'POST',

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dialog_ok">OK</string>
+    <string name="dialog_confirm">OK</string>
+    <string name="dialog_cancel">Abbrechen</string>
+    <string name="file_access_title">Dateizugriff erforderlich</string>
+    <string name="file_access_message">Audio-CPM muss Musikdateien aus dem Gerätespeicher lesen. Aktivieren Sie auf dem nächsten Bildschirm „Zugriff auf alle Dateien zulassen“; sonst werden nur Ordner, aber keine Titel angezeigt.</string>
+    <string name="file_access_grant">Zugriff erteilen</string>
+    <string name="file_access_later">Später</string>
+    <string name="notif_title">Benachrichtigungen sind aus</string>
+    <string name="notif_message">Ohne Benachrichtigungen erscheinen keine Wiedergabesteuerungen in der Benachrichtigungsleiste oder auf dem Sperrbildschirm. Aktivieren Sie Benachrichtigungen für diese App in den Systemeinstellungen.</string>
+    <string name="notif_settings">Einstellungen öffnen</string>
+    <string name="notif_known">Verstanden</string>
+    <string name="channel_playback">Wiedergabesteuerung</string>
+    <string name="action_prev">Zurück</string>
+    <string name="action_pause">Pausieren</string>
+    <string name="action_play">Wiedergeben</string>
+    <string name="action_next">Weiter</string>
+</resources>

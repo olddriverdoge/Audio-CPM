@@ -645,6 +645,7 @@ const App = (() => {
   }
 
   async function init() {
+    if (typeof I18n !== 'undefined') await I18n.init();
     if (typeof Sources !== 'undefined') await Sources.refresh();
     await applyCapabilities();
     if (typeof Sources !== 'undefined') {

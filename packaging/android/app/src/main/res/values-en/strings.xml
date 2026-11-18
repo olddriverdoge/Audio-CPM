@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dialog_ok">OK</string>
+    <string name="dialog_confirm">OK</string>
+    <string name="dialog_cancel">Cancel</string>
+    <string name="file_access_title">File access required</string>
+    <string name="file_access_message">Audio-CPM needs to read music files from your phone storage. On the next screen, enable “Allow access to all files”; otherwise you will only see folders, not songs.</string>
+    <string name="file_access_grant">Grant access</string>
+    <string name="file_access_later">Later</string>
+    <string name="notif_title">Notifications are off</string>
+    <string name="notif_message">Without notifications, playback controls will not appear in the notification shade or on the lock screen. Enable notifications for this app in system settings.</string>
+    <string name="notif_settings">Open settings</string>
+    <string name="notif_known">Got it</string>
+    <string name="channel_playback">Playback controls</string>
+    <string name="action_prev">Previous</string>
+    <string name="action_pause">Pause</string>
+    <string name="action_play">Play</string>
+    <string name="action_next">Next</string>
+</resources>

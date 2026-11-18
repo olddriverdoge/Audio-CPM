@@ -2,7 +2,7 @@
 
 Audio-CPM 是一个面向 Android 本地音乐库的音频管理与播放工具。它把目录浏览、音频播放、标签/封面编辑、批量处理和文件整理放进同一个可自定义的工作台，适合管理手机、SD 卡或 WebDAV 上的音乐收藏。
 
-当前版本：**0.4.0**（`versionCode 47`，`minSdk 24`，`arm64-v8a`）。
+当前版本：**0.4.1**（`versionCode 48`，`minSdk 24`，`arm64-v8a`）。
 
 ## 简介
 
@@ -75,6 +75,12 @@ Audio-CPM 的核心不是“再做一个播放器”，而是把日常音乐文�
 | 构建 | GitHub Actions `build-gradle.yml`，产出 arm64 debug APK |
 
 前端按经典脚本顺序加载，模块使用 IIFE 命名空间，不需要 Node/npm 构建。后端与前端通过相对路径 `/api/*` 通信，静态前端由 Starlette `StaticFiles` 挂载。
+
+### 多语言
+
+- 界面支持简体中文、English、日本語、Deutsch、Русский
+- 设置里可切换界面语言，选择后重启 WebView 生效
+- 语言包按需加载；未翻译条目自动回退英文，再回退中文源文案
 
 ## 快速开始
 

@@ -40,6 +40,14 @@ const SceneStore = (() => {
   };
 
   function esc(s) { return Utils.escapeHtml(String(s == null ? '' : s)); }
+  function tr(s) { return (typeof I18n !== 'undefined') ? I18n.t(s) : s; }
+  function modLabel(m) { return tr(LABEL[m] || m); }
+  function isBuiltin(s) { return !!(s && String(s.id || '').indexOf('builtin-') === 0); }
+  function sceneName(s) { return isBuiltin(s) ? tr(s.name) : s.name; }
+  function sceneDesc(s) {
+    if (isBuiltin(s)) return tr(s.desc);
+    return modulesOf(s).map(modLabel).join(' · ');
+  }
 
   /* 把当前浮窗的位置/尺寸一起存进场景，换场景时原样还原 */
   function snapshotGeo(mods) {
@@ -60,8 +68,8 @@ const SceneStore = (() => {
     tabs.innerHTML = all().map(s => {
       const active = modulesOf(s).length === open.length && modulesOf(s).every(m => open.indexOf(m) >= 0);
       return '<button type="button" class="scene-chip' + (active ? ' on' : '') + '" data-scene-id="' +
-        esc(s.id) + '" title="' + esc(modulesOf(s).map(m => LABEL[m] || m).join(' · ')) + '">' +
-        '<span class="scene-name">' + esc(s.name) + '</span>' +
+        esc(s.id) + '" title="' + esc(modulesOf(s).map(modLabel).join(' · ')) + '">' +
+        '<span class="scene-name">' + esc(sceneName(s)) + '</span>' +
         '</button>';
     }).join('');
   }
@@ -75,10 +83,10 @@ const SceneStore = (() => {
     const open = (App.openModules ? App.openModules() : []);
     grid.innerHTML = all().map(s => {
       const active = modulesOf(s).length === open.length && modulesOf(s).every(m => open.indexOf(m) >= 0);
-      const desc = modulesOf(s).map(m => LABEL[m] || m).join(' · ');
+      const desc = modulesOf(s).map(modLabel).join(' · ');
       return '<div class="sh-card' + (active ? ' on' : '') + '" data-id="' + esc(s.id) + '">' +
-        '<span class="sh-name">' + esc(s.name) + '</span>' +
-        '<span class="sh-desc">' + esc(desc) + '</span>' +
+        '<span class="sh-name">' + esc(sceneName(s)) + '</span>' +
+        '<span class="sh-desc">' + esc(sceneDesc(s)) + '</span>' +
         '<b class="sh-del" data-del="' + esc(s.id) + '" title="删除该场景">✕</b>' +
         '</div>';
     }).join('');

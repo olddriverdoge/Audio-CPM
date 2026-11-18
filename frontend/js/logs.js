@@ -1,6 +1,7 @@
 /* ---------------- Logs：全局日志浮窗（按页面隔离） ---------------------------- */
 const Logs = (() => {
   const NAMES = {workbench: '工作台'};
+  const tr = s => (typeof I18n !== 'undefined') ? I18n.t(s) : s;
   const SINGLE = 'workbench';   // 页面合并成工作台后日志统一一条流
   const MAX = 400;
   const buf = {workbench: []};
@@ -23,7 +24,7 @@ const Logs = (() => {
     if (!bodyEl) return;
     const arr = buf[ns] || [];
     bodyEl.innerHTML = arr.length ? arr.map(lineHtml).join('') :
-      '<div class="detail-empty">暂无日志</div>';
+      '<div class="detail-empty">' + tr('暂无日志') + '</div>';
     bodyEl.scrollTop = bodyEl.scrollHeight;
   }
 
@@ -31,7 +32,7 @@ const Logs = (() => {
     if (!NAMES[next]) return;
     ns = next;
     const tag = document.getElementById('lf-ns');
-    if (tag) tag.textContent = NAMES[ns];
+    if (tag) tag.textContent = tr(NAMES[ns]);
     paintBody();
   }
 
@@ -95,7 +96,7 @@ const Logs = (() => {
     inited = true;
     ns = pageNs();
     const tag = document.getElementById('lf-ns');
-    if (tag) tag.textContent = NAMES[ns];
+    if (tag) tag.textContent = tr(NAMES[ns]);
     if (fabEl) fabEl.addEventListener('click', () => toggle());
     const minBtn = document.getElementById('lf-min');
     if (minBtn) minBtn.addEventListener('click', () => toggle(false));

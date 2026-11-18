@@ -244,13 +244,17 @@ function createAudioPanel() {
 
   function renderInfoFail(reason) {
     const isAndroid = !!(window.AUDIOCPM_CAPS && window.AUDIOCPM_CAPS.android);
+    const tr = s => (typeof I18n !== 'undefined') ? I18n.t(s) : s;
+    let friendly = String(reason || '');
+    if (friendly === 'not_supported') friendly = tr('当前环境不支持原生音频输出');
+    else if (friendly === 'audioInfo 返回 ok=false') friendly = tr('音频输出信息读取失败');
     if (dynamic) dynamic.innerHTML = '<div class="detail-empty" style="text-align:left;line-height:1.8">' +
       (isAndroid
-        ? '音频输出信息暂时没有读到。<br>播放本身不受影响（仍可正常出声）；原因已写入「日志」模块。'
-        : '当前是网页/桌面模式，没有原生音频输出；音效与输出信息仅在 App 内可用。') +
-      (reason ? '<br><span style="color:#7d8b9c;font-size:10.5px">' + Utils.escapeHtml(String(reason).slice(0, 160)) + '</span>' : '') +
-      '<div style="margin-top:8px"><button type="button" class="small" id="af-info-retry">重试</button></div></div>';
-    if (trackEl) trackEl.textContent = isAndroid ? '信息读取失败' : '不可用';
+        ? Utils.escapeHtml(tr('音频输出信息暂时没有读到。')) + '<br>' + Utils.escapeHtml(tr('播放本身不受影响（仍可正常出声）；原因已写入「日志」模块。'))
+        : Utils.escapeHtml(tr('当前是网页/桌面模式，没有原生音频输出；音效与输出信息仅在 App 内可用。'))) +
+      (friendly ? '<br><span style="color:#7d8b9c;font-size:10.5px">' + Utils.escapeHtml(friendly.slice(0, 160)) + '</span>' : '') +
+      '<div style="margin-top:8px"><button type="button" class="small" id="af-info-retry">' + Utils.escapeHtml(tr('重试')) + '</button></div></div>';
+    if (trackEl) trackEl.textContent = isAndroid ? tr('信息读取失败') : tr('不可用');
     const retry = document.getElementById('af-info-retry');
     if (retry) retry.addEventListener('click', () => load());
   }
@@ -273,8 +277,8 @@ function createAudioPanel() {
     }
     if (trackEl) {
       const f = info.format || {};
-      trackEl.textContent = info.pending ? '待播放'
-        : (f.sampleRate ? ((f.sampleRate / 1000).toFixed(1) + 'k · ' + encName(f.encoding)) : '未播放');
+      trackEl.textContent = info.pending ? ((typeof I18n !== 'undefined') ? I18n.t('待播放') : '待播放')
+        : (f.sampleRate ? ((f.sampleRate / 1000).toFixed(1) + 'k · ' + encName(f.encoding)) : ((typeof I18n !== 'undefined') ? I18n.t('未播放') : '未播放'));
     }
     render();
     applyAll();

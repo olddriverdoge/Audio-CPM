@@ -4,6 +4,8 @@ const Sources = (() => {
   let current = '';
   let onChange = null;
   const esc = s => Utils.escapeHtml(s);
+  const tr = s => (typeof I18n !== 'undefined') ? I18n.t(s) : s;
+  const nameOf = r => (r && r.id === 'local' && r.name === '本机') ? tr('本机') : (r ? r.name : '');
   const val = id => {
     const el = document.getElementById(id);
     return el ? String(el.value || '').trim() : '';
@@ -64,8 +66,8 @@ const Sources = (() => {
     if (!sel) return;
     const saved = pick();
     sel.innerHTML = list.map(r =>
-      '<option value="' + esc(r.id) + '">' + esc(r.name) + '</option>').join('') ||
-      '<option value="">无数据源</option>';
+      '<option value="' + esc(r.id) + '">' + esc(nameOf(r)) + '</option>').join('') ||
+      '<option value="">' + esc(tr('无数据源')) + '</option>';
     if (saved && list.some(r => r.id === saved)) sel.value = saved;
     else if (list[0]) sel.value = list[0].id;
     current = sel.value;
@@ -78,12 +80,12 @@ const Sources = (() => {
     const box = document.getElementById('src-list');
     if (!box) return;
     box.innerHTML = list.map(r => {
-      const tag = r.kind === 'dav' ? (r.readonly === false ? 'dav·可写' : 'dav·只读') : '本地';
-      return '<span class="col-chip">' + esc(r.name) + ' <b>' + tag + '</b>' +
+      const tag = tr(r.kind === 'dav' ? (r.readonly === false ? 'dav·可写' : 'dav·只读') : '本地');
+      return '<span class="col-chip">' + esc(nameOf(r)) + ' <b>' + tag + '</b>' +
         (r.kind === 'dav'
-          ? '<button type="button" class="col-del" data-src-del="' + esc(r.id) + '" title="删除该源">✕</button>'
+          ? '<button type="button" class="col-del" data-src-del="' + esc(r.id) + '" title="' + esc(tr('删除该源')) + '">✕</button>'
           : '') + '</span>';
-    }).join('') || '<span class="hint">还没有数据源</span>';
+    }).join('') || '<span class="hint">' + esc(tr('还没有数据源')) + '</span>';
   }
 
   async function refresh() {

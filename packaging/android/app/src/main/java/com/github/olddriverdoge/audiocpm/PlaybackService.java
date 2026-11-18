@@ -128,7 +128,7 @@ public class PlaybackService extends MediaSessionService {
             if (Build.VERSION.SDK_INT >= 26) {
                 NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
                 NotificationChannel ch = new NotificationChannel(
-                        CHANNEL_ID, "播放控制", NotificationManager.IMPORTANCE_LOW);
+                        CHANNEL_ID, getString(R.string.channel_playback), NotificationManager.IMPORTANCE_LOW);
                 ch.setShowBadge(false);
                 ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
                 nm.createNotificationChannel(ch);
@@ -186,10 +186,10 @@ public class PlaybackService extends MediaSessionService {
                 .setOnlyAlertOnce(true)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
-                .addAction(android.R.drawable.ic_media_previous, "上一首", prev)
+                .addAction(android.R.drawable.ic_media_previous, getString(R.string.action_prev), prev)
                 .addAction(playing ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play,
-                        playing ? "暂停" : "播放", toggle)
-                .addAction(android.R.drawable.ic_media_next, "下一首", next);
+                        playing ? getString(R.string.action_pause) : getString(R.string.action_play), toggle)
+                .addAction(android.R.drawable.ic_media_next, getString(R.string.action_next), next);
         b.setStyle(new MediaStyleNotificationHelper.MediaStyle(session)
                 .setShowActionsInCompactView(0, 1, 2));
         return b.build();

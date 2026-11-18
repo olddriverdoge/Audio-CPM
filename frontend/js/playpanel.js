@@ -1,5 +1,6 @@
 /* ---------------- 播放管理（当前目录播放控制 / 主流播放器布局） ---------------- */
 function createPlayPanel() {
+  const tr = s => (typeof I18n !== 'undefined') ? I18n.t(s) : s;
   const fw = createFloatWin({
     winId: 'play-float', headId: 'pf-head', resizeId: 'pf-resize', minId: 'pf-min',
     minW: 280, minH: 320
@@ -35,11 +36,12 @@ function createPlayPanel() {
   }
 
   function renderMeta() {
-    const m = Player.meta || {title: '未在播放', artist: '', album: ''};
-    titleEl.textContent = m.title || Utils.basename(Player.current) || '未在播放';
+    const m = Player.meta || {title: tr('未在播放'), artist: '', album: ''};
+    const rawTitle = m.title || Utils.basename(Player.current) || '未在播放';
+    titleEl.textContent = (rawTitle === '未在播放') ? tr('未在播放') : rawTitle;
     const sub = [m.artist, m.album].filter(Boolean).join(' · ');
-    subEl.textContent = sub || (Player.current ? '' : '从文件浏览里点一首开始');
-    trackEl.textContent = Player.current ? Utils.basename(Player.current) : '未在播放';
+    subEl.textContent = sub || (Player.current ? '' : tr('从文件浏览里点一首开始'));
+    trackEl.textContent = Player.current ? Utils.basename(Player.current) : tr('未在播放');
     const p = Player.current || '';
     if (p && p.indexOf('dav:') !== 0) {
       coverImg.src = Api.coverUrl(p);
@@ -54,7 +56,7 @@ function createPlayPanel() {
     const list = (typeof App !== 'undefined' && App.playbackQueueList) ? App.playbackQueueList() : [];
     qCount.textContent = list.length + ' 首';
     if (!list.length) {
-      qEl.innerHTML = '<div class="detail-empty">当前目录没有音频文件</div>';
+      qEl.innerHTML = '<div class="detail-empty">' + Utils.escapeHtml(tr('当前目录没有音频文件')) + '</div>';
       return;
     }
     const cur = Player.current;
@@ -96,7 +98,7 @@ function createPlayPanel() {
     playBtn.innerHTML = on
       ? '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>'
       : '<svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="6,3 20,12 6,21"/></svg>';
-    modeBtn.textContent = MODE_LABEL[(App.playMode && App.playMode()) || 'order'] || '顺序';
+    modeBtn.textContent = tr(MODE_LABEL[(App.playMode && App.playMode()) || 'order'] || '顺序');
     const v = Number(vol.value);
     volVal.textContent = Math.round(v * 100) + '%';
     volIco.textContent = v === 0 ? '🔇' : (v < 0.5 ? '🔉' : '🔊');
@@ -172,5 +174,8 @@ function createPlayPanel() {
     }
   });
 
+  renderMeta();
+  renderQueue();
+  renderState();
   return Object.assign(fw, {refresh: () => { renderMeta(); renderQueue(); renderState(); } });
 }

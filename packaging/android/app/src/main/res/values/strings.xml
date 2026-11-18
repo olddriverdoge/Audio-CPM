@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dialog_ok">好</string>
+    <string name="dialog_confirm">确定</string>
+    <string name="dialog_cancel">取消</string>
+    <string name="file_access_title">需要文件访问权限</string>
+    <string name="file_access_message">Audio-CPM 需要读取手机存储里的音乐文件。请在下一步打开“允许访问所有文件”，否则只能看到目录、看不到歌曲。</string>
+    <string name="file_access_grant">去授权</string>
+    <string name="file_access_later">稍后</string>
+    <string name="notif_title">通知权限未开启</string>
+    <string name="notif_message">播放时通知栏/锁屏不会出现播放控件。可在系统设置里为本应用打开通知。</string>
+    <string name="notif_settings">去设置</string>
+    <string name="notif_known">知道了</string>
+    <string name="channel_playback">播放控制</string>
+    <string name="action_prev">上一首</string>
+    <string name="action_pause">暂停</string>
+    <string name="action_play">播放</string>
+    <string name="action_next">下一首</string>
+</resources>

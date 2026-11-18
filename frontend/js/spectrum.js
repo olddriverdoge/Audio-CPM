@@ -48,7 +48,7 @@ const Spectrum = (() => {
     if (!trackEl) return;
     const p = Player.current;
     const info = Player.meta;
-    if (!p) { trackEl.textContent = '未在播放'; trackEl.title = ''; return; }
+    if (!p) { trackEl.textContent = (typeof I18n !== 'undefined') ? I18n.t('未在播放') : '未在播放'; trackEl.title = ''; return; }
     const title = (info && info.title) || Utils.basename(p);
     const sub = info && (info.artist || info.album)
       ? [info.artist, info.album].filter(Boolean).join(' · ') : '';
@@ -663,7 +663,7 @@ const Spectrum = (() => {
   let inDraw = false;
   function start() {
     ensureCore();
-    if (!core) { setState('不可用'); return; }
+    if (!core) { setState((typeof I18n !== 'undefined') ? I18n.t('不可用') : '不可用'); return; }
     // 关键：draw 执行期间 raf 恒为 0，若此时再排一帧就会和 draw 末尾那帧并行成两条链，
     // 之后每自愈一次多一条，90Hz 桥调用叠加直接把 UI 线程拖死（真机表现：界面卡死但音频还在放）。
     if (!raf && !inDraw) raf = requestAnimationFrame(draw);

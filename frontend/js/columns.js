@@ -4,6 +4,7 @@
  * 右下角列编辑弹窗（cols-sheet）编辑"最近打开它的那一份"配置。
  */
 const Columns = (() => {
+  const tr = s => (typeof I18n !== 'undefined') ? I18n.t(s) : s;
   const PRESETS = [
     { id: 'name',     label: '文件名' },
     { id: 'size',     label: '大小' },
@@ -54,7 +55,7 @@ const Columns = (() => {
           continue;
         }
         const p = PRESETS.find(x => x.id === id);
-        if (p) out.push({ id: p.id, label: p.label, key: p.key || '' });
+        if (p) out.push({ id: p.id, label: tr(p.label), key: p.key || '' });
       }
       return out;
     }
@@ -168,7 +169,7 @@ const Columns = (() => {
       if (box) {
         const presetHtml = PRESETS.map(p =>
           '<label class="col-opt"><input type="checkbox" data-cid="' + p.id + '"' +
-          (t.cfg.ids.indexOf(p.id) >= 0 ? ' checked' : '') + '> ' + esc(p.label) + '</label>').join('');
+          (t.cfg.ids.indexOf(p.id) >= 0 ? ' checked' : '') + '> ' + esc(tr(p.label)) + '</label>').join('');
         const customHtml = t.cfg.custom.map(c => {
           const id = 'c:' + c.key;
           return '<label class="col-opt col-opt-custom"><input type="checkbox" data-cid="' + esc(id) + '"' +

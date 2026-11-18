@@ -101,7 +101,7 @@ public class MainActivity extends Activity {
                                      final android.webkit.JsResult result) {
                 new AlertDialog.Builder(MainActivity.this)
                         .setMessage(message)
-                        .setPositiveButton("好", (d, w) -> result.confirm())
+                        .setPositiveButton(getString(R.string.dialog_ok), (d, w) -> result.confirm())
                         .setOnCancelListener(d -> result.cancel())
                         .show();
                 return true;
@@ -112,8 +112,8 @@ public class MainActivity extends Activity {
                                        final android.webkit.JsResult result) {
                 new AlertDialog.Builder(MainActivity.this)
                         .setMessage(message)
-                        .setPositiveButton("确定", (d, w) -> result.confirm())
-                        .setNegativeButton("取消", (d, w) -> result.cancel())
+                        .setPositiveButton(getString(R.string.dialog_confirm), (d, w) -> result.confirm())
+                        .setNegativeButton(getString(R.string.dialog_cancel), (d, w) -> result.cancel())
                         .setOnCancelListener(d -> result.cancel())
                         .show();
                 return true;
@@ -306,11 +306,10 @@ public class MainActivity extends Activity {
 
     private void showAllFilesDialog() {
         new AlertDialog.Builder(this)
-                .setTitle("需要文件访问权限")
-                .setMessage("Audio-CPM 需要读取手机存储里的音乐文件。请在下一步打开“允许访问所有文件”，"
-                        + "否则只能看到目录、看不到歌曲。")
-                .setPositiveButton("去授权", (d, w) -> openAllFilesSettings())
-                .setNegativeButton("稍后", null)
+                .setTitle(getString(R.string.file_access_title))
+                .setMessage(getString(R.string.file_access_message))
+                .setPositiveButton(getString(R.string.file_access_grant), (d, w) -> openAllFilesSettings())
+                .setNegativeButton(getString(R.string.file_access_later), null)
                 .show();
     }
 
@@ -349,10 +348,10 @@ public class MainActivity extends Activity {
             }
             if (!anyNotif) {
                 new AlertDialog.Builder(this)
-                        .setTitle("通知权限未开启")
-                        .setMessage("播放时通知栏/锁屏不会出现播放控件。可在系统设置里为本应用打开通知。")
-                        .setPositiveButton("去设置", (d, w) -> openNotificationSettings())
-                        .setNegativeButton("知道了", null)
+                        .setTitle(getString(R.string.notif_title))
+                        .setMessage(getString(R.string.notif_message))
+                        .setPositiveButton(getString(R.string.notif_settings), (d, w) -> openNotificationSettings())
+                        .setNegativeButton(getString(R.string.notif_known), null)
                         .show();
             }
         }

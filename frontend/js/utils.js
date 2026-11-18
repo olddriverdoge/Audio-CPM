@@ -52,7 +52,7 @@ const Utils = (() => {
     if (!wrap) return;
     const el = document.createElement('div');
     el.className = 'toast ' + (kind || 'info');
-    el.textContent = msg;
+    el.textContent = (typeof I18n !== 'undefined') ? I18n.tr(msg) : msg;
     wrap.appendChild(el);
     setTimeout(() => {
       el.classList.add('out');
@@ -61,13 +61,15 @@ const Utils = (() => {
   }
   function log(level, text, ns) {
     // 统一走全局日志浮窗（按页面隔离：process / organize）
-    if (typeof Logs !== 'undefined' && Logs.add) { Logs.add(level, text, ns); return; }
+    const message = (typeof I18n !== 'undefined') ? I18n.tr(text) : text;
+    if (typeof Logs !== 'undefined' && Logs.add) { Logs.add(level, message, ns); return; }
     const el = document.getElementById('log');
     if (!el) return;
-    const time = new Date().toLocaleTimeString('zh-CN', {hour12:false});
+    const time = new Date().toLocaleTimeString(
+      (typeof I18n !== 'undefined' ? I18n.locale : 'zh-CN'), {hour12:false});
     const line = document.createElement('div');
     line.className = level || 'info';
-    line.textContent = '[' + time + '] ' + text;
+    line.textContent = '[' + time + '] ' + message;
     el.appendChild(line);
     el.scrollTop = el.scrollHeight;
     while (el.children.length > 500) el.removeChild(el.firstChild);

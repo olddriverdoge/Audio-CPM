@@ -4,6 +4,7 @@ function createMetaView(container, opts) {
   /* 默认只读：先展示 metadata，点「编辑」才进入可编辑并出现保存按钮 */
   const canEdit = opts.editable !== false;
   const esc = Utils.escapeHtml;
+  const tr = s => (typeof I18n !== 'undefined') ? I18n.t(s) : s;
   let curPath = null;
   let curTags = {};
   let curData = null;
@@ -60,7 +61,7 @@ function createMetaView(container, opts) {
       html += '<div class="detail-empty">无内嵌封面</div>';
     }
     html += '<div class="kv"><span class="k">内嵌封面</span><span class="v">' +
-      (d.has_cover ? '✓ 有' : '✗ 无') + '</span></div>';
+      (d.has_cover ? tr('✓ 有') : tr('✗ 无')) + '</span></div>';
 
     // 2) 元数据：默认只读展示，点「编辑」才切换成可编辑表格
     if (canEdit && editing) {
@@ -213,6 +214,7 @@ function createMetaFloat() {
   const resize = document.getElementById('mf-resize');
   const view = createMetaView(document.getElementById('meta3'), {editable: true});
   if (!box || !fab) return {load: () => {}, setEmpty: () => {}};
+  if (trackEl && typeof I18n !== 'undefined') trackEl.textContent = I18n.t('点击文件查看详情');
   let open = false;
   /* 与频谱/声谱浮窗完全一致的开关语义：展开后按钮隐藏，收起用浮窗自己的"—"，
      状态以 DOM 的 hidden 为准，避免重复 init 或拖动拦截 click 造成"点了不收"的死状态。 */
@@ -282,11 +284,11 @@ function createMetaFloat() {
   });
 
   function load(path) {
-    if (trackEl) trackEl.textContent = path ? Utils.basename(path) : '点击文件查看详情';
+    if (trackEl) trackEl.textContent = path ? Utils.basename(path) : ((typeof I18n !== 'undefined') ? I18n.t('点击文件查看详情') : '点击文件查看详情');
     if (trackEl) trackEl.title = path || '';
     return view.load(path);
   }
-  function setEmpty(msg) { view.setEmpty(msg); if (trackEl) trackEl.textContent = '点击文件查看详情'; }
+  function setEmpty(msg) { view.setEmpty(msg); if (trackEl) trackEl.textContent = (typeof I18n !== 'undefined') ? I18n.t('点击文件查看详情') : '点击文件查看详情'; }
   return {toggle, load, setEmpty,
           get open() { return open; },
           get path() { return view.path; }};

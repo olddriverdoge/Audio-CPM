@@ -38,6 +38,11 @@ const Settings = (() => {
     document.getElementById('cfg-cancel').onclick = close;
     const rst = document.getElementById('cfg-reset');
     if (rst) rst.onclick = reset;
+    const lang = document.getElementById('lang-select');
+    if (lang && typeof I18n !== 'undefined') {
+      lang.value = I18n.locale;
+      lang.onchange = () => I18n.setLocale(lang.value);
+    }
     document.getElementById('sheet-overlay').addEventListener('click', e => {
       if (e.target.id === 'sheet-overlay') close();
     });
