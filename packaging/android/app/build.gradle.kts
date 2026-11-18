@@ -3,12 +3,26 @@ plugins {
     id("com.chaquo.python")
 }
 
+/*
+ * 包名策略：只有 main / 发布 tag 使用主干包名，其他分支统一加 .dev。
+ * 这样 feature / 测试分支的 APK 可以与正式版同时安装，不会覆盖正式版数据。
+ */
+val buildRefName: String = System.getenv("GITHUB_REF_NAME")?.takeIf { it.isNotBlank() } ?: runCatching {
+    val head = rootProject.file("../../.git/HEAD")
+    if (!head.exists()) return@runCatching "main"
+    val raw = head.readText().trim()
+    if (raw.startsWith("ref: refs/heads/")) raw.removePrefix("ref: refs/heads/") else "detached"
+}.getOrDefault("main")
+val buildRefType: String = System.getenv("GITHUB_REF_TYPE") ?: "branch"
+val stablePackage: Boolean = buildRefType == "tag" || buildRefName == "main"
+val packageSuffix: String = if (stablePackage) "" else ".dev"
+
 android {
     namespace = "com.github.olddriverdoge.audiocpm"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.github.olddriverdoge.audiocpm"
+        applicationId = "com.github.olddriverdoge.audiocpm$packageSuffix"
         minSdk = 24
         targetSdk = 35
         versionCode = 48

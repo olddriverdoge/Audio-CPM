@@ -120,8 +120,9 @@ AC2_ROOT=/sdcard/Music AC2_DATA_DIR=./data python3 ac_web.py
 
 1. 打开仓库 Actions 页面；
 2. 选择 `build-audio-cpm`；
-3. 点击 `Run workflow`，分支选 `main`；
-4. 构建完成后下载 `audio-cpm-apk` artifact。
+3. 点击 `Run workflow`，`main` 或发布 tag 用主干包名 `com.github.olddriverdoge.audiocpm`；
+4. 非 `main` 分支会自动使用 `.dev` 后缀（`com.github.olddriverdoge.audiocpm.dev`），可与正式版同时安装；
+5. 构建完成后下载 `audio-cpm-apk` artifact。
 
 本地构建需要 JDK 17、Android SDK 35、Gradle 8.10.2，以及 FFmpeg 预编译产物；具体说明见 [packaging/README.md](packaging/README.md)。
 
