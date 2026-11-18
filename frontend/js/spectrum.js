@@ -84,6 +84,102 @@ const Spectrum = (() => {
   }
 
   let pcmTimer = 0;
+
+  function isDavTrack() {
+    try { return String(Player.current || '').indexOf('dav:') === 0; } catch (_) { return false; }
+  }
+
+  /* WebDAV 走 <audio> 播放，原生 SpectrumProcessor 没有输入；这里用 WebAudio 的
+     AnalyserNode 旁路分析解码后的 PCM。它不额外读网络，也不下载整首文件。
+     只在 DAV 曲目、打开频谱面板时启用；关闭面板后切回 source→destination，
+     避免把普通播放长期挂在 WebAudio 处理链上。 */
+  function setWebAnalyser(core, on) {
+    if (!core || core.native || !core.source || !core.analyser || !core.ctx) return;
+    try {
+      core.source.disconnect();
+      if (on) {
+        try { core.analyser.disconnect(); } catch (_) {}
+        core.source.connect(core.analyser);
+        core.analyser.connect(core.ctx.destination);
+      } else {
+        core.source.connect(core.ctx.destination);
+      }
+    } catch (_) {}
+  }
+
+  function createWebCore() {
+    if (window.__ac2WebAudioCore) return window.__ac2WebAudioCore;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC || typeof Player === 'undefined' || !Player.audio) return null;
+    try {
+      const ctx = new AC();
+      const source = ctx.createMediaElementSource(Player.audio);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = 0.78;
+      source.connect(analyser);
+      analyser.connect(ctx.destination);
+      ctx.resume().catch(() => {});
+      const core = {
+        native: false, ctx, source, analyser,
+        raw: new Uint8Array(analyser.frequencyBinCount),
+        data: new Uint8Array(96), levels: new Uint8Array(96),
+        bars: new Uint8Array(48), linbars: new Uint8Array(48),
+        spec: new Uint8Array(128), sampleRate: ctx.sampleRate
+      };
+      window.__ac2WebAudioCore = core;
+      return core;
+    } catch (e) {
+      try { Utils.log('warn', 'WebDAV 频谱初始化失败: ' + (e && e.message || e)); } catch (_) {}
+      return null;
+    }
+  }
+
+  function fillWebBands(core) {
+    if (!core || core.native || !core.analyser || !core.raw) return;
+    core.analyser.getByteFrequencyData(core.raw);
+    const nyq = Math.max(1, (core.ctx && core.ctx.sampleRate || core.sampleRate || 48000) / 2);
+    const raw = core.raw, n = raw.length;
+    const binAt = hz => Math.min(n - 1, Math.max(0, Math.floor(hz / nyq * n)));
+    // 96 个对数频段，和原生 bands 的烘焙方式对齐
+    for (let i = 0; i < 96; i++) {
+      const a = 30 * Math.pow(nyq / 30, i / 96);
+      const b = 30 * Math.pow(nyq / 30, (i + 1) / 96);
+      const x = binAt(a), y = Math.max(x, binAt(b));
+      let m = 0;
+      for (let j = x; j <= y; j++) if (raw[j] > m) m = raw[j];
+      core.data[i] = m;
+      core.levels[i] = m;
+    }
+    const barN = Math.max(1, effBars());
+    if (!core.bars || core.bars.length !== barN) {
+      core.bars = new Uint8Array(barN);
+      core.linbars = new Uint8Array(barN);
+    }
+    for (let i = 0; i < barN; i++) {
+      // 对数柱：把 96 个对数频段按柱数合并
+      const a = Math.floor(i * 96 / barN), b = Math.max(a + 1, Math.floor((i + 1) * 96 / barN));
+      let m = 0;
+      for (let j = a; j < b; j++) if (core.data[j] > m) m = core.data[j];
+      core.bars[i] = m;
+      // 线性柱：给 X 轴切到 lin 时用
+      const lx = Math.floor(i * n / barN), ly = Math.max(lx + 1, Math.floor((i + 1) * n / barN));
+      let lm = 0;
+      for (let j = lx; j < ly; j++) if (raw[j] > lm) lm = raw[j];
+      core.linbars[i] = lm;
+    }
+    // 声谱用线性谱（128 档），避免瀑布只显示 96 个粗频段
+    if (!core.spec || core.spec.length !== 128) core.spec = new Uint8Array(128);
+    for (let i = 0; i < 128; i++) {
+      const a = Math.floor(i * n / 128), b = Math.max(a + 1, Math.floor((i + 1) * n / 128));
+      let m = 0;
+      for (let j = a; j < b; j++) if (raw[j] > m) m = raw[j];
+      core.spec[i] = m;
+    }
+    core.sampleRate = core.ctx ? core.ctx.sampleRate : core.sampleRate;
+    dataSeq++;
+  }
+
   function packInto(src, dst) {
     if (!src || !src.length) return dst;
     const n = src.length;
@@ -162,6 +258,7 @@ const Spectrum = (() => {
   let pcmTickId = 0;
   function startPcmPoll() {
     if (pcmTimer) return;
+    if (!core || !core.native) return;   // WebDAV 用 WebAudio 分析，不启动原生桥轮询
     try { Api.playbackSpectrum(true); } catch (_) {}
     // 高刷路径：直接同步调用 Java（WebView JS 桥），跟 requestAnimationFrame 走，
     // 帧率由屏幕刷新率决定（60/90/120Hz），绕开 HTTP 轮询的延迟。
@@ -196,6 +293,12 @@ const Spectrum = (() => {
   }
 
   function ensureCore() {
+    if (isDavTrack()) {
+      if (core && core.native) stopPcmPoll();
+      if (!core || core.native) core = createWebCore();
+      if (core) setWebAnalyser(core, true);
+      return core;
+    }
     const hifi = !!(typeof Player !== 'undefined' && Player.hifiActive && Player.hifiActive());
     if (hifi) {
       if (!core || !core.native) {
@@ -205,13 +308,11 @@ const Spectrum = (() => {
       return core;
     }
     /*
-     * 非 HiFi（WebDAV 走 WebView 播放）不再接管 WebAudio。
-     * 之前 createMediaElementSource + connect(destination) 会把主播放链路拉进
-     * WebAudio（Android WebView 重采样 / 切后台渲染限流），是"开频谱就爆音"的根因。
-     * 现在频谱只在本地 HiFi（ExoPlayer PCM 旁路）下提供。
+     * 本地 WebView 播放仍不接管 WebAudio；WebDAV 曲目单独走上面的 AnalyserNode，
+     * 关闭频谱面板时会切回 source→destination，不影响普通播放链路。
      */
     if (core && !core.native) {
-      try { core.analyser.disconnect(); } catch (_) {}
+      setWebAnalyser(core, false);
       stopPcmPoll();
     }
     core = null;
@@ -537,8 +638,8 @@ const Spectrum = (() => {
       return;            // 同上：绝不能在 drawFrame 内再排帧
     }
     if (!core.native) {
-      if (core.ctx.state === 'suspended') core.ctx.resume().catch(() => {});
-      core.analyser.getByteFrequencyData(core.data);
+      if (core.ctx && core.ctx.state === 'suspended') core.ctx.resume().catch(() => {});
+      fillWebBands(core);
     } else if (delayMs > 0) {
       const f = pickDelayed();
       if (f) {
@@ -602,6 +703,12 @@ const Spectrum = (() => {
       core.data = new Uint8Array(96); core.levels = new Uint8Array(96);
       core.bars = new Uint8Array(barN); core.linbars = new Uint8Array(barN);
       core.spec = new Uint8Array(0);
+    } else if (core && !core.native) {
+      if (core.data) core.data.fill(0);
+      if (core.levels) core.levels.fill(0);
+      if (core.bars) core.bars.fill(0);
+      if (core.linbars) core.linbars.fill(0);
+      if (core.spec && core.spec.length) core.spec.fill(0);
     }
     try { if (wfCtx) { wfCtx.fillStyle = '#000'; wfCtx.fillRect(0, 0, wfW, wfH); } } catch (_) {}
     paramsSig = '';                      // 新 processor 是默认参数，必须重新下发
@@ -701,6 +808,7 @@ const Spectrum = (() => {
     suspended = true;
     stopPcmPoll();
     stop();
+    if (core && !core.native) setWebAnalyser(core, false);
     try { Api.playbackSpectrum(false); } catch (_) {}
     setState('暂停·已停算');
   }
@@ -982,6 +1090,7 @@ const Spectrum = (() => {
     } else {
       stop(); setState('');
       stopPcmPoll();
+      if (core && !core.native) setWebAnalyser(core, false);
       if (idleTimer) { clearInterval(idleTimer); idleTimer = 0; }
       stopped = false; pausedAt = 0;
       hideSub();

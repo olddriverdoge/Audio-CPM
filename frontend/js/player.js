@@ -183,6 +183,8 @@ const Player = (() => {
   function setPct(p) {
     p = Math.max(0, Math.min(100, Number(p) || 0));
     if (waveHi) waveHi.style.clipPath = clipCss(p);
+    const waveBox = document.getElementById('pb-wave');
+    if (waveBox) waveBox.style.setProperty('--pb-pct', p.toFixed(2) + '%');
     document.querySelectorAll('.row-wave .rw-hi').forEach(el => { el.style.clipPath = clipCss(p); });
   }
   function isGrid() {

@@ -435,9 +435,9 @@ const App = (() => {
       locked = !!on;
       hand.classList.toggle('on', locked);
       hand.setAttribute('aria-pressed', locked ? 'true' : 'false');
-      hand.title = locked ? '解锁工作台（当前只允许双指缩放）' : '锁定工作台：只允许双指缩放';
+      hand.title = locked ? '整体缩放（已锁定，双指缩放 50%–300%）' : '整体缩放';
       const lbl = hand.querySelector('.b-lbl');
-      if (lbl) lbl.textContent = locked ? '解锁' : '锁定';
+      if (lbl) lbl.textContent = '整体缩放';
       if (locked) {
         positionLock();
         lock.classList.remove('hidden');
