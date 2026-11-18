@@ -128,7 +128,7 @@ const Player = (() => {
   function setCover(path) {
     coverEl.classList.remove('on');
     coverEl.title = path ? '所在文件封面' : '暂无封面';
-    if (!path) { coverImg.removeAttribute('src'); return; }
+    if (!path || String(path).indexOf('dav:') === 0) { coverImg.removeAttribute('src'); return; }
     coverImg.src = Api.thumbUrl(path, 96);
   }
   // 读取标签后填充播放条的标题 / 专辑 / 艺术家，并同步媒体通知

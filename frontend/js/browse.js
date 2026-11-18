@@ -13,6 +13,7 @@ function createBrowseView(cfg) {
   };
 
   const esc = Utils.escapeHtml;
+  const isDavPath = p => String(p || '').indexOf('dav:') === 0;
   const NS = cfg.ns || 'process';       // 日志归属页（列表 1=处理 / 列表 2=整理）
   function lg(level, text) { Utils.log(level, text, NS); }
 
@@ -110,13 +111,17 @@ function createBrowseView(cfg) {
       }
       const f = it.file;
       const sel = st.sel.has(f.path);
-      const thumb = f.type === 'image' ? Api.imageUrl(f.path) : Api.thumbUrl(f.path, 48);
+      // WebDAV 音频不要为每一行自动拉封面：十几个文件会同时发起远端 Range 请求，
+      // 目录一打开就把 WebDAV 连接和线程打满，表现为进目录就卡死。
+      const thumb = f.type === 'image' ? Api.imageUrl(f.path) : (isDavPath(f.path) ? '' : Api.thumbUrl(f.path, 48));
+      const icon = thumb
+        ? '<img class="row-thumb" data-thumb="' + esc(thumb) + '" alt="" onerror="ThumbMgr.onError(this)">'
+        : (f.type === 'image' ? '🖼' : '♪');
       html += '<div class="item file' + (sel ? ' sel' : '') + '" data-path="' + esc(f.path) + '">' +
         '<button type="button" class="play-btn" data-act="play" title="播放">▶</button>' +
         '<input type="checkbox" class="chk file-chk" data-path="' + esc(f.path) + '"' +
         (sel ? ' checked' : '') + '>' +
-        '<span class="icon"><img class="row-thumb" data-thumb="' + esc(thumb) + '" alt="" ' +
-        'onerror="ThumbMgr.onError(this)"></span>' +
+        '<span class="icon">' + icon + '</span>' +
         (cols ? cols.cellsHtml(f)
           : '<span class="name" data-act="probe" title="' + esc(f.name) + '">' + esc(f.name) + '</span>' +
             '<span class="size">' + Utils.fmtSize(f.size) + '</span>' +
@@ -151,12 +156,12 @@ function createBrowseView(cfg) {
       const sel = st.sel.has(f.path);
       const played = PlayMgr.isPlayed(f.path);
       const isImg = f.type === 'image';
-      const url = isImg ? Api.imageUrl(f.path) : Api.thumbUrl(f.path, size);
+      const url = isImg ? Api.imageUrl(f.path) : (isDavPath(f.path) ? '' : Api.thumbUrl(f.path, size));
       return '<div class="tile' + (sel ? ' sel' : '') + '" data-path="' + esc(f.path) +
         '" style="width:' + w + 'px">' +
         '<div class="tile-cover" data-act="modal">' +
           '<span class="ph">' + (isImg ? '🖼' : '♪') + '</span>' +
-          '<img data-thumb="' + esc(url) + '" alt="" onerror="ThumbMgr.onError(this)">' +
+          (url ? '<img data-thumb="' + esc(url) + '" alt="" onerror="ThumbMgr.onError(this)">' : '') +
           '<input type="checkbox" class="chk tile-chk" data-path="' + esc(f.path) + '"' +
           (sel ? ' checked' : '') + '>' +
           '<button type="button" class="tile-play" data-act="play" title="播放">▶</button>' +
