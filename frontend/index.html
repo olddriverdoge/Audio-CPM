@@ -24,7 +24,7 @@
             style="max-width:150px"></select>
     <span class="spacer"></span>
     <button type="button" class="small" id="btn-fullscreen" title="全屏">⛶</button>
-    <button type="button" class="small hdr-btn" id="btn-player-cfg" title="设置（播放 + 界面配置）"><span class="b-ico">⚙</span><span class="b-lbl">设置</span></button>
+    <button type="button" class="small hdr-btn" id="btn-player-cfg" title="设置（数据源 / 工作台缩放）"><span class="b-ico">⚙</span><span class="b-lbl">设置</span></button>
   </header>
 
   <!-- 顶部只放场景（模块选择在右下角的模块坞） -->
@@ -40,7 +40,8 @@
         <div class="sh-title"><b>场景</b><span>一套场景对应一组模块；顶部 ＋ 保存当前布局</span></div>
       </div>
       <div class="sh-grid" id="sh-grid"></div>
-      <div class="sh-foot">模块浮窗可自由拖动 / 缩放 / 互相覆盖；收起后点这里换场景。</div>
+      <div class="sh-foot"><button type="button" class="scene-restore hidden" id="scene-restore">恢复默认场景</button>
+        模块浮窗可自由拖动 / 缩放 / 互相覆盖；收起后点这里换场景。</div>
     </div>
   </div>
 
@@ -244,6 +245,7 @@
     <span class="mf-track" id="af-track">未播放</span>
     <button type="button" class="sf-btn" id="af-min" title="收起">—</button>
   </div>
+  <div class="af-body" id="af-body">
   <div class="af-playcfg" id="af-playcfg">
     <div class="af-sec-h"><span>外部播放器</span><em>系统播放器模式 / ↗ 使用</em></div>
     <div class="row" style="display:block">
@@ -272,7 +274,8 @@
       <button type="button" class="small primary" id="af-cfg-save">保存播放设置</button>
     </div>
   </div>
-  <div class="af-body" id="af-body"><div class="detail-empty">正在读取音频输出信息…</div></div>
+    <div id="af-dynamic"><div class="detail-empty">正在读取音频输出信息…</div></div>
+  </div>
   <b class="fw-resize" id="af-resize" title="拖动调整大小（或双指捏合）"></b>
 </div>
 <div class="play-float hidden" id="play-float">
@@ -363,6 +366,18 @@
 <div id="sheet-overlay" class="sheet-overlay hidden">
   <div class="sheet" id="player-sheet">
     <h3 style="font-size:13px">设置</h3>
+    <div class="ui-scale-row">
+      <label for="ui-scale">工作台缩放</label>
+      <select id="ui-scale">
+        <option value="0.8">80%</option>
+        <option value="0.9">90%</option>
+        <option value="1" selected>100%</option>
+        <option value="1.1">110%</option>
+        <option value="1.2">120%</option>
+        <option value="1.25">125%</option>
+      </select>
+      <span class="hint" id="ui-scale-hint">仅缩放模块窗，位置不变</span>
+    </div>
 
 
     <div style="border-top:1px solid var(--border);margin:12px 0 0"></div>
@@ -387,28 +402,6 @@
       跨源搬运不做，文件处理只作用于本地。
     </p>
 
-    <div style="border-top:1px solid var(--border);margin:12px 0 0"></div>
-    <h3 style="font-size:13px;margin:10px 0 4px">界面配置（存本地 JSON）</h3>
-    <p class="hint" id="uicfg-file" style="margin:0 0 6px;word-break:break-all"></p>
-    <div class="row" style="gap:6px;align-items:center">
-      <select id="uicfg-presets" style="flex:1 1 auto;min-width:0"></select>
-      <button type="button" class="small" id="uicfg-load">加载</button>
-      <button type="button" class="small" id="uicfg-del">删除</button>
-    </div>
-    <div class="row" style="gap:6px;align-items:center;margin-top:6px">
-      <input type="text" id="uicfg-name" class="path" style="flex:1 1 auto;min-width:0"
-             placeholder="预设名（如 手机整理）">
-      <button type="button" class="small" id="uicfg-save">保存预设</button>
-    </div>
-    <div class="row" style="gap:6px;margin-top:6px;justify-content:flex-end">
-      <button type="button" class="small" id="uicfg-export">导出 JSON</button>
-      <button type="button" class="small" id="uicfg-import">导入 JSON</button>
-      <input type="file" id="uicfg-file-input" accept=".json,application/json" hidden>
-    </div>
-    <p class="hint" style="margin:6px 0 0">
-      视图 / 排序 / 分栏比例 / 目标目录标签 / 列设置 / 播放器设置等改动会自动写入上面的 JSON 文件，
-      换浏览器或清缓存后打开页面自动恢复。
-    </p>
     <div class="row" style="margin-top:10px;justify-content:flex-end">
       <button type="button" class="small" id="cfg-cancel">关闭</button>
       <button type="button" class="primary small" id="cfg-save">保存</button>
@@ -437,7 +430,6 @@
 <script src="/js/logs.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/sources.js"></script>
-<script src="/js/uicfg.js"></script>
 <script src="/js/wave.js"></script>
 <script src="/js/settings.js"></script>
 <script src="/js/dock.js"></script>

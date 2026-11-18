@@ -7,11 +7,15 @@ function createAudioPanel() {
   const win = document.getElementById('audio-float');
   if (!win) return fw;
   const body = document.getElementById('af-body');
+  const dynamic = document.getElementById('af-dynamic');
   const trackEl = document.getElementById('af-track');
   const PRESET_NAMES = ['关闭', '流行', '古典', '摇滚', '人声', '自定义'];
   const fmtDb = v => (v > 0 ? '+' : '') + Number(v || 0) + 'dB';
   const encName = e => (e === 4 ? '32-bit 浮点' : e === 21 ? '24-bit' : e === 22 ? '32-bit' : e === 3 ? '8-bit' : '16-bit');
   let cfg = Store.get('ac3_audio_cfg', {}) || {};
+  if (Array.isArray(cfg.bands)) {
+    cfg.bands = cfg.bands.map(v => Math.max(-2000, Math.min(2000, Number(v) || 0)));
+  }
   let info = null;
 
   function save() { Store.set('ac3_audio_cfg', cfg); }
@@ -86,7 +90,8 @@ function createAudioPanel() {
         '" data-preset="' + i + '">' + n + '</button>').join('') + '</div>';
       html += '<div class="af-bands">';
       (d.freqs || []).forEach((hz, i) => {
-        const lv = Array.isArray(cfg.bands) && cfg.bands[i] != null ? cfg.bands[i] : (d.levels ? d.levels[i] : 0);
+        let lv = Array.isArray(cfg.bands) && cfg.bands[i] != null ? cfg.bands[i] : (d.levels ? d.levels[i] : 0);
+        lv = Math.max(Number(d.minLevel ?? -2000), Math.min(Number(d.maxLevel ?? 2000), Number(lv) || 0));
         const label = hz >= 1000 ? (hz / 1000) + 'k' : hz + '';
         html += '<div class="af-band"><span class="af-f">' + label + '</span>' +
           '<input type="range" class="af-slider" data-band="' + i + '" min="' + d.minLevel +
@@ -127,7 +132,7 @@ function createAudioPanel() {
     html += '<div class="af-na">EQ 与音效在 PCM 链路上处理，不依赖系统 AudioEffect，因此不会出现“设备不支持”。独占/bit-perfect 需自写 AAudio 输出，仍是共享混音；DSD 走 PCM 转换后播放。</div>';
     html += '</div>';
 
-    body.innerHTML = html;
+    if (dynamic) dynamic.innerHTML = html;
     bind();
   }
 
@@ -176,6 +181,7 @@ function createAudioPanel() {
     const bassOn = document.getElementById('af-bass-on');
     const bassR = document.getElementById('af-bass');
     if (bassOn) bassOn.addEventListener('change', () => {
+      if (bassOn.checked && bassR && Number(bassR.value) === 0) bassR.value = '500';
       cfg.bass = bassOn.checked ? Number(bassR ? bassR.value : 500) : 0;
       save(); fx('bass', cfg.bass);
     });
@@ -185,6 +191,7 @@ function createAudioPanel() {
     const vzOn = document.getElementById('af-virt-on');
     const vzR = document.getElementById('af-virt');
     if (vzOn) vzOn.addEventListener('change', () => {
+      if (vzOn.checked && vzR && Number(vzR.value) === 0) vzR.value = '500';
       cfg.virt = vzOn.checked ? Number(vzR ? vzR.value : 500) : 0;
       save(); fx('virt', cfg.virt);
     });
@@ -199,7 +206,7 @@ function createAudioPanel() {
 
   function renderInfoFail(reason) {
     const isAndroid = !!(window.AUDIOCPM_CAPS && window.AUDIOCPM_CAPS.android);
-    body.innerHTML = '<div class="detail-empty" style="text-align:left;line-height:1.8">' +
+    if (dynamic) dynamic.innerHTML = '<div class="detail-empty" style="text-align:left;line-height:1.8">' +
       (isAndroid
         ? '音频输出信息暂时没有读到。<br>播放本身不受影响（仍可正常出声）；原因已写入「日志」模块。'
         : '当前是网页/桌面模式，没有原生音频输出；音效与输出信息仅在 App 内可用。') +
@@ -212,6 +219,7 @@ function createAudioPanel() {
 
   async function load() {
     let reason = '';
+    info = null;
     for (let i = 0; i < 3; i++) {
       try {
         const r = await Api.audioInfo();
@@ -227,7 +235,8 @@ function createAudioPanel() {
     }
     if (trackEl) {
       const f = info.format || {};
-      trackEl.textContent = f.sampleRate ? ((f.sampleRate / 1000).toFixed(1) + 'k · ' + encName(f.encoding)) : '未播放';
+      trackEl.textContent = info.pending ? '待播放'
+        : (f.sampleRate ? ((f.sampleRate / 1000).toFixed(1) + 'k · ' + encName(f.encoding)) : '未播放');
     }
     render();
     applyAll();

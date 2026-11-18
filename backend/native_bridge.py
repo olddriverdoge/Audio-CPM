@@ -148,8 +148,23 @@ def audio_fx(op, a=0, b=0):
         return {'ok': False, 'error': str(e)[:300]}
 
 
+SOFTWARE_FX_FALLBACK = {
+    'ok': True, 'mode': 'software', 'bands': 10,
+    'minLevel': -2000, 'maxLevel': 2000, 'eqOn': False, 'preamp': 0,
+    'freqs': [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
+    'levels': [0] * 10, 'bass': True, 'virt': True, 'session': -1,
+}
+
+
 def audio_info():
     if not _playback:
+        # 播放服务尚未起来时，软件 EQ/音效本身仍然存在；返回可用骨架，
+        # 避免音频模块一打开就显示“不可用”。播放启动后重新打开会刷新真实信息。
+        if available():
+            logger.info('audio_info: playback bridge not ready, returning software EQ fallback')
+            return {'ok': True, 'pending': True, 'playback_available': False,
+                    'bridge_available': True, 'mode': 'software',
+                    'deviceSampleRate': 0, 'format': {}, 'fx': dict(SOFTWARE_FX_FALLBACK)}
         logger.warning('audio_info: native playback bridge not registered')
         return {'ok': False, 'error': 'not_supported', 'playback_available': False,
                 'bridge_available': available()}
@@ -161,6 +176,12 @@ def audio_info():
         return {'ok': False, 'error': 'bad native response', 'raw': str(r)[:300]}
     except Exception as e:
         logger.exception('audio_info failed')
+        if available():
+            fb = {'ok': True, 'pending': True, 'playback_available': True,
+                  'bridge_available': True, 'mode': 'software',
+                  'deviceSampleRate': 0, 'format': {}, 'fx': dict(SOFTWARE_FX_FALLBACK),
+                  'warning': str(e)[:120]}
+            return fb
         return {'ok': False, 'error': str(e)[:300], 'playback_available': True}
 
 

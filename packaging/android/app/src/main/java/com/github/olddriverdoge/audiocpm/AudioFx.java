@@ -8,7 +8,7 @@ import android.util.Log;
 /**
  * 音频输出效果链：
  *  - EQ / 前级增益：软件 10 段 EQ（PCM 级，任何设备/蓝牙都生效，不依赖 audio session）
- *  - 低音增强 / 虚拟环绕：系统 AudioEffect（设备支持才生效，不支持时 UI 里置灰）
+ *  - 低音增强 / 虚拟环绕：同样走 SoftwareEqProcessor（PCM 级软件处理，任何设备都可用）
  */
 public class AudioFx {
     private static final String TAG = "Audio-CPM";
@@ -56,17 +56,11 @@ public class AudioFx {
                     SoftwareEqProcessor.setPreamp(a);
                     return "{\"ok\":true}";
                 case "bass": {
-                    if (a <= 0) { if (bass != null) bass.setEnabled(false); return "{\"ok\":true}"; }
-                    if (!sync() || bass == null) return "{\"ok\":false,\"error\":\"bass unsupported\"}";
-                    bass.setStrength((short) Math.max(0, Math.min(1000, a)));
-                    bass.setEnabled(true);
+                    SoftwareEqProcessor.setBass(a);
                     return "{\"ok\":true}";
                 }
                 case "virt": {
-                    if (a <= 0) { if (virt != null) virt.setEnabled(false); return "{\"ok\":true}"; }
-                    if (!sync() || virt == null) return "{\"ok\":false,\"error\":\"virtualizer unsupported\"}";
-                    virt.setStrength((short) Math.max(0, Math.min(1000, a)));
-                    virt.setEnabled(true);
+                    SoftwareEqProcessor.setVirt(a);
                     return "{\"ok\":true}";
                 }
                 case "reset":
@@ -82,13 +76,10 @@ public class AudioFx {
     }
 
     public static String info() {
-        boolean hasBass, hasVirt;
-        try { hasBass = sync() && bass != null; } catch (Throwable t) { hasBass = false; }
-        try { hasVirt = sync() && virt != null; } catch (Throwable t) { hasVirt = false; }
-        String base = SoftwareEqProcessor.infoJson();      // 一定 ok:true，不再出现“设备不支持均衡器”
+        // 低音/环绕也已改为软件处理（SoftwareEqProcessor），任何设备都可用
+        String base = SoftwareEqProcessor.infoJson();
         return base.substring(0, base.length() - 1)
-                + ",\"bass\":" + (hasBass ? "true" : "false")
-                + ",\"virt\":" + (hasVirt ? "true" : "false")
+                + ",\"bass\":true,\"virt\":true"
                 + ",\"session\":" + session + "}";
     }
 }

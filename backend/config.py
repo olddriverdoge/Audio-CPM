@@ -21,7 +21,6 @@ except Exception:
     pass
 
 TASK_PRESETS_FILE = os.path.join(DATA_DIR, "ac2_presets.json")  # 沿用旧文件名，避免丢用户任务预设
-UI_CONFIG_FILE = os.path.join(DATA_DIR, "ac2_ui_config.json")
 STORAGE_FILE = os.path.join(DATA_DIR, "ac2_storage.json")
 TASKS_FILE = os.path.join(DATA_DIR, "ac2_tasks.json")
 

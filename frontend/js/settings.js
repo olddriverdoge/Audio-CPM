@@ -17,13 +17,20 @@ const Settings = (() => {
     const el = document.getElementById('cfg-hint');
     if (el) el.textContent = msg || '';
   }
+  function paintScale() {
+    const sel = document.getElementById('ui-scale');
+    if (!sel) return;
+    const v = String(Store.get(K.uiScale, 1) || 1);
+    sel.value = v;
+    if (!sel.value) sel.value = '1';
+  }
   function open() {
+    paintScale();
     const cs = document.getElementById('cols-sheet');
     if (cs) cs.classList.add('hidden');
     const ps = document.getElementById('player-sheet');
     if (ps) ps.classList.remove('hidden');
     document.getElementById('sheet-overlay').classList.remove('hidden');
-    if (typeof UiCfg !== 'undefined') UiCfg.refresh();
   }
   function close() {
     document.getElementById('sheet-overlay').classList.add('hidden');
@@ -35,6 +42,14 @@ const Settings = (() => {
   function reset() {}
   function init() {
     document.getElementById('btn-player-cfg').onclick = open;
+    const scaleSel = document.getElementById('ui-scale');
+    if (scaleSel) {
+      paintScale();
+      scaleSel.addEventListener('change', () => {
+        const v = Number(scaleSel.value);
+        if (typeof App !== 'undefined' && App.setUiScale) App.setUiScale(v, true);
+      });
+    }
     document.getElementById('cfg-save').onclick = save;
     document.getElementById('cfg-cancel').onclick = close;
     const rst = document.getElementById('cfg-reset');

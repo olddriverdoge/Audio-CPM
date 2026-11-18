@@ -30,8 +30,11 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
     };
 
     private static volatile boolean enabled = false;
-    private static volatile int preampMb = 0;                 // 千分之一 dB，可正可负
+    private static volatile int preampMb = 0;                 // 百分之一 dB，可正可负
     private static final int[] gainsMb = new int[BANDS];
+    private static volatile int bassAmount = 0;               // 0..1000（软件低音增强）
+    private static volatile int virtAmount = 0;               // 0..1000（软件立体声扩展）
+    private static final int MAX_BAND_MB = 2000;              // 单个频段最多 +20.0 dB，防止破音
     private static volatile long rev = 0;
 
     private int channels = 2, sampleRate = 48000, encoding = C.ENCODING_PCM_16BIT;
@@ -47,7 +50,17 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
 
     public static void setBand(int band, int mb) {
         if (band < 0 || band >= BANDS) return;
-        gainsMb[band] = mb;
+        gainsMb[band] = Math.max(-MAX_BAND_MB, Math.min(MAX_BAND_MB, mb));
+        rev++;
+    }
+
+    public static void setBass(int amount) {
+        bassAmount = Math.max(0, Math.min(1000, amount));
+        rev++;
+    }
+
+    public static void setVirt(int amount) {
+        virtAmount = Math.max(0, Math.min(1000, amount));
         rev++;
     }
 
@@ -68,13 +81,15 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
     public static void resetAll() {
         enabled = false;
         preampMb = 0;
+        bassAmount = 0;
+        virtAmount = 0;
         for (int i = 0; i < BANDS; i++) gainsMb[i] = 0;
         rev++;
     }
 
     public static String infoJson() {
         StringBuilder sb = new StringBuilder("{\"ok\":true,\"mode\":\"software\",\"bands\":")
-                .append(BANDS).append(",\"minLevel\":-12000,\"maxLevel\":12000,\"eqOn\":").append(enabled)
+                .append(BANDS).append(",\"minLevel\":-2000,\"maxLevel\":2000,\"eqOn\":").append(enabled)
                 .append(",\"preamp\":").append(preampMb).append(",\"freqs\":[");
         for (int i = 0; i < BANDS; i++) { if (i > 0) sb.append(','); sb.append((int) FREQ[i]); }
         sb.append("],\"levels\":[");
@@ -92,6 +107,7 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
         bypass = (encoding != C.ENCODING_PCM_16BIT && encoding != C.ENCODING_PCM_FLOAT);
         z1 = new float[channels][BANDS];
         z2 = new float[channels][BANDS];
+        bassZ = new float[channels];
         appliedRev = -1;
         return inputFormat;
     }
@@ -100,11 +116,12 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
     protected void onFlush() {
         if (z1 != null) for (float[] row : z1) java.util.Arrays.fill(row, 0f);
         if (z2 != null) for (float[] row : z2) java.util.Arrays.fill(row, 0f);
+        if (bassZ != null) java.util.Arrays.fill(bassZ, 0f);
     }
 
     @Override
     protected void onReset() {
-        z1 = null; z2 = null;
+        z1 = null; z2 = null; bassZ = null;
         appliedRev = -1;
     }
 
@@ -130,22 +147,45 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
         }
         // 前级增益混在第一个双二阶之前，用单独系数保存
         preampLin = (float) Math.pow(10.0, preampDb / 20.0);
+        double fc = Math.min(160.0, fs * 0.2);
+        bassAlpha = (float) (1.0 - Math.exp(-2.0 * Math.PI * fc / fs));
+        bassGain = (bassAmount / 1000f) * 0.65f;       // 最大约 +4.3 dB 的低频增益，避免直接削波
+        virtWidth = (virtAmount / 1000f) * 1.1f;       // 最大 2.1 倍侧向扩展
         if (z1 == null) { z1 = new float[channels][BANDS]; z2 = new float[channels][BANDS]; }
+        if (bassZ == null) bassZ = new float[channels];
     }
 
     private float preampLin = 1f;
+    private float[] bassZ;
+    private float bassAlpha = 0.02f;
+    private float bassGain = 0f;
+    private float virtWidth = 0f;
 
     private float processSample(int ch, float x) {
         float v = x * preampLin;
-        if (!enabled) return v;
-        float[] zz1 = z1[ch], zz2 = z2[ch];
-        for (int i = 0; i < BANDS; i++) {
-            float y = (float) (b0[i] * v + zz1[i]);
-            zz1[i] = (float) (b1[i] * v - a1[i] * y + zz2[i]);
-            zz2[i] = (float) (b2[i] * v - a2[i] * y);
-            v = y;
+        if (enabled) {
+            float[] zz1 = z1[ch], zz2 = z2[ch];
+            for (int i = 0; i < BANDS; i++) {
+                float y = (float) (b0[i] * v + zz1[i]);
+                zz1[i] = (float) (b1[i] * v - a1[i] * y + zz2[i]);
+                zz2[i] = (float) (b2[i] * v - a2[i] * y);
+                v = y;
+            }
+        }
+        if (bassAmount > 0 && bassZ != null) {
+            bassZ[ch] += bassAlpha * (v - bassZ[ch]);
+            v += bassGain * bassZ[ch];
         }
         return v;
+    }
+
+    private void widenStereo(float[] frame) {
+        if (virtAmount <= 0 || channels < 2 || frame.length < 2) return;
+        float l = frame[0], r = frame[1];
+        float m = (l + r) * 0.5f;
+        float side = (l - r) * 0.5f * (1f + virtWidth);
+        frame[0] = m + side;
+        frame[1] = m - side;
     }
 
     @Override
@@ -166,12 +206,15 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
         if (frames <= 0) return;
 
         ByteBuffer out = replaceOutputBuffer(frames * frameSize);
+        float[] frame = new float[channels];
         if (encoding == C.ENCODING_PCM_FLOAT) {
             FloatBuffer in = inputBuffer.asFloatBuffer();
             FloatBuffer ob = out.asFloatBuffer();
             for (int f = 0; f < frames; f++) {
+                for (int ch = 0; ch < channels; ch++) frame[ch] = processSample(ch, in.get());
+                widenStereo(frame);
                 for (int ch = 0; ch < channels; ch++) {
-                    float v = processSample(ch, in.get());
+                    float v = frame[ch];
                     if (v > 1f) v = 1f; else if (v < -1f) v = -1f;
                     ob.put(v);
                 }
@@ -180,8 +223,10 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
             ShortBuffer in = inputBuffer.asShortBuffer();
             ShortBuffer ob = out.asShortBuffer();
             for (int f = 0; f < frames; f++) {
+                for (int ch = 0; ch < channels; ch++) frame[ch] = processSample(ch, in.get() / 32768f);
+                widenStereo(frame);
                 for (int ch = 0; ch < channels; ch++) {
-                    float v = processSample(ch, in.get() / 32768f);
+                    float v = frame[ch];
                     if (v > 1f) v = 1f; else if (v < -1f) v = -1f;
                     ob.put((short) Math.round(v * 32767f));
                 }

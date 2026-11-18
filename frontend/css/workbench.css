@@ -178,6 +178,9 @@
     border-radius:6px;color:var(--muted);font-size:11px}
   .sh-del:hover{color:var(--err);background:rgba(239,68,68,.12)}
   .sh-foot{font-size:10.5px;color:#3d4a5c;line-height:1.6}
+  .scene-restore{display:block;margin:0 0 5px;padding:0;border:0;background:none;
+    color:#5f93b8;font-size:10.5px;font-family:inherit;cursor:pointer;text-decoration:underline}
+  .scene-restore.hidden{display:none}
   .af-sec-h em{font-style:normal;font-size:9.5px;color:#5b6b7d;font-weight:400;margin-left:6px}
   .af-fx.off{opacity:.45}
 
@@ -240,11 +243,21 @@
   .scene-add span{display:block;line-height:1}
 
   /* 音频输出里的外部播放器配置 */
-  .af-playcfg{flex:0 0 auto;max-height:44%;overflow:auto;padding:7px 10px 8px;
-    border-bottom:1px solid var(--border);background:rgba(17,24,32,.6)}
+  .af-playcfg{padding:8px 10px;border-bottom:1px solid var(--border);
+    background:rgba(17,24,32,.6)}
   .af-playcfg .row{margin-top:5px!important}
   .af-playcfg label{font-size:10.5px;color:#9fb0c2;margin-bottom:2px!important}
   .af-playcfg select,.af-playcfg input{font-size:11px;padding:4px 6px}
 
   /* 设置等模态层要压住所有浮窗与模块坞 */
   .sheet-overlay{z-index:2147483600}
+
+
+  /* 工作台整体缩放：只缩放模块浮窗，左上角为原点，窗口位置保持不变 */
+  .fw-win,.play-float,.audio-float,.meta-float,.spectrum-float,.log-float{
+    transform:scale(var(--ui-scale,1));transform-origin:top left;
+  }
+  .ui-scale-row{display:flex;align-items:center;gap:8px;margin:2px 0 8px}
+  .ui-scale-row label{font-size:11.5px;color:var(--muted);flex:0 0 auto}
+  .ui-scale-row select{flex:0 0 auto;font-size:11px;padding:3px 6px}
+  .ui-scale-row .hint{margin:0;font-size:10.5px;color:#66788b}

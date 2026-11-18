@@ -10,6 +10,10 @@ const WinMgr = (() => {
   const GAP = 6;
 
   function px(v, d) { return Number.isFinite(Number(v)) ? Number(v) : d; }
+  function uiScale() {
+    const v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-scale'));
+    return Number.isFinite(v) && v > 0.4 && v < 2.5 ? v : 1;
+  }
 
   /* 可用区域：header + modbar 之下，播放条（可见时）之上，左右留 6px */
   function bounds() {
@@ -47,10 +51,12 @@ const WinMgr = (() => {
   }
 
   function setRect(win, r) {
+    const z = uiScale();
     win.style.left = Math.round(r.x) + 'px';
     win.style.top = Math.round(r.y) + 'px';
-    win.style.width = Math.round(r.w) + 'px';
-    win.style.height = Math.round(r.h) + 'px';
+    // 窗口 transform:scale(z) 以左上角为原点：视觉尺寸 = 样式尺寸 * z
+    win.style.width = Math.round(r.w / z) + 'px';
+    win.style.height = Math.round(r.h / z) + 'px';
     win.style.right = 'auto';
     win.style.bottom = 'auto';
   }
@@ -111,10 +117,11 @@ const WinMgr = (() => {
       const maxW = Math.max(80, b.right - b.left);
       const maxH = Math.max(80, b.bottom - b.top);
       if (contentSized) {
-        const w = Math.min(win.offsetWidth || maxW, maxW);
-        const h = Math.min(win.offsetHeight || maxH, maxH);
-        win.style.maxWidth = maxW + 'px';
-        win.style.maxHeight = maxH + 'px';
+        const z = uiScale();
+        const w = Math.min((win.offsetWidth || maxW) * z, maxW);
+        const h = Math.min((win.offsetHeight || maxH) * z, maxH);
+        win.style.maxWidth = Math.round(maxW / z) + 'px';
+        win.style.maxHeight = Math.round(maxH / z) + 'px';
         rect = rect || {x: b.left, y: b.top, w: w, h: h};
         rect.w = w; rect.h = h;
         rect.x = Math.max(b.left, Math.min(rect.x, b.right - w));
@@ -186,8 +193,9 @@ const WinMgr = (() => {
       }
       if (mode === 'drag' && drag0) {
         const b0 = bounds();
-        const w = contentSized ? win.offsetWidth : rect.w;
-        const h = contentSized ? win.offsetHeight : rect.h;
+        const z = uiScale();
+        const w = contentSized ? (win.offsetWidth * z) : rect.w;
+        const h = contentSized ? (win.offsetHeight * z) : rect.h;
         const x = Math.max(b0.left, Math.min(b0.right - w, drag0.rx + (e.clientX - drag0.x)));
         const y = Math.max(b0.top, Math.min(b0.bottom - h, drag0.ry + (e.clientY - drag0.y)));
         rect = {...rect, x, y};
@@ -299,5 +307,6 @@ const WinMgr = (() => {
     if (pb) new MutationObserver(() => reclampAll()).observe(pb, {attributes: true, attributeFilter: ['class']});
   });
 
-  return {register, raise, reclampAll, bounds};
+  function reapplyAll() { regs.forEach(r => { try { r.refresh(); } catch (_) {} }); }
+  return {register, raise, reclampAll, reapplyAll, bounds};
 })();

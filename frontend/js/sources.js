@@ -131,7 +131,6 @@ const Sources = (() => {
       list = r.roots || list;
       renderSelect(); renderList();
       toast('已保存存储源');
-      try { if (typeof UiCfg !== 'undefined') UiCfg.refresh(); } catch (_) {}
       // 保存后直接切到该源，立刻能看到是否可浏览
       if (list.some(x => x.id === id)) await pickSource(id);
     } catch (e) { toast('保存失败: ' + e.message, 'err'); }

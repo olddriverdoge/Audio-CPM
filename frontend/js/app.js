@@ -389,6 +389,18 @@ const App = (() => {
     const c = String(v || '').split('-')[0].toLowerCase();
     return c === 'aiff' ? 'aif' : c;
   };
+  function setUiScale(value, persist) {
+    let s = Number(value);
+    if (!Number.isFinite(s)) s = 1;
+    s = Math.max(0.8, Math.min(1.25, s));
+    document.documentElement.style.setProperty('--ui-scale', String(s));
+    window.AUDIOCPM_UI_SCALE = s;
+    if (persist) Store.set(K.uiScale, s);
+    try { WinMgr.reclampAll(true); } catch (_) {}
+    return s;
+  }
+  function currentUiScale() { return Number(window.AUDIOCPM_UI_SCALE || 1); }
+
   async function applyCapabilities() {
     let caps = null;
     try { caps = await Api.caps(); } catch (_) { return; }
@@ -564,11 +576,7 @@ const App = (() => {
   }
 
   async function init() {
-    await Promise.all([
-      (typeof UiCfg !== 'undefined') ? UiCfg.load() : Promise.resolve(),
-      (typeof Sources !== 'undefined') ? Sources.refresh() : Promise.resolve(),
-    ]);
-    if (typeof UiCfg !== 'undefined') UiCfg.init();
+    if (typeof Sources !== 'undefined') await Sources.refresh();
     await applyCapabilities();
     if (typeof Sources !== 'undefined') {
       Sources.init();
@@ -684,6 +692,7 @@ const App = (() => {
     });
     if (typeof Spectrum !== 'undefined') Spectrum.init();
 
+    setUiScale(Store.get(K.uiScale, 1), false);
     initMods();
     if (typeof SceneStore !== 'undefined') SceneStore.init();
     applyPlayMode();
@@ -753,7 +762,7 @@ const App = (() => {
   return {
     init, browse, onPlayed, updateMoveBar: () => MoveMgr.update(), isGridView, refreshColumns,
     playNext, playPrev, autoplayNext, autoplayOn, applyPlayMode, playMode, cyclePlayMode,
-    openModule, openModules, closeAllModules, openMod: openModule, addTargetCurrent, addFavCurrent,
+    openModule, openModules, closeAllModules, openMod: openModule, setUiScale, currentUiScale, addTargetCurrent, addFavCurrent,
     playbackQueueList: () => playbackList().slice(), hifiQueue, toggleModule,
     get path() { return currentPath; },
     selection: () => (bv ? bv.selected() : []),

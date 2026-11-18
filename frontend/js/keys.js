@@ -8,7 +8,7 @@
 const K = {
   lastPath:'ac2_last_path', s2LastPath:'ac2_s2_last_path', viewMode:'ac2_view_mode', gridSize:'ac2_grid_size',
   sortBy:'ac2_sort_by', sortOrder:'ac2_sort_order', folderOrder:'ac2_folder_order',
-  conflict:'ac2_conflict_mode',
+  conflict:'ac2_conflict_mode', uiScale:'ac3_ui_scale',
   recent:'ac2_recent_paths', played:'ac2_played',
   split2:'ac2_layout_split2', split3:'ac2_layout_split3',
   page:'ac2_page',

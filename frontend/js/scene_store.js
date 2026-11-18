@@ -1,8 +1,9 @@
 /* ---------------- 场景（Scene）：一套模块布局，点一下摆好 ---------------- */
 const SceneStore = (() => {
   const STORE = 'ac3_scenes';
+  const HIDDEN = 'ac3_scenes_hidden';
   const LABEL = {
-    browse: '文件浏览', task: '批处理', tree: '目标路径',
+    browse: '文件浏览', task: '批处理', tree: '目标目录',
     meta: '元数据', spectrum: '频谱声谱', log: '日志', play: '播放管理', audio: '音频输出'
   };
   const DEFAULTS = [
@@ -22,8 +23,15 @@ const SceneStore = (() => {
     return Array.isArray(a) ? a.filter(x => x && x.id && modulesOf(x).length) : [];
   }
   function saveCustom(list) { Store.set(STORE, list); }
+  function hiddenIds() {
+    const a = Store.get(HIDDEN, []);
+    return Array.isArray(a) ? a.filter(Boolean) : [];
+  }
   function all() {
-    return DEFAULTS.concat(customs().map(x => Object.assign({}, x, {modules: modulesOf(x), custom: true})));
+    const hid = hiddenIds();
+    return DEFAULTS.filter(x => hid.indexOf(x.id) < 0)
+      .concat(customs().filter(x => hid.indexOf(x.id) < 0)
+        .map(x => Object.assign({}, x, {modules: modulesOf(x), custom: true})));
   }
 
   const WIN = {
@@ -33,7 +41,7 @@ const SceneStore = (() => {
 
   function esc(s) { return Utils.escapeHtml(String(s == null ? '' : s)); }
 
-  /* 把当前浮窗的位置/尺寸一起存进预设，换场景时原样还原 */
+  /* 把当前浮窗的位置/尺寸一起存进场景，换场景时原样还原 */
   function snapshotGeo(mods) {
     const geo = {};
     mods.forEach(m => {
@@ -54,13 +62,15 @@ const SceneStore = (() => {
       return '<button type="button" class="scene-chip' + (active ? ' on' : '') + '" data-scene-id="' +
         esc(s.id) + '" title="' + esc(modulesOf(s).map(m => LABEL[m] || m).join(' · ')) + '">' +
         '<span class="scene-name">' + esc(s.name) + '</span>' +
-        (s.custom ? '<i class="scene-x" data-del-scene="' + esc(s.id) + '" title="删除场景">✕</i>' : '') +
+        '<i class="scene-x" data-del-scene="' + esc(s.id) + '" title="删除场景">✕</i>' +
         '</button>';
     }).join('');
   }
 
   function render() {
     renderTabs();
+    const restore = document.getElementById('scene-restore');
+    if (restore) restore.classList.toggle('hidden', hiddenIds().length === 0);
     const grid = document.getElementById('sh-grid');
     if (!grid) return;
     const open = (App.openModules ? App.openModules() : []);
@@ -70,7 +80,7 @@ const SceneStore = (() => {
       return '<div class="sh-card' + (active ? ' on' : '') + '" data-id="' + esc(s.id) + '">' +
         '<span class="sh-name">' + esc(s.name) + '</span>' +
         '<span class="sh-desc">' + esc(desc) + '</span>' +
-        (s.custom ? '<b class="sh-del" data-del="' + esc(s.id) + '" title="删除该预设">✕</b>' : '') +
+        '<b class="sh-del" data-del="' + esc(s.id) + '" title="删除该场景">✕</b>' +
         '</div>';
     }).join('');
   }
@@ -99,7 +109,11 @@ const SceneStore = (() => {
 
   function remove(id) {
     if (!confirm('删除这个场景？')) return;
-    saveCustom(customs().filter(x => x.id !== id));
+    if (DEFAULTS.some(x => x.id === id)) {
+      Store.set(HIDDEN, hiddenIds().concat([id]));
+    } else {
+      saveCustom(customs().filter(x => x.id !== id));
+    }
     render();
   }
 
@@ -118,6 +132,8 @@ const SceneStore = (() => {
     }
     const add = document.getElementById('scene-add');
     if (add) add.onclick = saveCurrent;
+    const restore = document.getElementById('scene-restore');
+    if (restore) restore.onclick = () => { Store.remove(HIDDEN); render(); };
     const grid = document.getElementById('sh-grid');
     if (grid) {
       grid.addEventListener('click', e => {
