@@ -8,15 +8,27 @@ Range 稳定；同一个文件按 源+路径+大小 缓存，第二次起秒开�
 """
 import hashlib
 import os
+import threading
 
 from .config import DATA_DIR
 from .storage import get_dav_client
 
 CACHE_DIR = os.path.join(DATA_DIR, 'dav_cache')
+_locks_guard = threading.Lock()
+_locks = {}
 
 
 class DavStreamError(Exception):
     pass
+
+
+def _lock_for(path):
+    with _locks_guard:
+        lock = _locks.get(path)
+        if lock is None:
+            lock = threading.Lock()
+            _locks[path] = lock
+        return lock
 
 
 def cached_path(source, path):
@@ -32,30 +44,42 @@ def cached_path(source, path):
     except Exception as e:
         raise DavStreamError('缓存目录不可写: %s' % e)
     local = os.path.join(CACHE_DIR, key + (os.path.splitext(path)[1] or '.bin'))
-    if os.path.isfile(local) and (size <= 0 or os.path.getsize(local) == size):
+    # 同一个文件只允许一个下载任务，避免并发 Range 请求各下一份、把线程和网络打满。
+    with _lock_for(local):
+        if os.path.isfile(local) and (size <= 0 or os.path.getsize(local) == size):
+            return local
+        tmp = local + '.part'
+        try:
+            resp = cli.open_range(path, None)
+        except Exception as e:
+            raise DavStreamError('WebDAV 读取失败: %s' % e)
+        if resp.status_code not in (200, 206):
+            try: resp.close()
+            except Exception: pass
+            raise DavStreamError('WebDAV 返回 %s' % resp.status_code)
+        try:
+            with open(tmp, 'wb') as f:
+                for chunk in resp.iter_content(chunk_size=1024 * 64):
+                    if chunk:
+                        f.write(chunk)
+        finally:
+            try:
+                resp.close()
+            except Exception:
+                pass
+        got = os.path.getsize(tmp) if os.path.isfile(tmp) else 0
+        if got <= 0:
+            try:
+                os.remove(tmp)
+            except Exception:
+                pass
+            raise DavStreamError('WebDAV 返回空文件')
+        # stat 有明确大小时必须校验，避免服务端返回错误页/半截文件后被当成缓存。
+        if size > 0 and got != size:
+            try:
+                os.remove(tmp)
+            except Exception:
+                pass
+            raise DavStreamError('WebDAV 文件大小不一致（%d/%d）' % (got, size))
+        os.replace(tmp, local)
         return local
-    tmp = local + '.part'
-    try:
-        resp = cli.open_range(path, None)
-    except Exception as e:
-        raise DavStreamError('WebDAV 读取失败: %s' % e)
-    if resp.status_code not in (200, 206):
-        raise DavStreamError('WebDAV 返回 %s' % resp.status_code)
-    try:
-        with open(tmp, 'wb') as f:
-            for chunk in resp.iter_content(chunk_size=1024 * 64):
-                if chunk:
-                    f.write(chunk)
-    finally:
-        try:
-            resp.close()
-        except Exception:
-            pass
-    if not os.path.isfile(tmp) or os.path.getsize(tmp) <= 0:
-        try:
-            os.remove(tmp)
-        except Exception:
-            pass
-        raise DavStreamError('WebDAV 返回空文件')
-    os.replace(tmp, local)
-    return local

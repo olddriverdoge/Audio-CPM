@@ -8,7 +8,7 @@ import re
 import shutil
 import subprocess
 
-from starlette.concurrency import run_in_threadpool
+from starlette.concurrency import iterate_in_threadpool, run_in_threadpool
 from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import FileResponse, Response, StreamingResponse
@@ -96,7 +96,48 @@ async def api_stream(request: Request):
     path = qs(request, 'path')
     ref = parse_ref(path)
     if ref.kind == 'dav':
-        # 落盘缓存后由本地静态服务提供，Range/Content-Length 稳定，避免 WebDAV 端实现差异导致无法播放
+        # 先尝试直接把 WebDAV 的 Range 响应透传给浏览器：不再为了播第一秒
+        # 先下载完整文件。服务端 Range 不规范的源再回退到本地缓存。
+        from ..storage.dav import DavError
+        range_header = request.headers.get('range')
+        resp = None
+        try:
+            cli = get_dav_client(ref.source)
+            resp = cli.open_range(ref.path, range_header)
+            if range_header and resp.status_code == 200:
+                # 请求了 Range 却回 200：这个源不支持按段读，关掉走缓存。
+                resp.close()
+                resp = None
+            elif resp.status_code not in (200, 206):
+                code = resp.status_code
+                resp.close()
+                resp = None
+                raise HTTPException(code, 'WebDAV 返回 %s' % code)
+        except DavError as e:
+            if resp is not None:
+                try: resp.close()
+                except Exception: pass
+            logger.warning('WebDAV 直连失败，回退缓存: %s', e)
+            resp = None
+
+        if resp is not None:
+            mt = (mimetypes.guess_type(ref.path)[0] or 'application/octet-stream')
+            headers = {}
+            for h in ('content-length', 'content-range', 'accept-ranges', 'last-modified'):
+                v = resp.headers.get(h)
+                if v:
+                    headers[h] = v
+            async def gen():
+                try:
+                    async for chunk in iterate_in_threadpool(resp.iter_bytes()):
+                        if chunk:
+                            yield chunk
+                finally:
+                    try: resp.close()
+                    except Exception: pass
+            return StreamingResponse(gen(), status_code=resp.status_code, media_type=mt, headers=headers)
+
+        # 回退：落盘缓存后由本地静态服务提供，兼容不支持 Range 的 WebDAV。
         from ..davstream import cached_path, DavStreamError
         try:
             local = await run_in_threadpool(cached_path, ref.source, ref.path)
