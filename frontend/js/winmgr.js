@@ -8,27 +8,22 @@ const WinMgr = (() => {
   let zTop = zBase;
   const regs = [];
   const GAP = 6;
+  // 大画布：模块不再被夹在当前视口里，允许拖到视口外，再由手掌模式平移回来。
+  const CANVAS = {left: -2048, top: -768, right: 4096, bottom: 3072};
 
   function px(v, d) { return Number.isFinite(Number(v)) ? Number(v) : d; }
   function uiScale() {
     const v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-scale'));
     return Number.isFinite(v) && v >= 0.5 && v <= 3.005 ? v : 1;
   }
+  function canvasPan() {
+    const c = window.AUDIOCPM_CANVAS;
+    return {x: (c && Number(c.x)) || 0, y: (c && Number(c.y)) || 0};
+  }
 
-  /* 可用区域：header + modbar 之下，播放条（可见时）之上，左右留 6px */
+  /* 大画布逻辑边界；视口只用于初始落位，不再限制模块坐标。 */
   function bounds() {
-    const vw = window.innerWidth, vh = window.innerHeight;
-    const bar = document.getElementById('modbar') || document.getElementById('scene-bar');
-    const hdr = document.getElementById('app-hdr');
-    const topEl = bar || hdr;
-    const top = (topEl ? Math.round(topEl.getBoundingClientRect().bottom) : 0) + GAP;
-    const pb = document.getElementById('player-bar');
-    let bottom = vh - 6;
-    if (pb && !pb.classList.contains('hidden')) {
-      const t = Math.round(pb.getBoundingClientRect().top);
-      if (t > top + 40) bottom = Math.min(bottom, t - GAP);
-    }
-    return {left: GAP, top, right: vw - GAP, bottom};
+    return CANVAS;
   }
 
   function clampRect(r, minW, minH) {
@@ -47,7 +42,8 @@ const WinMgr = (() => {
 
   function measure(win) {
     const r = win.getBoundingClientRect();
-    return {x: Math.round(r.left), y: Math.round(r.top),
+    const p = canvasPan();
+    return {x: Math.round(r.left - p.x), y: Math.round(r.top - p.y),
             w: Math.round(r.width), h: Math.round(r.height)};
   }
 
@@ -192,12 +188,13 @@ const WinMgr = (() => {
         const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
         const s = Math.max(0.35, Math.min(2.2, dist / pinch0.dist));
         const b0 = bounds();
+        const p = canvasPan();
         const maxW = b0.right - b0.left, maxH = b0.bottom - b0.top;
         const nw = Math.max(minW, Math.min(pinch0.rect.w * s, maxW));
         const nh = Math.max(minH, Math.min(pinch0.rect.h * s, maxH));
         rect = clampRect({
-          x: cx - nw / 2 + (cx - pinch0.cx) * 0,
-          y: cy - nh / 2,
+          x: cx - p.x - nw / 2,
+          y: cy - p.y - nh / 2,
           w: nw, h: nh
         }, minW, minH);
         rect.x = Math.min(rect.x, b0.right - nw);

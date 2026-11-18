@@ -390,6 +390,26 @@ const App = (() => {
     return c === 'aiff' ? 'aif' : c;
   };
   const UI_SCALE_MIN = 0.5, UI_SCALE_MAX = 3.0;
+  const CANVAS_MIN = -4096, CANVAS_MAX = 4096;
+  const CANVAS_PAN_KEY = 'ac3_canvas_pan';
+  function canvasPan() {
+    const c = window.AUDIOCPM_CANVAS;
+    return {x: (c && Number(c.x)) || 0, y: (c && Number(c.y)) || 0};
+  }
+  function applyCanvasPan(x, y, persist) {
+    const px = Math.max(CANVAS_MIN, Math.min(CANVAS_MAX, Number(x) || 0));
+    const py = Math.max(CANVAS_MIN, Math.min(CANVAS_MAX, Number(y) || 0));
+    document.documentElement.style.setProperty('--canvas-x', px + 'px');
+    document.documentElement.style.setProperty('--canvas-y', py + 'px');
+    window.AUDIOCPM_CANVAS = {x: px, y: py};
+    if (persist) Store.set(CANVAS_PAN_KEY, {x: Math.round(px), y: Math.round(py)});
+    return {x: px, y: py};
+  }
+  function setCanvasPan(x, y, persist) {
+    const p = applyCanvasPan(x, y, persist);
+    try { WinMgr.syncRects(); } catch (_) {}
+    return p;
+  }
   function applyUiScale(value) {
     let s = Number(value);
     if (!Number.isFinite(s)) s = 1;
@@ -414,7 +434,7 @@ const App = (() => {
     const lock = document.getElementById('ui-lock');
     const hdr = document.getElementById('app-hdr');
     if (!hand || !lock || !hdr) return;
-    let locked = false, pinch = null;
+    let locked = false, pinch = null, pan0 = null;
     function positionLock() {
       lock.style.top = Math.round(hdr.getBoundingClientRect().bottom) + 'px';
     }
@@ -423,12 +443,21 @@ const App = (() => {
       const dy = touches[0].clientY - touches[1].clientY;
       return Math.max(1, Math.sqrt(dx * dx + dy * dy));
     }
+    function commitCanvas() {
+      const p = canvasPan();
+      setCanvasPan(p.x, p.y, true);
+    }
     function finishPinch(e) {
-      if (!pinch) return;
-      if (e && e.touches && e.touches.length >= 2) return;
-      const s = currentUiScale();
-      pinch = null;
-      commitUiScale(s);
+      if (pinch) {
+        const s = currentUiScale();
+        pinch = null;
+        commitUiScale(s);
+        commitCanvas();
+      }
+      if (pan0 && (!e || !e.touches || e.touches.length === 0)) {
+        pan0 = null;
+        commitCanvas();
+      }
       if (e && e.cancelable) e.preventDefault();
     }
     function setLocked(on) {
@@ -443,7 +472,7 @@ const App = (() => {
         lock.classList.remove('hidden');
         lock.setAttribute('aria-hidden', 'false');
         document.body.classList.add('ui-locked');
-        Utils.toast('工作台已锁定：双指缩放 50%–300%');
+        Utils.toast('工作台已锁定：单指平移，双指缩放 50%–300%');
       } else {
         finishPinch(null);
         lock.classList.add('hidden');
@@ -456,15 +485,40 @@ const App = (() => {
     window.addEventListener('resize', () => { if (locked) positionLock(); });
     window.addEventListener('orientationchange', () => { if (locked) setTimeout(positionLock, 120); });
     lock.addEventListener('touchstart', e => {
-      if (e.touches.length !== 2) { pinch = null; return; }
+      if (e.touches.length === 1) {
+        e.preventDefault();
+        pinch = null;
+        const p = canvasPan();
+        pan0 = {x: e.touches[0].clientX, y: e.touches[0].clientY, cx: p.x, cy: p.y};
+        return;
+      }
+      if (e.touches.length !== 2) { pinch = null; pan0 = null; return; }
       e.preventDefault();
-      pinch = {d: dist(e.touches), scale: currentUiScale()};
+      pan0 = null;
+      const p = canvasPan();
+      pinch = {d: dist(e.touches), scale: currentUiScale(), cx: p.x, cy: p.y,
+               mx: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+               my: (e.touches[0].clientY + e.touches[1].clientY) / 2};
     }, {passive: false});
     lock.addEventListener('touchmove', e => {
-      if (!pinch || e.touches.length < 2) return;
-      e.preventDefault();
-      const ratio = dist(e.touches) / pinch.d;
-      previewUiScale(pinch.scale * ratio);
+      if (pinch && e.touches.length >= 2) {
+        e.preventDefault();
+        const ratio = dist(e.touches) / pinch.d;
+        const s = Math.max(UI_SCALE_MIN, Math.min(UI_SCALE_MAX, pinch.scale * ratio));
+        const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        // 以双指中心为锚点缩放：中心下面的画布内容保持不动，实现局部放大。
+        const ax = (pinch.mx - pinch.cx) / pinch.scale;
+        const ay = (pinch.my - pinch.cy) / pinch.scale;
+        previewUiScale(s);
+        applyCanvasPan(mx - ax * s, my - ay * s, false);
+        return;
+      }
+      if (pan0 && e.touches.length === 1) {
+        e.preventDefault();
+        applyCanvasPan(pan0.cx + (e.touches[0].clientX - pan0.x),
+                       pan0.cy + (e.touches[0].clientY - pan0.y), false);
+      }
     }, {passive: false});
     lock.addEventListener('touchend', finishPinch, {passive: false});
     lock.addEventListener('touchcancel', finishPinch, {passive: false});
@@ -762,6 +816,8 @@ const App = (() => {
     });
     if (typeof Spectrum !== 'undefined') Spectrum.init();
 
+    const savedPan = Store.get(CANVAS_PAN_KEY, null);
+    applyCanvasPan(savedPan && savedPan.x, savedPan && savedPan.y, false);
     setUiScale(Store.get(K.uiScale, 1), false);
     initMods();
     initHandLock();
@@ -833,7 +889,7 @@ const App = (() => {
   return {
     init, browse, onPlayed, updateMoveBar: () => MoveMgr.update(), isGridView, refreshColumns,
     playNext, playPrev, autoplayNext, autoplayOn, applyPlayMode, playMode, cyclePlayMode,
-    openModule, openModules, closeAllModules, openMod: openModule, setUiScale, previewUiScale, commitUiScale, currentUiScale, addTargetCurrent, addFavCurrent,
+    openModule, openModules, closeAllModules, openMod: openModule, setUiScale, previewUiScale, commitUiScale, currentUiScale, setCanvasPan, applyCanvasPan, canvasPan, addTargetCurrent, addFavCurrent,
     playbackQueueList: () => playbackList().slice(), hifiQueue, toggleModule,
     get path() { return currentPath; },
     selection: () => (bv ? bv.selected() : []),

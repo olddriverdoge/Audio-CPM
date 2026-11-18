@@ -266,7 +266,8 @@
   .sheet-overlay{z-index:2147483600}
 
 
-  /* 工作台整体缩放：只缩放模块浮窗，左上角为原点，窗口位置保持不变 */
+  /* 工作台整体缩放 + 画布平移：translate 先作用于屏幕坐标，再按左上角缩放 */
   .fw-win,.play-float,.audio-float,.meta-float,.spectrum-float,.log-float{
-    transform:scale(var(--ui-scale,1));transform-origin:top left;
+    transform:translate3d(var(--canvas-x,0px), var(--canvas-y,0px), 0) scale(var(--ui-scale,1));
+    transform-origin:top left;
   }
