@@ -131,16 +131,6 @@ packaging/tests/           前端回归脚本
 requirements.txt           Python 依赖
 ```
 
-## 文档
-
-- [packaging/docs/HANDOVER.md](packaging/docs/HANDOVER.md)：代码结构、接口契约、运行与排障
-- [packaging/docs/APP_PACKAGING_HANDOFF.md](packaging/docs/APP_PACKAGING_HANDOFF.md)：打包交接与验收
-- [packaging/README.md](packaging/README.md)：当前 Android 构建说明与历史文档索引
-- [packaging/docs/OFFLINE_APP_PLAN_V3.md](packaging/docs/OFFLINE_APP_PLAN_V3.md)：离线 App 业务层方案
-- [packaging/docs/P4A_MIGRATION_PLAN.md](packaging/docs/P4A_MIGRATION_PLAN.md)：p4a 路线历史存档
-- [packaging/docs/PACKAGING_OPTIONS_WEBTOAPP_P4A.md](packaging/docs/PACKAGING_OPTIONS_WEBTOAPP_P4A.md)：壳选型对比历史存档
-
-> `packaging/docs/` 中的 p4a、WebToApp 等文档是路线评估记录，当前实际构建以 Gradle + Chaquopy 工程为准。
 
 ## 当前限制
 
