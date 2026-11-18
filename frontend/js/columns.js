@@ -144,6 +144,9 @@ const Columns = (() => {
       container.querySelectorAll('[data-col][data-path]').forEach(el => {
         const path = el.dataset.path;
         if (!path) return;
+        // WebDAV 的自定义标签列不做整页探测：每个文件都要 stat + 远端读元数据，
+        // 十几个 FLAC 的目录会在渲染时排队打满后端；点文件名仍可单独 probe。
+        if (String(path).indexOf('dav:') === 0) { setCell(el, ''); return; }
         const mtime = Number(el.dataset.mtime) || 0;
         const c = cache.get(path);
         if (c && c.mtime === mtime) { setCell(el, val(c.tags, el.dataset.col)); return; }
