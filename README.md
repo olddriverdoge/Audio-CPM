@@ -43,14 +43,11 @@ Audio-CPM 的核心不是“再做一个播放器”，而是把日常音乐文�
 - 移动 / 复制 / 撤销，支持同名冲突策略
 - 目标目录树惰性加载，支持新建、重命名、删除空目录
 
-### 批量任务
+### 批处理
 
 - 格式转换
 - 整理标签
 - 替换封面
-- 检查标签
-- SSE 实时进度与任务日志
-- 批处理输出目录支持一键填入当前路径
 
 ### 工作台与场景
 
@@ -83,7 +80,6 @@ Audio-CPM 的核心不是“再做一个播放器”，而是把日常音乐文�
 从 GitHub Releases 下载最新 APK：
 
 - 发布页：<https://github.com/olddriverdoge/Audio-CPM/releases>
-- 当前版本直链：<https://github.com/olddriverdoge/Audio-CPM/releases/download/v0.4.0/Audio-CPM-0.4.0.apk>
 
 APK 使用固定调试签名，适合侧载安装，不是应用商店发布签名。当前只打 `arm64-v8a`。
 
