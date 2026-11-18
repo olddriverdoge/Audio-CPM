@@ -28,7 +28,6 @@
 .tree-row { min-height: 44px; }
 .tree-row.active { background: rgba(251,146,60,.12); }
 #movebar { padding-bottom: calc(6px + env(safe-area-inset-bottom)); }
-#mv-btn, #mv-undo { min-height: 34px; }
 .pb-wave.time-only .wave-base, .pb-wave.time-only .wave-hi { display: none; }
 .pb-wave.time-only {
   background: linear-gradient(90deg, rgba(251,146,60,.55), rgba(251,146,60,.18));

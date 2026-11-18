@@ -55,6 +55,10 @@ public class AudioFx {
                 case "loud":
                     SoftwareEqProcessor.setPreamp(a);
                     return "{\"ok\":true}";
+                case "treble": {
+                    SoftwareEqProcessor.setTreble(a);
+                    return "{\"ok\":true}";
+                }
                 case "bass": {
                     SoftwareEqProcessor.setBass(a);
                     return "{\"ok\":true}";
@@ -79,7 +83,7 @@ public class AudioFx {
         // 低音/环绕也已改为软件处理（SoftwareEqProcessor），任何设备都可用
         String base = SoftwareEqProcessor.infoJson();
         return base.substring(0, base.length() - 1)
-                + ",\"bass\":true,\"virt\":true"
+                + ",\"treble\":true,\"bass\":true,\"virt\":true"
                 + ",\"session\":" + session + "}";
     }
 }

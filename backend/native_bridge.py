@@ -152,7 +152,7 @@ SOFTWARE_FX_FALLBACK = {
     'ok': True, 'mode': 'software', 'bands': 10,
     'minLevel': -2000, 'maxLevel': 2000, 'eqOn': False, 'preamp': 0,
     'freqs': [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
-    'levels': [0] * 10, 'bass': True, 'virt': True, 'session': -1,
+    'levels': [0] * 10, 'treble': True, 'bass': True, 'virt': True, 'session': -1,
 }
 
 

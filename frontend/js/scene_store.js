@@ -62,7 +62,6 @@ const SceneStore = (() => {
       return '<button type="button" class="scene-chip' + (active ? ' on' : '') + '" data-scene-id="' +
         esc(s.id) + '" title="' + esc(modulesOf(s).map(m => LABEL[m] || m).join(' · ')) + '">' +
         '<span class="scene-name">' + esc(s.name) + '</span>' +
-        '<i class="scene-x" data-del-scene="' + esc(s.id) + '" title="删除场景">✕</i>' +
         '</button>';
     }).join('');
   }
@@ -122,8 +121,6 @@ const SceneStore = (() => {
     const tabs = document.getElementById('scene-tabs');
     if (tabs) {
       tabs.addEventListener('click', e => {
-        const del = e.target.closest('[data-del-scene]');
-        if (del) { e.preventDefault(); e.stopPropagation(); remove(del.dataset.delScene); return; }
         const chip = e.target.closest('[data-scene-id]');
         if (!chip) return;
         const s = all().filter(x => x.id === chip.dataset.sceneId)[0];

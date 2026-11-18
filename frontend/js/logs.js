@@ -5,7 +5,7 @@ const Logs = (() => {
   const MAX = 400;
   const buf = {workbench: []};
   let ns = 'process';
-  let floatEl = null, bodyEl = null, tabsEl = null, fabEl = null;
+  let floatEl = null, bodyEl = null, fabEl = null;
   let open = false, inited = false;
 
   function stamp() {
@@ -27,19 +27,11 @@ const Logs = (() => {
     bodyEl.scrollTop = bodyEl.scrollHeight;
   }
 
-  function paintTabs() {
-    if (!tabsEl) return;
-    tabsEl.querySelectorAll('button[data-ns]').forEach(b => {
-      b.classList.toggle('on', b.dataset.ns === ns);
-    });
-  }
-
   function setNs(next) {
     if (!NAMES[next]) return;
     ns = next;
     const tag = document.getElementById('lf-ns');
     if (tag) tag.textContent = NAMES[ns];
-    paintTabs();
     paintBody();
   }
 
@@ -91,23 +83,20 @@ const Logs = (() => {
     if (floatEl) floatEl.classList.toggle('hidden', !open);
     if (fabEl) fabEl.style.display = open ? 'none' : '';
     if (fabEl) fabEl.classList.toggle('on', open);
-    if (open) { paintTabs(); paintBody(); }
+    if (open) paintBody();
   }
 
   function init() {
     if (inited) return;
     floatEl = document.getElementById('log-float');
     bodyEl = document.getElementById('lf-body');
-    tabsEl = document.getElementById('lf-tabs');
     fabEl = document.getElementById('log-fab');
     if (!floatEl || !fabEl) return;
     inited = true;
     ns = pageNs();
+    const tag = document.getElementById('lf-ns');
+    if (tag) tag.textContent = NAMES[ns];
     if (fabEl) fabEl.addEventListener('click', () => toggle());
-    if (tabsEl) tabsEl.addEventListener('click', e => {
-      const b = e.target.closest('button[data-ns]');
-      if (b) setNs(b.dataset.ns);
-    });
     const minBtn = document.getElementById('lf-min');
     if (minBtn) minBtn.addEventListener('click', () => toggle(false));
     const cp = document.getElementById('lf-copy');

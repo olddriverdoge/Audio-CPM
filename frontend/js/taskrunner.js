@@ -269,6 +269,19 @@ const TaskRunner = (() => {
   function init() {
     const cb = document.getElementById('cancel-btn');
     if (cb) cb.addEventListener('click', cancel);
+    // 任务类型切换必须刷新各自的配置面板；之前只在模块打开时 syncUI，
+    // 导致“重命名 / 替换封面”的界面切过去看不到。
+    document.querySelectorAll('input[name="task"]').forEach(r => {
+      r.addEventListener('change', syncUI);
+    });
+    const useCur = document.getElementById('btn-use-cur-dir');
+    if (useCur) useCur.addEventListener('click', () => {
+      const inp = document.getElementById('output-dir');
+      if (!inp) return;
+      if (!App.path) { Utils.toast('先打开一个目录', 'warn'); return; }
+      inp.value = App.path;
+      Utils.toast('已填入当前路径');
+    });
     checkUnfinished();
   }
 

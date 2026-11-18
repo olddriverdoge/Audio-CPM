@@ -184,10 +184,6 @@ body.has-player .sf-fab.log-fab{bottom:248px}
   box-shadow:0 8px 28px rgba(0,0,0,.6);overflow:hidden}
 body.has-player .log-float{bottom:248px}
 .log-float.hidden{display:none}
-.log-tabs{display:flex;gap:4px;padding:4px 6px;border-bottom:1px solid var(--border);flex:0 0 auto}
-.log-tabs button{flex:1 1 0;padding:4px 6px;font-size:11px;border-radius:5px;
-  border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:inherit}
-.log-tabs button.on{color:var(--accent);border-color:var(--accent);background:rgba(56,189,248,.08)}
 .log-body{flex:1 1 auto;overflow:auto;padding:4px 6px;font-family:ui-monospace,Menlo,monospace;
   font-size:11px;line-height:1.5;-webkit-overflow-scrolling:touch}
 .log-line{white-space:pre-wrap;word-break:break-all;color:var(--muted)}

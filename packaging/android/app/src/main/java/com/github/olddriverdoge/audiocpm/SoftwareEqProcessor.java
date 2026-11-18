@@ -33,6 +33,7 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
     private static volatile int preampMb = 0;                 // 百分之一 dB，可正可负
     private static final int[] gainsMb = new int[BANDS];
     private static volatile int bassAmount = 0;               // 0..1000（软件低音增强）
+    private static volatile int trebleAmount = 0;             // 0..1000（软件高音增强）
     private static volatile int virtAmount = 0;               // 0..1000（软件立体声扩展）
     private static final int MAX_BAND_MB = 2000;              // 单个频段最多 +20.0 dB，防止破音
     private static volatile long rev = 0;
@@ -59,6 +60,11 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
         rev++;
     }
 
+    public static void setTreble(int amount) {
+        trebleAmount = Math.max(0, Math.min(1000, amount));
+        rev++;
+    }
+
     public static void setVirt(int amount) {
         virtAmount = Math.max(0, Math.min(1000, amount));
         rev++;
@@ -82,6 +88,7 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
         enabled = false;
         preampMb = 0;
         bassAmount = 0;
+        trebleAmount = 0;
         virtAmount = 0;
         for (int i = 0; i < BANDS; i++) gainsMb[i] = 0;
         rev++;
@@ -108,6 +115,7 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
         z1 = new float[channels][BANDS];
         z2 = new float[channels][BANDS];
         bassZ = new float[channels];
+        trebleZ = new float[channels];
         appliedRev = -1;
         return inputFormat;
     }
@@ -117,11 +125,12 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
         if (z1 != null) for (float[] row : z1) java.util.Arrays.fill(row, 0f);
         if (z2 != null) for (float[] row : z2) java.util.Arrays.fill(row, 0f);
         if (bassZ != null) java.util.Arrays.fill(bassZ, 0f);
+        if (trebleZ != null) java.util.Arrays.fill(trebleZ, 0f);
     }
 
     @Override
     protected void onReset() {
-        z1 = null; z2 = null; bassZ = null;
+        z1 = null; z2 = null; bassZ = null; trebleZ = null;
         appliedRev = -1;
     }
 
@@ -150,15 +159,22 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
         double fc = Math.min(160.0, fs * 0.2);
         bassAlpha = (float) (1.0 - Math.exp(-2.0 * Math.PI * fc / fs));
         bassGain = (bassAmount / 1000f) * 0.65f;       // 最大约 +4.3 dB 的低频增益，避免直接削波
+        double fcT = Math.min(4000.0, fs * 0.2);
+        trebleAlpha = (float) (1.0 - Math.exp(-2.0 * Math.PI * fcT / fs));
+        trebleGain = (trebleAmount / 1000f) * 0.65f;   // 最大约 +4.3 dB 的高频增益
         virtWidth = (virtAmount / 1000f) * 1.1f;       // 最大 2.1 倍侧向扩展
         if (z1 == null) { z1 = new float[channels][BANDS]; z2 = new float[channels][BANDS]; }
         if (bassZ == null) bassZ = new float[channels];
+        if (trebleZ == null) trebleZ = new float[channels];
     }
 
     private float preampLin = 1f;
     private float[] bassZ;
     private float bassAlpha = 0.02f;
     private float bassGain = 0f;
+    private float[] trebleZ;
+    private float trebleAlpha = 0.4f;
+    private float trebleGain = 0f;
     private float virtWidth = 0f;
 
     private float processSample(int ch, float x) {
@@ -175,6 +191,10 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
         if (bassAmount > 0 && bassZ != null) {
             bassZ[ch] += bassAlpha * (v - bassZ[ch]);
             v += bassGain * bassZ[ch];
+        }
+        if (trebleAmount > 0 && trebleZ != null) {
+            trebleZ[ch] += trebleAlpha * (v - trebleZ[ch]);
+            v += trebleGain * (v - trebleZ[ch]);       // 一阶高通，补足高频
         }
         return v;
     }

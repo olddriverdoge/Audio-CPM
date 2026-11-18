@@ -62,6 +62,7 @@ function createAudioPanel() {
     if (Array.isArray(cfg.bands) && info && info.fx && info.fx.ok) {
       cfg.bands.forEach((lv, i) => fx('band', lv, i));
     }
+    fx('treble', cfg.treble || 0);
     fx('bass', cfg.bass || 0);
     fx('virt', cfg.virt || 0);
     fx('preamp', Math.round((cfg.preamp || 0) * 100));
@@ -93,10 +94,10 @@ function createAudioPanel() {
         let lv = Array.isArray(cfg.bands) && cfg.bands[i] != null ? cfg.bands[i] : (d.levels ? d.levels[i] : 0);
         lv = Math.max(Number(d.minLevel ?? -2000), Math.min(Number(d.maxLevel ?? 2000), Number(lv) || 0));
         const label = hz >= 1000 ? (hz / 1000) + 'k' : hz + '';
-        html += '<div class="af-band"><span class="af-f">' + label + '</span>' +
-          '<input type="range" class="af-slider" data-band="' + i + '" min="' + d.minLevel +
-          '" max="' + d.maxLevel + '" value="' + lv + '" step="50">' +
-          '<span class="af-db">' + (lv / 100).toFixed(1) + '</span></div>';
+        html += '<div class="af-band"><span class="af-db">' + (lv / 100).toFixed(1) + '</span>' +
+          '<input type="range" class="af-slider af-vslider" data-band="' + i + '" min="' + d.minLevel +
+          '" max="' + d.maxLevel + '" value="' + lv + '" step="50" aria-label="' + label + 'Hz">' +
+          '<span class="af-f">' + label + '</span></div>';
       });
       html += '</div>';
       html += '<div class="af-pre"><span>前级增益</span><input type="range" class="af-slider" id="af-preamp" min="-20" max="20" step="0.5" value="' + (cfg.preamp || 0) + '"><span class="af-db" id="af-preamp-v">' + fmtDb(cfg.preamp || 0) + '</span></div>';
@@ -107,7 +108,9 @@ function createAudioPanel() {
 
     /* ---- 音效 ---- */
     html += '<div class="af-sec"><div class="af-sec-h"><span>音效</span></div>';
-    const bassOk = d.bass === true, virtOk = d.virt === true;
+    const trebleOk = d.treble === true, bassOk = d.bass === true, virtOk = d.virt === true;
+    html += '<div class="af-fx' + (trebleOk ? '' : ' off') + '"><label class="af-switch"><input type="checkbox" id="af-treble-on"' + (cfg.treble ? ' checked' : '') + (trebleOk ? '' : ' disabled') + '><i></i></label>' +
+      '<span>高音增强</span><input type="range" class="af-slider" id="af-treble" min="0" max="1000" step="50" value="' + (cfg.treble || 0) + '"></div>';
     html += '<div class="af-fx' + (bassOk ? '' : ' off') + '"><label class="af-switch"><input type="checkbox" id="af-bass-on"' + (cfg.bass ? ' checked' : '') + (bassOk ? '' : ' disabled') + '><i></i></label>' +
       '<span>低音增强</span><input type="range" class="af-slider" id="af-bass" min="0" max="1000" step="50" value="' + (cfg.bass || 0) + '"></div>';
     html += '<div class="af-fx' + (virtOk ? '' : ' off') + '"><label class="af-switch"><input type="checkbox" id="af-virt-on"' + (cfg.virt ? ' checked' : '') + (virtOk ? '' : ' disabled') + '><i></i></label>' +
@@ -178,6 +181,16 @@ function createAudioPanel() {
         cfg.preamp = Number(pre.value); save(); fx('preamp', Math.round(cfg.preamp * 100));
       });
     }
+    const trebleOn = document.getElementById('af-treble-on');
+    const trebleR = document.getElementById('af-treble');
+    if (trebleOn) trebleOn.addEventListener('change', () => {
+      if (trebleOn.checked && trebleR && Number(trebleR.value) === 0) trebleR.value = '500';
+      cfg.treble = trebleOn.checked ? Number(trebleR ? trebleR.value : 500) : 0;
+      save(); fx('treble', cfg.treble);
+    });
+    if (trebleR) trebleR.addEventListener('change', () => {
+      if (trebleOn && trebleOn.checked) { cfg.treble = Number(trebleR.value); save(); fx('treble', cfg.treble); }
+    });
     const bassOn = document.getElementById('af-bass-on');
     const bassR = document.getElementById('af-bass');
     if (bassOn) bassOn.addEventListener('change', () => {

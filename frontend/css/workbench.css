@@ -137,11 +137,17 @@
   .af-chip{padding:3px 8px;border-radius:999px;border:1px solid var(--border);background:var(--panel2);
     color:var(--muted);font-size:10.5px;font-family:inherit;cursor:pointer}
   .af-chip.on{color:var(--accent);border-color:rgba(56,189,248,.55);background:rgba(56,189,248,.1)}
-  .af-bands{display:flex;flex-direction:column;gap:2px}
-  .af-band{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted)}
-  .af-f{width:34px;flex:0 0 auto;text-align:right;font-variant-numeric:tabular-nums}
-  .af-db{width:36px;flex:0 0 auto;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+  /* 10 段 EQ 横向推子排布，避免纵向列表里上下滑时误触相邻频段 */
+  .af-bands{display:flex;flex-direction:row;align-items:stretch;gap:4px;overflow-x:auto;
+    padding:3px 2px 2px;scrollbar-width:none}
+  .af-bands::-webkit-scrollbar{display:none}
+  .af-band{display:flex;flex-direction:column;align-items:center;gap:2px;
+    flex:1 0 24px;min-width:24px;font-size:9.5px;color:var(--muted)}
+  .af-f{width:auto;flex:0 0 auto;text-align:center;font-variant-numeric:tabular-nums;font-size:9px}
+  .af-db{width:auto;flex:0 0 auto;text-align:center;color:var(--muted);font-variant-numeric:tabular-nums;font-size:9px}
   .af-slider{flex:1 1 auto;min-width:0;accent-color:var(--accent);height:18px}
+  .af-vslider{flex:0 0 auto;width:22px;height:104px;writing-mode:vertical-lr;direction:rtl;
+    accent-color:var(--accent);padding:0;margin:0}
   .af-pre{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:10.5px;color:var(--muted)}
   .af-fx{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);margin:4px 0}
   .af-fx>span:first-of-type{flex:0 0 64px}
@@ -211,7 +217,7 @@
   .mv-bar .mv-n{font-size:10.5px;color:var(--muted);white-space:nowrap}
   .mv-bar select{flex:0 0 auto;max-width:92px;background:var(--panel2);border:1px solid var(--border);
     color:var(--text);border-radius:6px;font-size:10.5px;padding:2px 4px;font-family:inherit}
-  .mv-bar .primary{background:rgba(56,189,248,.12);border-color:rgba(56,189,248,.5);color:var(--accent)}
+
   .mv-bar button{border-radius:6px}
 
 
@@ -243,8 +249,8 @@
   /* 场景 chip 的删除与 + 居中 */
   .scene-chip{display:inline-flex;align-items:center;gap:4px}
   .scene-name{display:inline-block}
-  .scene-x{font-style:normal;font-size:10px;color:#7d8b9c;padding:0 1px;line-height:1}
-  .scene-x:hover{color:#f87171}
+
+
   .scene-add{display:inline-flex;align-items:center;justify-content:center;padding:0;
     line-height:1;font-size:16px;font-weight:600;transform:translateY(-0.5px)}
   .scene-add span{display:block;line-height:1}
