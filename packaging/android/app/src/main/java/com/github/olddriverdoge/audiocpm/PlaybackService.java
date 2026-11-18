@@ -53,6 +53,8 @@ public class PlaybackService extends MediaSessionService {
     /** DAC / USB / 有线输出路由：只改 ExoPlayer 的 preferred device，不改变解码和 EQ 链路。 */
     public static boolean setPreferredDevice(int id) {
         preferredDeviceId = Math.max(0, id);
+        // 服务/播放器还没起来时先记住选择，PlaybackService.onCreate 会再应用一次。
+        if (player == null) return true;
         return applyPreferredDevice();
     }
 

@@ -144,6 +144,8 @@ public class AudioCpmBridge {
     /** 选择输出设备；id=0 表示系统默认。 */
     public static String setAudioDevice(final int id) {
         try {
+            Context ctx = AudioCpmApp.get();
+            if (ctx != null) ensureService(ctx);
             boolean ok = PlaybackService.setPreferredDevice(id);
             return "{\"ok\":" + ok + ",\"id\":" + Math.max(0, id) + "}";
         } catch (Throwable t) {
