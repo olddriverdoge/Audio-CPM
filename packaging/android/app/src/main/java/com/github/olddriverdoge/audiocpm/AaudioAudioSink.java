@@ -130,7 +130,12 @@ public final class AaudioAudioSink implements AudioSink {
     }
 
     @Override
-    public boolean supportsFormat(Format format) { return true; }
+    public boolean supportsFormat(Format format) {
+        // 不能无脑返回 true：ExoPlayer 会据此判定“可以直通”，把 FLAC/MP3 等
+        // 编码帧直接交给 AudioSink，触发 Unable to configure passthrough。
+        // 这里必须沿用 DefaultAudioSink 的判断，让 MediaCodec 正常解码成 PCM。
+        return fallback.supportsFormat(format);
+    }
 
     @Override
     public int getFormatSupport(Format format) {
