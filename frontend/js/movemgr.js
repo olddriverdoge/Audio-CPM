@@ -38,7 +38,7 @@ const MoveMgr = (() => {
           lg('err', (op === 'copy' ? '复制失败: ' : '移动失败: ') + Utils.basename(x.src) + ' ' + (x.reason || ''));
         }
       }
-      await ctx.afterMove();
+      await ctx.afterMove({op: op, sources: sources, target: target, results: res.results || []});
     } catch (e) {
       Utils.toast((op === 'copy' ? '复制失败: ' : '移动失败: ') + e.message, 'err');
       lg('err', (op === 'copy' ? '复制失败: ' : '移动失败: ') + e.message);

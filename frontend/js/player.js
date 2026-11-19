@@ -429,6 +429,20 @@ const Player = (() => {
     setPct(d > 0 ? t / d * 100 : 0);
     if (audio.paused) audio.play().catch(() => {});
   }
+  function pause() {
+    if (!cur) return;
+    if (hifi) {
+      if (hifiPlaying) {
+        try { Api.playbackPause().catch(() => {}); } catch (_) {}
+        hifiPlaying = false;
+      }
+      setToggle(false);
+      paintButtons(cur);
+      syncMediaState(false);
+      return;
+    }
+    try { audio.pause(); } catch (_) {}
+  }
   function toggle() {
     if (!cur) return;
     if (hifi) {
@@ -543,7 +557,7 @@ const Player = (() => {
     } catch (_) {}
   }, 2000);
 
-  return {open, toggle, close, external, syncBar, paintRows, pct, seekRatio, onMeta,
+  return {open, toggle, pause, close, external, syncBar, paintRows, pct, seekRatio, onMeta,
           position: positionSec, duration: durationSec, isPlaying, setVolume, seekSec, replay,
           hifiActive: () => hifi, hifiPlaying: () => hifiPlaying,
           get current() { return cur; },

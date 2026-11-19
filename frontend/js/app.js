@@ -423,6 +423,18 @@ const App = (() => {
     Utils.toast('目标目录已指向当前路径');
   }
 
+  /* 移动/删除后的路径比较：local: 前缀去掉，目录按前缀判断。 */
+  function normPath(p) {
+    let s = String(p || '');
+    if (s.indexOf('local:') === 0) s = s.slice(6);
+    return s.replace(/\/+$/, '');
+  }
+  function pathInSrc(path, src) {
+    const a = normPath(path), b = normPath(src);
+    if (!a || !b) return false;
+    return a === b || a.indexOf(b + '/') === 0;
+  }
+
   /* 一次点击：开始播放并落到点击位置 */
   function playRowClick(path, e, rowEl) {
     if (!path) return;
@@ -1008,7 +1020,18 @@ const App = (() => {
     MoveMgr.bind({
       getSources: () => (bv ? bv.selected() : []),
       getTarget: () => (tree ? tree.selected : ''),
-      afterMove: async () => {
+      afterMove: async (info) => {
+        // 移动会把正在播放的文件从原路径拿走；先暂停，不要让 ExoPlayer
+        // 继续读一个已经失效/正在被移动的路径，表现成无休止的一卡一卡。
+        if (info && info.op === 'move' && Player.current) {
+          const moved = (info.results || []).some(x =>
+            x.status === 'ok' && pathInSrc(Player.current, x.src));
+          if (moved) {
+            try { Player.pause(); } catch (_) {}
+            Utils.toast('当前播放文件已被移动，已暂停');
+            Utils.log('warn', '当前播放文件被移动，已暂停: ' + Player.current, 'organize');
+          }
+        }
         await browse(currentPath);
         if (bv) bv.clearSelection();
         updateSelInfo();
