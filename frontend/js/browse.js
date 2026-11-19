@@ -444,31 +444,6 @@ function createBrowseView(cfg) {
       Utils.toast('删除失败: ' + e.message, 'err');
     }
   }
-  /* 文件浏览：从左边缘向右滑 = 返回上一级。
-     只认左边缘起手，避免和列表横向滚动/文件拖选冲突；选择模式下不触发。 */
-  let swipeBack = null;
-  el.addEventListener('pointerdown', e => {
-    if (e.pointerType === 'mouse' || st.selMode) return;
-    if (!st.parent || st.parent === st.path) return;
-    if (e.clientX > 30) return;
-    if (e.target.closest('input, button')) return;
-    swipeBack = {id: e.pointerId, x: e.clientX, y: e.clientY, t: Date.now()};
-  }, true);
-  el.addEventListener('pointermove', e => {
-    if (!swipeBack || e.pointerId !== swipeBack.id) return;
-    const dx = e.clientX - swipeBack.x, dy = e.clientY - swipeBack.y;
-    if (dx > 70 && Math.abs(dy) < 55 && dx > Math.abs(dy) * 1.4) {
-      const parent = st.parent;
-      swipeBack = null;
-      suppressClick = true;
-      setTimeout(() => { suppressClick = false; }, 700);
-      if (cfg.onOpenDir && parent) cfg.onOpenDir(parent);
-    }
-  }, true);
-  ['pointerup', 'pointercancel'].forEach(t => el.addEventListener(t, e => {
-    if (swipeBack && e.pointerId === swipeBack.id) swipeBack = null;
-  }, true));
-
   el.addEventListener('pointerdown', e => {
     const row = e.target.closest('.item.file, .tile, .item.dir[data-dir-path]');
     if (!row) return;

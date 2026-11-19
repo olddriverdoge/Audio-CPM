@@ -455,5 +455,10 @@
   "播放中，输出格式尚未就绪": "Wiedergabe läuft; Ausgabeformat noch nicht bereit",
   "播放中，未读到格式": "Wiedergabe läuft; Format nicht verfügbar",
   "外部播放器（目标 App）": "Externer Player (Ziel-App)",
-  "外部播放器模式下，解码与输出由目标播放器负责；本应用只能确认播放请求已发送，读不到它的实际采样率/位深。需要精确输出信息请切回网页内播放。": "Im externen Player-Modus übernehmen die Ziel-App Dekodierung und Ausgabe. Diese App kann nur bestätigen, dass die Wiedergabeanfrage gesendet wurde, und kann die tatsächliche Abtastrate/Bittiefe nicht auslesen. Für genaue Ausgabedetails bitte zur In-App-Wiedergabe zurückkehren."
+  "外部播放器模式下，解码与输出由目标播放器负责；本应用只能确认播放请求已发送，读不到它的实际采样率/位深。需要精确输出信息请切回网页内播放。": "Im externen Player-Modus übernehmen die Ziel-App Dekodierung und Ausgabe. Diese App kann nur bestätigen, dass die Wiedergabeanfrage gesendet wurde, und kann die tatsächliche Abtastrate/Bittiefe nicht auslesen. Für genaue Ausgabedetails bitte zur In-App-Wiedergabe zurückkehren.",
+  "缩放": "Zoom",
+  "缩放（双指在模块上缩放该模块，空白处缩放整体）": "Zoom (Modul mit zwei Fingern zoomen; leere Fläche zoomt alles)",
+  "工作台已锁定：单指平移；双指在模块上缩放该模块，空白处缩放整体": "Arbeitsbereich gesperrt: Mit einem Finger verschieben; Modul mit zwei Fingern zoomen, leere Fläche zoomt alles",
+  "展开一层": "Eine Ebene öffnen",
+  "已展开一层": "Eine Ebene geöffnet"
 }

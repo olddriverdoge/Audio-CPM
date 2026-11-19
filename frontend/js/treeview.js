@@ -133,7 +133,7 @@ function createTreeView(opts) {
       }
       if (budget <= 0) break;
     }
-    if (budget <= 0) Utils.toast('已展开一层（为保护 WebDAV 只加载了部分，继续点可再展开）', 'warn');
+    if (budget <= 0) Utils.toast('已展开一层', 'warn');
   }
 
   /* 手动「全部收起」：只保留根节点一层 */

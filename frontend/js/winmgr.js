@@ -20,6 +20,15 @@ const WinMgr = (() => {
     const c = window.AUDIOCPM_CANVAS;
     return {x: (c && Number(c.x)) || 0, y: (c && Number(c.y)) || 0};
   }
+  /* 单个模块自己的内容比例；和全局 --ui-scale 相乘。 */
+  function winScale(win) {
+    try {
+      const raw = win.style.getPropertyValue('--win-scale');
+      const v = raw ? parseFloat(raw) : parseFloat(getComputedStyle(win).getPropertyValue('--win-scale'));
+      return Number.isFinite(v) ? Math.max(0.5, Math.min(3, v)) : 1;
+    } catch (_) { return 1; }
+  }
+  function totalScale(win) { return uiScale() * winScale(win); }
 
   /* 大画布逻辑边界；视口只用于初始落位，不再限制模块坐标。 */
   function bounds() {
@@ -64,10 +73,10 @@ const WinMgr = (() => {
   }
 
   function setRect(win, r) {
-    const z = uiScale();
+    // 全局缩放 × 该窗口自己的内容缩放；视觉尺寸 = 样式尺寸 × 两者乘积
+    const z = totalScale(win);
     win.style.left = Math.round(r.x) + 'px';
     win.style.top = Math.round(r.y) + 'px';
-    // 窗口 transform:scale(z) 以左上角为原点：视觉尺寸 = 样式尺寸 * z
     win.style.width = Math.round(r.w / z) + 'px';
     win.style.height = Math.round(r.h / z) + 'px';
     win.style.right = 'auto';
@@ -92,15 +101,18 @@ const WinMgr = (() => {
     function readGeo() {
       const g = Store.get(geoKey, null);
       if (!g || !Number.isFinite(Number(g.w)) || !Number.isFinite(Number(g.h))) return null;
-      // 几何尺寸按 100% 逻辑尺寸存，缩放后按当前 z 还原成视觉尺寸
+      // 几何尺寸按全局 100% 逻辑尺寸存；该窗口自己的内容比例单独恢复。
       const z = uiScale();
+      const k = Number.isFinite(Number(g.scale)) ? Math.max(0.5, Math.min(3, Number(g.scale))) : 1;
+      win.style.setProperty('--win-scale', String(k));
       return {x: Number(g.x), y: Number(g.y), w: Number(g.w) * z, h: Number(g.h) * z};
     }
     function persist() {
       if (!rect) return;
       const z = uiScale();
       Store.set(geoKey, {x: Math.round(rect.x), y: Math.round(rect.y),
-                         w: Math.round(rect.w / z), h: Math.round(rect.h / z)});
+                         w: Math.round(rect.w / z), h: Math.round(rect.h / z),
+                         scale: Math.round(winScale(win) * 100) / 100});
     }
     function apply(remeasure) {
       const saved = readGeo();
@@ -329,13 +341,17 @@ const WinMgr = (() => {
        不修改全局 --ui-scale，其他模块保持原样。 */
     function zoomAt(base, factor, sx, sy) {
       if (!rect || !base) return;
-      const z = uiScale();
+      // 不是只改窗口尺寸：同时改 --win-scale，让模块里的文字、按钮、列表
+      // 和窗口边框一起缩放；其他模块保持原样。
+      const cur = winScale(win);
+      const next = Math.max(0.5, Math.min(3, cur * factor));
+      const f = cur > 0 ? next / cur : 1;
       const p = canvasPan();
-      const ax = (sx - p.x) / z, ay = (sy - p.y) / z;
-      const nw = Math.max(minW, base.w * factor);
-      const nh = Math.max(minH, base.h * factor);
-      const nx = ax - (ax - base.x) * factor;
-      const ny = ay - (ay - base.y) * factor;
+      const nw = Math.max(minW, base.w * f);
+      const nh = Math.max(minH, base.h * f);
+      const nx = base.x + (sx - p.x - base.x) * (1 - f);
+      const ny = base.y + (sy - p.y - base.y) * (1 - f);
+      win.style.setProperty('--win-scale', String(Math.round(next * 1000) / 1000));
       rect = clampRect({x: nx, y: ny, w: nw, h: nh}, minW, minH);
       if (contentSized) {
         win.style.left = Math.round(rect.x) + 'px';

@@ -482,9 +482,9 @@ const App = (() => {
       locked = !!on;
       hand.classList.toggle('on', locked);
       hand.setAttribute('aria-pressed', locked ? 'true' : 'false');
-      hand.title = locked ? '整体缩放（双指在模块上缩放该模块，空白处缩放整体）' : '整体缩放';
+      hand.title = locked ? '缩放（双指在模块上缩放该模块，空白处缩放整体）' : '缩放';
       const lbl = hand.querySelector('.b-lbl');
-      if (lbl) lbl.textContent = '整体缩放';
+      if (lbl) lbl.textContent = '缩放';
       if (locked) {
         positionLock();
         lock.classList.remove('hidden');
@@ -776,6 +776,7 @@ const App = (() => {
       onSelect: () => MoveMgr.update(),
       onTreeChanged: () => MoveMgr.update()
     });
+    bindFavs();
     /* 目标目录树头部的“展开/收起”：之前只有函数没有绑定按钮，点了完全没反应 */
     const treeExpand = document.getElementById('tree-expand-one');
     const treeCollapse = document.getElementById('tree-collapse-all');

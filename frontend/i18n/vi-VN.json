@@ -455,5 +455,10 @@
   "播放中，输出格式尚未就绪": "Đang phát; định dạng đầu ra chưa sẵn sàng",
   "播放中，未读到格式": "Đang phát; không đọc được định dạng",
   "外部播放器（目标 App）": "Trình phát ngoài (ứng dụng đích)",
-  "外部播放器模式下，解码与输出由目标播放器负责；本应用只能确认播放请求已发送，读不到它的实际采样率/位深。需要精确输出信息请切回网页内播放。": "Ở chế độ trình phát ngoài, việc giải mã và đầu ra do trình phát đích thực hiện. Ứng dụng này chỉ xác nhận đã gửi yêu cầu phát và không đọc được tần số lấy mẫu/độ sâu bit thực tế. Hãy quay lại phát trong ứng dụng để xem thông tin đầu ra chính xác."
+  "外部播放器模式下，解码与输出由目标播放器负责；本应用只能确认播放请求已发送，读不到它的实际采样率/位深。需要精确输出信息请切回网页内播放。": "Ở chế độ trình phát ngoài, việc giải mã và đầu ra do trình phát đích thực hiện. Ứng dụng này chỉ xác nhận đã gửi yêu cầu phát và không đọc được tần số lấy mẫu/độ sâu bit thực tế. Hãy quay lại phát trong ứng dụng để xem thông tin đầu ra chính xác.",
+  "缩放": "Thu phóng",
+  "缩放（双指在模块上缩放该模块，空白处缩放整体）": "Thu phóng (chụm trên mô-đun để phóng to mô-đun đó, chụm vùng trống để phóng to toàn bộ)",
+  "工作台已锁定：单指平移；双指在模块上缩放该模块，空白处缩放整体": "Bàn làm việc đã khóa: một ngón để di chuyển; chụm trên mô-đun để phóng to mô-đun đó, chụm vùng trống để phóng to toàn bộ",
+  "展开一层": "Mở một cấp",
+  "已展开一层": "Đã mở một cấp"
 }

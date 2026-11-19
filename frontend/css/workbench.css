@@ -279,8 +279,12 @@
   .sheet-overlay{z-index:2147483600}
 
 
-  /* 工作台整体缩放 + 画布平移：translate 先作用于屏幕坐标，再按左上角缩放 */
+  /* 工作台缩放 + 画布平移：translate 先作用于屏幕坐标，再按左上角缩放。
+     --win-scale 是模块自己的内容缩放（文字/控件/窗口一起变），
+     --ui-scale 是全局缩放；两者相乘得到该窗口的实际比例。 */
   .fw-win,.play-float,.audio-float,.meta-float,.spectrum-float,.log-float{
-    transform:translate3d(var(--canvas-x,0px), var(--canvas-y,0px), 0) scale(var(--ui-scale,1));
+    --win-scale:1;
+    transform:translate3d(var(--canvas-x,0px), var(--canvas-y,0px), 0)
+              scale(var(--ui-scale,1)) scale(var(--win-scale,1));
     transform-origin:top left;
   }
