@@ -390,6 +390,8 @@ const App = (() => {
     return c === 'aiff' ? 'aif' : c;
   };
   const UI_SCALE_MIN = 0.5, UI_SCALE_MAX = 3.0;
+  /* 单模块内容缩放增益：比全局略钝，避免两指稍微一动文字就跳很大。 */
+  const MODULE_ZOOM_GAIN = 0.7;
   const CANVAS_MIN = -4096, CANVAS_MAX = 4096;
   const CANVAS_PAN_KEY = 'ac3_canvas_pan';
   function canvasPan() {
@@ -530,7 +532,9 @@ const App = (() => {
         const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
         const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
         if (pinch.targetCtl && pinch.baseRect) {
-          WinMgr.zoomWindow(pinch.targetWin, pinch.baseRect, ratio, mx, my);
+          // 双指距离比例先收敛，再交给窗口内容缩放；不会比全局更冲。
+          const moduleRatio = 1 + (ratio - 1) * MODULE_ZOOM_GAIN;
+          WinMgr.zoomWindow(pinch.targetWin, pinch.baseRect, moduleRatio, mx, my);
           return;
         }
         const s = Math.max(UI_SCALE_MIN, Math.min(UI_SCALE_MAX, pinch.scale * ratio));

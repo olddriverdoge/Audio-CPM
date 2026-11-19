@@ -208,20 +208,22 @@
   .af-sec-h em{font-style:normal;font-size:9.5px;color:#5b6b7d;font-weight:400;margin-left:6px}
   .af-fx.off{opacity:.45}
 
-  /* ---------- 文件浏览收藏条 ---------- */
-  .favbar{display:flex;align-items:center;gap:5px;overflow-x:auto;padding:3px 0 4px;
+  /* ---------- 文件浏览收藏条：和目标目录标签保持同一套视觉 ---------- */
+  .favbar{display:flex;align-items:center;gap:4px;overflow-x:auto;padding:0 0 4px;
     -webkit-overflow-scrolling:touch;scrollbar-width:none}
   .favbar::-webkit-scrollbar{display:none}
-  .fav-chip{display:inline-flex;align-items:center;gap:3px;flex:0 0 auto;padding:2px 7px;
-    border:1px solid var(--border);border-radius:999px;background:rgba(17,24,32,.9);
-    color:var(--muted);font-size:10.5px;cursor:pointer;max-width:150px}
-  .fav-chip b{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:118px}
-  .fav-chip.on{color:var(--accent);border-color:rgba(56,189,248,.55);background:rgba(56,189,248,.1)}
+  .fav-chip{display:inline-flex;align-items:center;gap:3px;flex:none;padding:2px 9px;
+    border:1px solid var(--border);border-radius:6px;background:var(--panel2);
+    color:var(--muted);font-size:11.5px;cursor:pointer;max-width:130px;
+    overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .fav-chip b{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px}
+  .fav-chip.on{background:var(--hl);color:var(--text);border-color:var(--accent)}
   .fav-chip i{font-style:normal;color:#5b6b7d;font-size:9px;padding:0 2px}
   .fav-chip i:hover{color:var(--err)}
-  .fav-add{flex:0 0 auto;padding:2px 8px;border-radius:999px;border:1px dashed #34455a;
-    background:transparent;color:var(--muted);font-size:10.5px;font-family:inherit;cursor:pointer}
-  .fav-add:hover{color:var(--accent);border-color:rgba(56,189,248,.5)}
+  .fav-add{flex:none;padding:2px 9px;border-radius:6px;border:1px solid var(--border);
+    background:var(--panel2);color:var(--accent);font-size:11.5px;font-family:inherit;
+    font-weight:600;cursor:pointer}
+  .fav-add:hover{color:var(--accent);border-color:var(--accent);background:var(--hl)}
 
   /* ---------- 目标目录顶部：移动/复制工具条 ---------- */
   .mv-bar{display:flex;align-items:center;gap:6px;padding:5px 6px;border-bottom:1px solid var(--border);flex:0 0 auto}
