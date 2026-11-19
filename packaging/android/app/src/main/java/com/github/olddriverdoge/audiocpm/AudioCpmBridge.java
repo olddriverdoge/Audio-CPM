@@ -326,6 +326,16 @@ public class AudioCpmBridge {
         }
     }
 
+    /** 前端 probe 的元数据推给原生通知栏；FLAC composer 不依赖 ROM 的 retriever 支持。 */
+    public static String setNowPlayingMeta(String path, String title, String artist, String composer, String album) {
+        try {
+            PlaybackService.setNowPlayingMeta(path, title, artist, composer, album);
+            return "{\"ok\":true}";
+        } catch (Throwable t) {
+            return "{\"ok\":false,\"error\":\"" + esc(String.valueOf(t)) + "\"}";
+        }
+    }
+
     public static String pause() { return simpleVoid(() -> { ExoPlayer p = PlaybackService.getPlayer(); if (p != null) p.pause(); }); }
     public static String resume() { return simpleVoid(() -> { ExoPlayer p = PlaybackService.getPlayer(); if (p != null) p.play(); }); }
     public static String stop() { return simpleVoid(() -> { ExoPlayer p = PlaybackService.getPlayer(); if (p != null) { p.stop(); p.clearMediaItems(); } }); }

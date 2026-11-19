@@ -48,6 +48,13 @@ const Api = (() => {
     imageUrl: p => '/api/image?path=' + enc(p),
     coverUrl: p => '/api/cover?path=' + enc(p) + '&t=' + Date.now(),
     playbackOpen: (path, startMs, sampleRate, bitDepth, channels) => jpost('/api/playback/open', {path, startMs, sampleRate, bitDepth, channels}),
+    playbackMeta: (path, tags) => jpost('/api/playback/meta', {
+      path,
+      title: tags && tags.title || '',
+      artist: tags && tags.artist || '',
+      composer: tags && tags.composer || '',
+      album: tags && tags.album || ''
+    }),
     playbackState: () => jfetch('/api/playback/state'),
   playbackQueue: (paths, index, startMs) => jpost('/api/playback/queue', {paths, index, startMs}),
     playbackSpectrum: enabled => jfetch('/api/playback/spectrum' + (enabled === undefined ? '' : ('?enabled=' + (enabled ? '1' : '0')))),

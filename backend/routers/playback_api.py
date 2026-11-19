@@ -72,6 +72,15 @@ async def playback_seek(request):
     return JSONResponse(await run_in_threadpool(native_bridge.playback_control, 'seek', int(d.get('positionMs') or 0)))
 
 
+async def playback_meta(request):
+    d = await _body(request)
+    path = _local_path(d.get('path') or '')
+    return JSONResponse(await run_in_threadpool(
+        native_bridge.playback_meta, path,
+        d.get('title') or '', d.get('artist') or '',
+        d.get('composer') or '', d.get('album') or ''))
+
+
 async def playback_state(request):
     return JSONResponse(await run_in_threadpool(native_bridge.playback_state))
 
@@ -153,6 +162,7 @@ routes = [
     Route('/api/playback/resume', playback_resume, methods=['POST']),
     Route('/api/playback/stop', playback_stop, methods=['POST']),
     Route('/api/playback/seek', playback_seek, methods=['POST']),
+    Route('/api/playback/meta', playback_meta, methods=['POST']),
     Route('/api/playback/state', playback_state, methods=['GET']),
     Route('/api/playback/spectrum', playback_spectrum, methods=['GET']),
     Route('/api/playback/queue', playback_queue, methods=['POST']),

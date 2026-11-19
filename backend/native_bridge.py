@@ -73,6 +73,7 @@ def register() -> bool:
             'audio_info_raw': lambda: Bridge.audioInfo(),
             'devices': lambda: _call('audioDevices'),
             'set_device': lambda id: _call('setAudioDevice', int(id or 0)),
+            'meta': lambda p, t, a, c, al: _call('setNowPlayingMeta', str(p), str(t or ''), str(a or ''), str(c or ''), str(al or '')),
         }
     except Exception:
         _playback = None
@@ -172,6 +173,15 @@ def set_audio_device(device_id):
         return {'ok': False, 'error': 'not_supported'}
     try:
         return _playback['set_device'](device_id)
+    except Exception as e:
+        return {'ok': False, 'error': str(e)[:300]}
+
+
+def playback_meta(path, title='', artist='', composer='', album=''):
+    if not _playback:
+        return {'ok': False, 'error': 'not_supported'}
+    try:
+        return _playback['meta'](path, title, artist, composer, album)
     except Exception as e:
         return {'ok': False, 'error': str(e)[:300]}
 

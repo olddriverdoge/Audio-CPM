@@ -47,6 +47,14 @@ public class PlaybackService extends MediaSessionService {
     private PowerManager.WakeLock wakeLock;
     private volatile String metaPath = "";
     private volatile String[] metaCache = null;
+    /* 前端 probe 已经把 title/artist/composer/album 读出来了；FLAC 的 composer
+       在部分 ROM 的 MediaMetadataRetriever 里取不到，这里优先使用前端提示。 */
+    private static volatile String hintPath = "";
+    private static volatile String hintTitle = "";
+    private static volatile String hintArtist = "";
+    private static volatile String hintComposer = "";
+    private static volatile String hintAlbum = "";
+    private static volatile PlaybackService instance;
 
     /** 频谱旁路：挂在 AudioSink 上只读 PCM，不改音频数据 */
     private final SpectrumProcessor spectrum = new SpectrumProcessor();
@@ -55,6 +63,16 @@ public class PlaybackService extends MediaSessionService {
 
     public static ExoPlayer getPlayer() { return player; }
     public static int getPreferredDeviceId() { return preferredDeviceId; }
+
+    public static void setNowPlayingMeta(String path, String title, String artist, String composer, String album) {
+        hintPath = path == null ? "" : path;
+        hintTitle = title == null ? "" : title;
+        hintArtist = artist == null ? "" : artist;
+        hintComposer = composer == null ? "" : composer;
+        hintAlbum = album == null ? "" : album;
+        PlaybackService s = instance;
+        if (s != null) s.refreshNotification();
+    }
 
     /** DAC / USB / 有线输出路由：只改 ExoPlayer 的 preferred device，不改变解码和 EQ 链路。 */
     public static boolean setPreferredDevice(int id) {
@@ -90,6 +108,7 @@ public class PlaybackService extends MediaSessionService {
     @Override
     public void onCreate() {
         super.onCreate();
+        instance = this;
         Log.i(TAG, "PlaybackService.onCreate");
         ensureChannel();
         // 每次新进程启动都清掉上次的诊断残留，避免旧 errorLog 被误当成
@@ -256,6 +275,9 @@ public class PlaybackService extends MediaSessionService {
     }
 
     private String[] metadataFor(String path) {
+        if (path != null && path.equals(hintPath)) {
+            return new String[]{hintTitle, hintArtist, hintComposer, hintAlbum};
+        }
         if (path != null && path.equals(metaPath) && metaCache != null) return metaCache;
         String[] tags = new String[4];
         MediaMetadataRetriever r = null;
@@ -416,6 +438,7 @@ public class PlaybackService extends MediaSessionService {
         if (player != null) player.release();
         session = null;
         player = null;
+        if (instance == this) instance = null;
         super.onDestroy();
     }
 }

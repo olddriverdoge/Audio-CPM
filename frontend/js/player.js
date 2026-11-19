@@ -157,6 +157,11 @@ const Player = (() => {
         metaEl.title = [artist, composer, album].filter(Boolean).join(' / ');
       }
       updateMediaSession(path, {title, artist, album, composer}, d.has_cover);
+      // HiFi 原生通知栏优先用这里的标签：FLAC 的 composer 在部分 ROM 上
+      // MediaMetadataRetriever 读不到，前端 probe 能稳定拿到。
+      if (hifiAvailable() && String(path).indexOf('dav:') !== 0) {
+        try { Api.playbackMeta(path, {title, artist, composer, album}); } catch (_) {}
+      }
       notifyMeta();
     }).catch(() => {});
   }
