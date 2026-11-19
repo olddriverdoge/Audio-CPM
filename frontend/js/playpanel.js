@@ -123,7 +123,17 @@ function createPlayPanel() {
   coverImg.addEventListener('load', () => coverBox.classList.add('on'));
   coverImg.addEventListener('error', () => { coverImg.removeAttribute('src'); coverBox.classList.remove('on'); });
 
-  playBtn.addEventListener('click', () => Player.toggle());
+  playBtn.addEventListener('click', () => {
+    // 播放管理第一次打开时不一定已经选中过文件。以前这里直接 Player.toggle()，
+    // cur 为空会立即 return，看起来就是“点播放没反应”。
+    if (!Player.current) {
+      const list = (typeof App !== 'undefined' && App.playbackQueueList) ? App.playbackQueueList() : [];
+      if (!list.length) { Utils.toast('当前目录没有音频文件', 'warn'); return; }
+      PlayMgr.play(list[0].path);
+      return;
+    }
+    Player.toggle();
+  });
   document.getElementById('pf-prev').addEventListener('click', () => { if (App.playPrev) App.playPrev(); });
   document.getElementById('pf-next').addEventListener('click', () => { if (App.playNext) App.playNext(); });
   document.getElementById('pf-stop').addEventListener('click', () => {
