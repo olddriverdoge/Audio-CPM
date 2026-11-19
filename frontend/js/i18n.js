@@ -1,6 +1,7 @@
 /* ---------------- I18n：源码中文为 key，运行时翻译 + 缺省回退 -------------------- */
 const I18n = (() => {
-  const SUPPORTED = ['zh-CN', 'en-US', 'ja-JP', 'de-DE', 'ru-RU'];
+  const AUTO = 'auto';
+  const SUPPORTED = ['zh-CN', 'en-US', 'ja-JP', 'de-DE', 'ru-RU', 'vi-VN', 'hi-IN'];
   const FALLBACK = 'en-US';
   const SKIP = [
     '#view1', '#tree', '#scene-tabs', '#sh-grid', '#pb1-crumbs',
@@ -31,21 +32,31 @@ const I18n = (() => {
     if (low === 'ja' || low.startsWith('ja-')) return 'ja-JP';
     if (low === 'de' || low.startsWith('de-')) return 'de-DE';
     if (low === 'ru' || low.startsWith('ru-')) return 'ru-RU';
-    return 'en-US';
+    if (low === 'vi' || low.startsWith('vi-')) return 'vi-VN';
+    if (low === 'hi' || low.startsWith('hi-')) return 'hi-IN';
+    // 未支持的语言统一回退英文；不要回退中文，否则外语系统用户会看到中文界面。
+    return FALLBACK;
+  }
+
+  function savedMode() {
+    if (typeof Store === 'undefined') return AUTO;
+    const saved = String(Store.get(K.lang, '') || '');
+    if (!saved || saved === AUTO) return AUTO;
+    return SUPPORTED.indexOf(saved) >= 0 ? saved : normalize(saved);
   }
 
   function detect() {
-    const saved = (typeof Store !== 'undefined') ? Store.get(K.lang, '') : '';
-    if (saved && SUPPORTED.indexOf(saved) >= 0) return saved;
+    const saved = savedMode();
+    if (saved !== AUTO) return saved;
+    let langs = [];
     try {
-      const langs = navigator.languages && navigator.languages.length
-        ? navigator.languages : [navigator.language || ''];
-      for (const l of langs) {
-        const n = normalize(l);
-        if (SUPPORTED.indexOf(n) >= 0) return n;
-      }
+      langs = (navigator.languages && navigator.languages.length)
+        ? Array.from(navigator.languages) : [navigator.language || ''];
     } catch (_) {}
-    return 'zh-CN';
+    // 系统首选语言不匹配时直接回退英文；不要继续尝试后面的语言，
+    // 否则“系统首选法语、第二语言中文”会意外变成中文界面。
+    if (!langs.length || !String(langs[0] || '').trim()) return FALLBACK;
+    return normalize(langs[0]);
   }
 
   async function load(code) {
@@ -209,15 +220,18 @@ const I18n = (() => {
   }
 
   function setLocale(code) {
-    const next = normalize(code);
+    const raw = String(code || '').trim();
+    const next = raw.toLowerCase() === AUTO ? AUTO : normalize(raw);
+    const prev = savedMode();
     if (typeof Store !== 'undefined') Store.set(K.lang, next);
-    if (next === locale) return;
+    if (next === prev) return;
     location.reload();
   }
 
   return {
     init, setLocale, tr, t: tr, message: tr, apply,
     get locale() { return locale; },
+    get mode() { return savedMode(); },
     get languages() { return SUPPORTED.slice(); }
   };
 })();

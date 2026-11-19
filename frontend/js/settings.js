@@ -40,7 +40,7 @@ const Settings = (() => {
     if (rst) rst.onclick = reset;
     const lang = document.getElementById('lang-select');
     if (lang && typeof I18n !== 'undefined') {
-      lang.value = I18n.locale;
+      lang.value = I18n.mode;
       lang.onchange = () => I18n.setLocale(lang.value);
     }
     document.getElementById('sheet-overlay').addEventListener('click', e => {

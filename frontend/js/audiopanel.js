@@ -190,7 +190,7 @@ function createAudioPanel() {
         let lv = Array.isArray(cfg.bands) && cfg.bands[i] != null ? cfg.bands[i] : (d.levels ? d.levels[i] : 0);
         lv = Math.max(Number(d.minLevel ?? -2000), Math.min(Number(d.maxLevel ?? 2000), Number(lv) || 0));
         const label = hz >= 1000 ? (hz / 1000) + 'k' : hz + '';
-        html += '<div class="af-band"><span class="af-db">' + (lv / 100).toFixed(1) + '</span>' +
+        html += '<div class="af-band"><span class="af-db">' + (lv / 100).toFixed(1) + 'dB</span>' +
           '<input type="range" class="af-slider af-vslider" data-band="' + i + '" min="' + d.minLevel +
           '" max="' + d.maxLevel + '" value="' + lv + '" step="50" aria-label="' + label + 'Hz"' +
           (cfg.eqOn ? '' : ' disabled') + '>' +
@@ -305,7 +305,7 @@ function createAudioPanel() {
       const db = sl.parentElement.querySelector('.af-db');
       let t = 0;
       sl.addEventListener('input', () => {
-        if (db) db.textContent = (Number(sl.value) / 100).toFixed(1);
+        if (db) db.textContent = (Number(sl.value) / 100).toFixed(1) + 'dB';
         cfg.preset = 5;
         document.querySelectorAll('.af-chip[data-preset]').forEach(x => x.classList.toggle('on', x.dataset.preset === '5'));
       });
