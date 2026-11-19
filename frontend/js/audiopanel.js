@@ -10,6 +10,16 @@ function createAudioPanel() {
   const dynamic = document.getElementById('af-dynamic');
   const trackEl = document.getElementById('af-track');
   const PRESET_NAMES = ['关闭', '流行', '古典', '摇滚', '人声', '自定义'];
+  // 与 SoftwareEqProcessor.PRESETS 一致（dB × 100）。切换预设时前端推子要立即
+  // 跟着变，不能等下一次 audioInfo 刷新，否则声音变了但界面还是旧曲线。
+  const PRESET_LEVELS = [
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 100, 300, 300, 200, 0, -100, -100, 0],
+    [100, 200, 300, 200, 0, 0, -100, -100, 0, 100],
+    [300, 300, 100, -100, -200, 0, 200, 400, 400, 200],
+    [-200, -100, 0, 200, 400, 400, 300, 100, 0, -100],
+    null
+  ];
   const fmtDb = v => (v > 0 ? '+' : '') + Number(v || 0) + 'dB';
   const encName = e => (e === 4 ? '32-bit 浮点' : e === 21 ? '24-bit' : e === 22 ? '32-bit' : e === 3 ? '8-bit' : e === 0 ? '编码未知' : '16-bit');
   const encFromBits = b => (b === 24 ? 21 : b === 32 ? 22 : b === 8 ? 3 : 2);
@@ -229,7 +239,6 @@ function createAudioPanel() {
     } else {
       html += row('实际输出', playing ? '播放中，未读到格式' : '尚未开始播放');
     }
-    if (src.sampleRate && outputReady) html += row('音源格式', fmtLine(src) + (info.sourceCodec ? ' · ' + info.sourceCodec : ''));
     html += row('设备原生采样率', devRate ? (devRate / 1000).toFixed(1) + ' kHz' : '未知');
     if (webMode && info.webSampleRate) html += row('WebAudio 采样率', (info.webSampleRate / 1000).toFixed(1) + ' kHz');
     if (info.framesPerBuffer) html += row('缓冲', info.framesPerBuffer + ' 帧 · 约 ' + (info.latencyMs || 0) + ' ms');
@@ -275,7 +284,12 @@ function createAudioPanel() {
       b.addEventListener('click', () => {
         const p = Number(b.dataset.preset);
         cfg.preset = p;
-        if (p !== 5) { cfg.bands = null; fx('preset', p); }
+        if (p !== 5) {
+          cfg.bands = PRESET_LEVELS[p].slice();
+          fx('preset', p);
+        } else {
+          cfg.bands = null;
+        }
         // “关闭”预设必须真的关掉 EQ；原来的实现只把增益归零，
         // EQ 仍处于开启状态，所以拖频段/前级还会影响输出。
         cfg.eqOn = p !== 0;

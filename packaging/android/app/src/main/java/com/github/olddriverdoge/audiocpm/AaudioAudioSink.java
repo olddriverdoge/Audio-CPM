@@ -47,6 +47,8 @@ public final class AaudioAudioSink implements AudioSink {
     private int preferredDeviceId;
     private float currentVolume = 1.0f;
     private long streamOffsetUs;
+    /** 当前 seek/起播之后第一帧的媒体时间；进度必须从这里加，不能固定从 0 加。 */
+    private long startMediaTimeUs = C.TIME_UNSET;
     private PlaybackParameters playbackParameters = PlaybackParameters.DEFAULT;
     private boolean skipSilence;
     private AudioAttributes audioAttributes;
@@ -160,8 +162,10 @@ public final class AaudioAudioSink implements AudioSink {
     public synchronized long getCurrentPositionUs(boolean sourceEnded) {
         if (!nativeActive) return fallback.getCurrentPositionUs(sourceEnded);
         long pos = nativePositionUs(nativeHandle);
-        if (pos < 0) return CURRENT_POSITION_NOT_SET;
-        return pos + streamOffsetUs;
+        if (pos < 0 || startMediaTimeUs == C.TIME_UNSET) return CURRENT_POSITION_NOT_SET;
+        // AAudio 的 framesRead 是“本次 open/seek 后已经播掉的相对帧”，
+        // 必须叠加这一段的起始媒体时间；否则 seek 到 1:30 后进度会从 0 重新走。
+        return startMediaTimeUs + pos;
     }
 
     @Override
@@ -174,6 +178,7 @@ public final class AaudioAudioSink implements AudioSink {
         sEncoding = 0;
         sDevice = "";
         sError = "";
+        startMediaTimeUs = C.TIME_UNSET;
         sInputRate = inputFormat == null ? 0 : inputFormat.sampleRate;
         sInputChannels = inputFormat == null ? 0 : inputFormat.channelCount;
         sInputEncoding = inputFormat == null ? 0 : inputFormat.pcmEncoding;
@@ -303,6 +308,9 @@ public final class AaudioAudioSink implements AudioSink {
     public synchronized boolean handleBuffer(ByteBuffer buffer, long presentationTimeUs, int encodedAccessUnitCount)
             throws InitializationException, WriteException {
         if (!nativeActive) return fallback.handleBuffer(buffer, presentationTimeUs, encodedAccessUnitCount);
+        if (startMediaTimeUs == C.TIME_UNSET && presentationTimeUs != C.TIME_UNSET) {
+            startMediaTimeUs = Math.max(0, presentationTimeUs);
+        }
         try {
             int guard = 0;
             while (buffer.hasRemaining() && guard++ < 16) {
@@ -490,6 +498,8 @@ public final class AaudioAudioSink implements AudioSink {
         if (nativeActive) {
             nativeFlush(nativeHandle);
             try { pipeline.flush(); } catch (Throwable ignored) {}
+            // seek/flush 后第一帧会带新的 presentationTimeUs，进度基准重新锚定。
+            startMediaTimeUs = C.TIME_UNSET;
             ended = false;
         } else {
             fallback.flush();
@@ -504,6 +514,7 @@ public final class AaudioAudioSink implements AudioSink {
             nativeActive = false;
         }
         sActive = false;
+        startMediaTimeUs = C.TIME_UNSET;
         try { pipeline.reset(); } catch (Throwable ignored) {}
         pipeline = newPipeline();
         ended = false;
