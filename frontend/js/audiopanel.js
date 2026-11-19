@@ -478,10 +478,22 @@ function createAudioPanel() {
   // 只有播放状态或格式变化才重绘，避免每 1.5 秒重建 EQ 推子、打断拖动。
   async function refresh() {
     try {
+      const prev = info;
       const r = await Api.audioInfo();
       if (!r || !r.ok) return;
       info = r;
+      // audioInfo 的原生桥偶发整体回退（pending + 空 format），不能让它把
+      // 上一帧的好数据冲掉；只在拿不到格式时保留上一帧的输出/AAudio 参数。
+      if (r.pending || !r.format || !r.format.sampleRate) {
+        if (prev && prev.format && prev.format.sampleRate) {
+          info.format = prev.format;
+          info.aaudio = prev.aaudio || info.aaudio;
+          if (!info.deviceSampleRate) info.deviceSampleRate = prev.deviceSampleRate;
+          if (!info.sourceFormat || !info.sourceFormat.sampleRate) info.sourceFormat = prev.sourceFormat || info.sourceFormat;
+        }
+      }
       await enrichWebInfo(info);
+      await enrichNativeInfo(info);
       paintTrack();
       const key = infoKey();
       if (key !== lastInfoKey) { lastInfoKey = key; render(); }

@@ -365,7 +365,9 @@ public final class AaudioAudioSink implements AudioSink {
     @Override
     public boolean hasPendingData() {
         if (!nativeActive) return fallback.hasPendingData();
-        return false;
+        // 返回 AAudio 硬件队列里还没播完的帧数：ExoPlayer 据此判断是否继续喂数据。
+        // 之前恒为 false，会干扰渲染器的 underrun/续播判断。
+        return nativePendingFrames(nativeHandle) > 0;
     }
 
     @Override
@@ -496,5 +498,7 @@ public final class AaudioAudioSink implements AudioSink {
     private static native int nativeGetChannels(long handle);
     private static native int nativeGetFormat(long handle);
     private static native int nativeGetSharingMode(long handle);
+    private static native int nativePendingFrames(long handle);
+    private static native int nativeXRunCount(long handle);
     private static native String nativeLastError();
 }

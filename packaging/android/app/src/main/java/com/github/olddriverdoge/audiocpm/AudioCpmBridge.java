@@ -193,7 +193,9 @@ public class AudioCpmBridge {
                     sb.append(",\"playing\":").append(p.isPlaying());
                     sb.append(",\"playbackState\":").append(p.getPlaybackState());
                     sb.append(",\"sourceFormat\":").append(sourceFormat(p));
-                    sb.append(",\"speed\":").append(p.getPlaybackParameters().speed);
+                    float sp = p.getPlaybackParameters().speed;
+                    if (Float.isNaN(sp) || Float.isInfinite(sp)) sp = 1.0f;
+                    sb.append(",\"speed\":").append(sp);
                 } else {
                     sb.append(",\"player\":false,\"playing\":false,\"playbackState\":-1");
                     sb.append(",\"sourceFormat\":{\"sampleRate\":0,\"channels\":0,\"encoding\":0}");

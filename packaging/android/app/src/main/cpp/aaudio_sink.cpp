@@ -65,7 +65,7 @@ Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativeOpen(
         if (deviceId > 0) AAudioStreamBuilder_setDeviceId(b, deviceId);
         // EXCLUSIVE 的默认缓冲很小，解码线程稍微晚一点就会 underrun（听起来一卡一卡）。
         // 保留约 40ms 的硬件缓冲，兼顾低延迟和连续输出。
-        int target = bufferFrames > 0 ? bufferFrames : (sampleRate / 25); // ~40ms
+        int target = bufferFrames > 0 ? bufferFrames : (sampleRate / 12); // ~80ms
         AAudioStreamBuilder_setBufferCapacityInFrames(b, target * 2);
         return b;
     };
@@ -93,7 +93,7 @@ Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativeOpen(
         }
         // 部分 ROM 的 builder 只设置 capacity，不会自动把 size 提到目标值；
         // 显式设置一次，避免实际可写空间仍然只有几毫秒。
-        int target = bufferFrames > 0 ? bufferFrames : (sampleRate / 25); // ~40ms
+        int target = bufferFrames > 0 ? bufferFrames : (sampleRate / 12); // ~80ms
         AAudioStream_setBufferSizeInFrames(stream, target);
         usedSharing = sharing;
         return true;
@@ -167,6 +167,23 @@ Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativeFlush(JNIEnv *, jcl
         auto r = AAudioStream_requestStart(s->stream);
         if (r == AAUDIO_OK) s->playing = true;
     }
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativePendingFrames(JNIEnv *, jclass, jlong handle) {
+    Sink *s = sinkOf(handle);
+    if (!s) return 0;
+    int64_t written = AAudioStream_getFramesWritten(s->stream);
+    int64_t read = AAudioStream_getFramesRead(s->stream);
+    int64_t pending = written - read;
+    return static_cast<jint>(pending < 0 ? 0 : (pending > INT32_MAX ? INT32_MAX : pending));
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativeXRunCount(JNIEnv *, jclass, jlong handle) {
+    Sink *s = sinkOf(handle);
+    if (!s) return -1;
+    return static_cast<jint>(AAudioStream_getXRunCount(s->stream));
 }
 
 extern "C" JNIEXPORT jint JNICALL

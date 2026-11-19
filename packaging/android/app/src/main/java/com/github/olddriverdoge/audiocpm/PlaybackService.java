@@ -7,6 +7,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.media.AudioDeviceInfo;
 import android.media.AudioManager;
+import android.os.PowerManager;
 import android.content.Intent;
 import android.os.Build;
 import android.util.Log;
@@ -42,6 +43,7 @@ public class PlaybackService extends MediaSessionService {
     private static volatile long errorSeq = 0;
     private static volatile int audioSessionId = 0;
     private static volatile int preferredDeviceId = 0;
+    private PowerManager.WakeLock wakeLock;
 
     /** 频谱旁路：挂在 AudioSink 上只读 PCM，不改音频数据 */
     private final SpectrumProcessor spectrum = new SpectrumProcessor();
@@ -140,6 +142,10 @@ public class PlaybackService extends MediaSessionService {
             @Override
             public void onIsPlayingChanged(boolean isPlaying) {
                 Log.i(TAG, "isPlaying -> " + isPlaying);
+                // 长后台/锁屏期间 CPU 会被 Doze 深度限频，AAudio 独占缓冲又小，
+                // 解锁唤醒瞬间会 underrun 造成一卡一卡。播放期间持 PARTIAL_WAKE_LOCK，
+                // 让解码线程保持可调度；暂停即释放。
+                setCpuAwake(isPlaying);
                 // 通知栏按钮/图标必须跟着实际播放状态走；只依赖 MediaSession
                 // 的默认刷新在部分 ROM 上会滞后甚至不刷新。
                 refreshNotification();
@@ -168,6 +174,31 @@ public class PlaybackService extends MediaSessionService {
         // （本机 notifEnabled=true 却始终无通知，就是这个原因）。
         addSession(session);
         Log.i(TAG, "MediaSession created and added, player ready");
+    }
+
+    private void ensureWakeLock() {
+        try {
+            if (wakeLock != null && wakeLock.isHeld()) return;
+            PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+            if (pm == null) return;
+            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Audio-CPM:playback");
+            wakeLock.setReferenceCounted(false);
+        } catch (Throwable t) {
+            Log.w(TAG, "wake lock create failed", t);
+        }
+    }
+
+    private void setCpuAwake(boolean awake) {
+        try {
+            if (awake) {
+                ensureWakeLock();
+                if (wakeLock != null && !wakeLock.isHeld()) wakeLock.acquire(12 * 60 * 60 * 1000L);
+            } else {
+                if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "wake lock toggle failed", t);
+        }
     }
 
     private void ensureChannel() {
@@ -325,6 +356,7 @@ public class PlaybackService extends MediaSessionService {
     @Override
     public void onDestroy() {
         Log.i(TAG, "PlaybackService.onDestroy");
+        setCpuAwake(false);
         if (session != null) session.release();
         if (player != null) player.release();
         session = null;

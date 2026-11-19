@@ -70,7 +70,7 @@ def register() -> bool:
             'mode': lambda rep, sh: _call('setMode', int(rep), bool(sh)),
             'skip': lambda d: _call('skip', int(d)),
             'audio_fx': lambda op, a, b: _call('fx', str(op), int(a), int(b)),
-            'audio_info': lambda: _call('audioInfo'),
+            'audio_info_raw': lambda: Bridge.audioInfo(),
             'devices': lambda: _call('audioDevices'),
             'set_device': lambda id: _call('setAudioDevice', int(id or 0)),
         }
@@ -190,21 +190,24 @@ def audio_info():
         logger.warning('audio_info: native playback bridge not registered')
         return {'ok': False, 'error': 'not_supported', 'playback_available': False,
                 'bridge_available': available()}
+    raw = None
     try:
-        r = _playback['audio_info']()
+        raw = _playback['audio_info_raw']()
+        r = json.loads(raw) if isinstance(raw, str) else raw
         if isinstance(r, dict):
             r.setdefault('playback_available', True)
             return r
         return {'ok': False, 'error': 'bad native response', 'raw': str(r)[:300]}
     except Exception as e:
-        logger.exception('audio_info failed')
+        logger.warning('audio_info parse failed: %s raw=%s', e, (raw or '')[:300])
         if available():
             fb = {'ok': True, 'pending': True, 'playback_available': True,
                   'bridge_available': True, 'mode': 'software',
                   'player': True, 'playing': False, 'playbackState': -1,
                   'deviceSampleRate': 0, 'format': {}, 'sourceFormat': {},
                   'fx': dict(SOFTWARE_FX_FALLBACK),
-                  'warning': str(e)[:120]}
+                  'warning': str(e)[:120],
+                  'audioInfoRaw': (raw or '')[:600]}
             return fb
         return {'ok': False, 'error': str(e)[:300], 'playback_available': True}
 
