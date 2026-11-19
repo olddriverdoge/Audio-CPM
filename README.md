@@ -132,7 +132,7 @@ AC2_ROOT=/sdcard/Music AC2_DATA_DIR=./data python3 ac_web.py
 
 服务默认没有鉴权，不要随意绑定 `0.0.0.0` 到公网。
 
-### 构建 APK
+### 构建 APK / AAB
 
 推荐使用 GitHub Actions：
 
@@ -141,9 +141,23 @@ AC2_ROOT=/sdcard/Music AC2_DATA_DIR=./data python3 ac_web.py
 3. 点击 `Run workflow`；
 4. `main` 或发布 tag 使用主干包名 `com.github.olddriverdoge.audiocpm`；
 5. 非 `main` 分支自动使用 `.dev` 后缀（`com.github.olddriverdoge.audiocpm.dev`），可与正式版同时安装；
-6. 构建完成后下载 `audio-cpm-apk` artifact，包内为 `Audio-CPM-debug.apk`。
+6. 普通分支构建下载 `audio-cpm-apk` artifact，包内为 `Audio-CPM-debug.apk`；
+7. 推送 `v*` tag 或手动勾选 `build_release` 时，构建已签名的 `Audio-CPM-release.apk` 和 `Audio-CPM-release.aab`，artifact 名为 `audio-cpm-release`。
 
-本地构建需要 JDK 17、Android SDK 35、Gradle 8.10.2、Android NDK 27，以及 FFmpeg 预编译产物；具体说明见 [packaging/README.md](packaging/README.md)。
+Release 构建需要配置 4 个签名 Secrets，步骤见 [docs/store/RELEASE_SIGNING.md](docs/store/RELEASE_SIGNING.md)。本地构建需要 JDK 17、Android SDK 35、Gradle 8.10.2、Android NDK 27，以及 FFmpeg 预编译产物；具体说明见 [packaging/README.md](packaging/README.md)。
+
+## 商店与合规材料
+
+- [PRIVACY.md](PRIVACY.md)：隐私政策源文件
+- [docs/privacy/](docs/privacy/)：GitHub Pages 公开版本
+- [docs/store/README.md](docs/store/README.md)：上架准备清单
+- [docs/store/RELEASE_SIGNING.md](docs/store/RELEASE_SIGNING.md)：release keystore、GitHub Secrets、AAB 构建
+- [docs/store/DATA_SAFETY.md](docs/store/DATA_SAFETY.md)：数据安全与权限底稿
+- [docs/store/LISTING.md](docs/store/LISTING.md)：中英文商店文案
+- [docs/store/ASSETS.md](docs/store/ASSETS.md)：图标、功能图和截图规格
+- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)：第三方组件许可证
+
+> `MANAGE_EXTERNAL_STORAGE` 仍是 Google Play 审核的主要风险；SAF 目录授权模式尚未实现，不能把当前全盘模式当作已合规的商店方案。
 
 ## 目录结构
 
@@ -154,8 +168,10 @@ frontend/                  WebView 前端：HTML + CSS + JS + 7 种语言包
 packaging/android/         Gradle + Chaquopy Android 工程
 packaging/docs/            架构、交接与历史方案文档
 packaging/tests/           前端回归脚本
+docs/                      隐私政策与商店材料
+fastlane/metadata/         商店文案骨架
 requirements.txt           Python 依赖
-.github/                   CI、Issue 模板与 PR 模板
+.github/                   CI、Issue 模板、PR 模板与 Dependabot
 ```
 
 ## 文档与社区
@@ -166,6 +182,7 @@ requirements.txt           Python 依赖
 - [CONTRIBUTING.md](CONTRIBUTING.md)：开发、测试与提交规范
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)：社区行为准则
 - [SECURITY.md](SECURITY.md)：安全漏洞报告方式
+- [PRIVACY.md](PRIVACY.md)：隐私政策
 - [LICENSE](LICENSE)：MIT License
 
 > `packaging/docs/` 中的 p4a、WebToApp 等文档是路线评估记录；当前实际构建以 Gradle + Chaquopy 工程为准。
@@ -173,7 +190,8 @@ requirements.txt           Python 依赖
 ## 当前限制
 
 - 仅 Android，当前 APK 为 `arm64-v8a`。
-- 发布 APK 为固定调试签名，不能直接上架应用商店。
+- GitHub 上的 `0.4.33` Release 仍是固定调试签名；商店发布必须使用独立 release key 重新构建，不能直接复用该 APK。
+- `MANAGE_EXTERNAL_STORAGE` 与 Play All files access 政策存在审核风险，SAF 合规路径尚未完成。
 - AAudio 独占是否真正生效取决于 ROM、设备和音频通路；被拒绝时会回退共享混音，输出面板会显示实际状态。
 - 网页内播放由 WebView/系统解码，无法保证与原生 AAudio 路径相同的采样率和位深。
 - WebDAV 功能依赖服务端对 `PROPFIND`、`Range`、`MOVE` 等方法的支持。
@@ -181,4 +199,4 @@ requirements.txt           Python 依赖
 
 ## 许可证
 
-项目源代码采用 [MIT License](LICENSE)。打包产物中的 FFmpeg 可执行文件、AndroidX/Media3、Chaquopy 等第三方组件遵循各自许可证；分发时请保留相应声明。
+项目源代码采用 [MIT License](LICENSE)。打包产物中的 FFmpeg 可执行文件、AndroidX/Media3、Chaquopy、Mutagen 等第三方组件遵循各自许可证；分发时请保留 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 中的声明。

@@ -17,6 +17,16 @@ val buildRefType: String = System.getenv("GITHUB_REF_TYPE") ?: "branch"
 val stablePackage: Boolean = buildRefType == "tag" || buildRefName == "main"
 val packageSuffix: String = if (stablePackage) "" else ".dev"
 
+/*
+ * 商店发布签名：密钥不提交仓库，由 CI 从 GitHub Secrets 解码到临时目录，
+ * 再通过环境变量传入。只有配置了签名文件时才创建 release signingConfig；
+ * 本地 debug 构建和没有密钥的普通分支构建不受影响。
+ */
+val releaseKeystoreFile: File? = System.getenv("AC2_RELEASE_KEYSTORE")
+    ?.takeIf { it.isNotBlank() }
+    ?.let { File(it) }
+    ?.takeIf { it.isFile }
+
 android {
     namespace = "com.github.olddriverdoge.audiocpm"
     compileSdk = 35
@@ -59,11 +69,25 @@ android {
             keyAlias = "ac2"
             keyPassword = "ac2debug"
         }
+        if (releaseKeystoreFile != null) {
+            create("release") {
+                storeFile = releaseKeystoreFile
+                storePassword = System.getenv("AC2_RELEASE_STORE_PASSWORD")
+                keyAlias = System.getenv("AC2_RELEASE_KEY_ALIAS")
+                keyPassword = System.getenv("AC2_RELEASE_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         getByName("debug") {
             signingConfig = signingConfigs.getByName("ac2")
+        }
+        getByName("release") {
+            isMinifyEnabled = false
+            if (releaseKeystoreFile != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
@@ -123,12 +147,30 @@ dependencies {
     implementation("androidx.media3:media3-session:1.5.1")
 }
 
-/* APK 输出名与项目一致：Audio-CPM-debug.apk */
+/* APK 输出名与项目一致：Audio-CPM-debug.apk / Audio-CPM-release.apk */
 tasks.matching { it.name == "assembleDebug" }.configureEach {
     doLast {
         val apkDir = layout.buildDirectory.dir("outputs/apk/debug").get().asFile
         apkDir.listFiles { f -> f.name == "app-debug.apk" }?.firstOrNull()?.let {
             it.renameTo(File(apkDir, "Audio-CPM-debug.apk"))
+        }
+    }
+}
+
+/* 发布 APK 与 AAB 使用统一命名，便于 Release / 商店上传 */
+tasks.matching { it.name == "assembleRelease" }.configureEach {
+    doLast {
+        val apkDir = layout.buildDirectory.dir("outputs/apk/release").get().asFile
+        apkDir.listFiles { f -> f.name == "app-release.apk" }?.firstOrNull()?.let {
+            it.renameTo(File(apkDir, "Audio-CPM-release.apk"))
+        }
+    }
+}
+tasks.matching { it.name == "bundleRelease" }.configureEach {
+    doLast {
+        val bundleDir = layout.buildDirectory.dir("outputs/bundle/release").get().asFile
+        bundleDir.listFiles { f -> f.name == "app-release.aab" }?.firstOrNull()?.let {
+            it.renameTo(File(bundleDir, "Audio-CPM-release.aab"))
         }
     }
 }

@@ -22,3 +22,9 @@ packaging/tests/package-lock.json
 
 ac2.log
 ac2_screen.png
+
+# release signing material (never commit)
+*.p12
+*.jks
+*.keystore
+*.b64

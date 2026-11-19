@@ -2,6 +2,15 @@ name: build-audio-cpm
 
 on:
   workflow_dispatch:
+    inputs:
+      build_release:
+        description: "构建已签名的 release APK / AAB（需要 release secrets）"
+        required: false
+        type: boolean
+        default: false
+  push:
+    tags:
+      - "v*"
 
 jobs:
   # ---------------------------------------------------------------- FFmpeg
@@ -58,7 +67,7 @@ jobs:
           name: ffmpeg-android-arm64
           path: packaging/android/ffmpeg/out/libffmpegbin.so
 
-  # ---------------------------------------------------------------- APK
+  # ---------------------------------------------------------------- APK / AAB
   build:
     needs: ffmpeg
     runs-on: ubuntu-latest
@@ -72,11 +81,11 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.14'
+          python-version: "3.14"
 
       - name: Install Android SDK 35
         run: |
@@ -95,14 +104,62 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.10.2'
+          gradle-version: "8.10.2"
+
+      # 发布构建需要 4 个仓库 secrets：
+      # AC2_RELEASE_KEYSTORE_BASE64 / AC2_RELEASE_STORE_PASSWORD
+      # AC2_RELEASE_KEY_ALIAS / AC2_RELEASE_KEY_PASSWORD
+      - name: Prepare release keystore
+        if: ${{ github.ref_type == 'tag' || inputs.build_release == true }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.AC2_RELEASE_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.AC2_RELEASE_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.AC2_RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.AC2_RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in KEYSTORE_BASE64 STORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::缺少 release signing secret: $name"
+              exit 1
+            fi
+          done
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/audiocpm-release.p12"
+          chmod 600 "$RUNNER_TEMP/audiocpm-release.p12"
+          {
+            echo "AC2_RELEASE_KEYSTORE=$RUNNER_TEMP/audiocpm-release.p12"
+            echo "AC2_RELEASE_STORE_PASSWORD=$STORE_PASSWORD"
+            echo "AC2_RELEASE_KEY_ALIAS=$KEY_ALIAS"
+            echo "AC2_RELEASE_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
 
       - name: Build debug APK
+        if: ${{ github.ref_type != 'tag' && inputs.build_release != true }}
         working-directory: packaging/android
         run: gradle assembleDebug --no-daemon --stacktrace
 
+      - name: Build signed release APK + AAB
+        if: ${{ github.ref_type == 'tag' || inputs.build_release == true }}
+        working-directory: packaging/android
+        run: gradle assembleRelease bundleRelease --no-daemon --stacktrace
+
+      - name: Verify release signatures
+        if: ${{ github.ref_type == 'tag' || inputs.build_release == true }}
+        run: |
+          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          "$APKSIGNER" verify --print-certs packaging/android/app/build/outputs/apk/release/Audio-CPM-release.apk
+          jarsigner -verify packaging/android/app/build/outputs/bundle/release/Audio-CPM-release.aab | tail -3
+
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ github.ref_type != 'tag' && inputs.build_release != true }}
         with:
           name: audio-cpm-apk
           path: packaging/android/app/build/outputs/apk/debug/*.apk
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ github.ref_type == 'tag' || inputs.build_release == true }}
+        with:
+          name: audio-cpm-release
+          path: |
+            packaging/android/app/build/outputs/apk/release/Audio-CPM-release.apk
+            packaging/android/app/build/outputs/bundle/release/Audio-CPM-release.aab

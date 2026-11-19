@@ -1,0 +1,35 @@
+version: 2
+updates:
+  - package-ecosystem: "gradle"
+    directory: "/packaging/android"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      android-dependencies:
+        patterns:
+          - "androidx.*"
+          - "com.android.*"
+          - "com.chaquo.*"
+
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+
+  - package-ecosystem: "npm"
+    directory: "/packaging/tests"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+    groups:
+      actions:
+        patterns:
+          - "*"

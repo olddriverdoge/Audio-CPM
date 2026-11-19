@@ -1,0 +1,6 @@
+0.4.33
+- Save-scene flow with new/overwrite and full window geometry, global zoom and canvas position
+- Stop playback immediately when the current file is moved or deleted
+- Show AAudio exclusive/shared status and USB DAC / system default output
+- 10-band EQ limited to ±10 dB; palm lock now allows drag and taps only
+- Fix target-tree, favorites, select-all/clear interactions
