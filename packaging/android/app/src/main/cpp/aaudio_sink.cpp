@@ -26,6 +26,7 @@ struct Sink {
     bool paused = false;
     int sharingMode = 0;
     float volume = 1.0f;
+    std::vector<uint8_t> scaledBuffer;
 };
 
 static std::mutex gLock;
@@ -186,8 +187,11 @@ Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativeFlush(JNIEnv *, jcl
     }
     // 用 framesRead 做 seek 后的基准，不能用 framesWritten：
     // 写入量比实际听到的量多一个硬件缓冲，用 written 会让进度条整体提前。
-    s->baseFrames = AAudioStream_getFramesRead(s->stream);
+    int64_t readBeforeFlush = AAudioStream_getFramesRead(s->stream);
+    s->baseFrames = readBeforeFlush;
     AAudioStream_requestFlush(s->stream);
+    int64_t readAfterFlush = AAudioStream_getFramesRead(s->stream);
+    if (readAfterFlush < readBeforeFlush) s->baseFrames = 0; // 计数器被 ROM 归零
     if (wasPlaying) {
         auto r = AAudioStream_requestStart(s->stream);
         if (r == AAUDIO_OK) s->playing = true;
@@ -249,18 +253,19 @@ Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativeWrite(
     int64_t total = 0;
 
     if (std::fabs(s->volume - 1.0f) > 0.001f) {
-        std::vector<uint8_t> tmp(static_cast<size_t>(frames) * s->bytesPerFrame);
-        std::memcpy(tmp.data(), src, tmp.size());
+        size_t bytes = static_cast<size_t>(frames) * s->bytesPerFrame;
+        s->scaledBuffer.resize(bytes);
+        std::memcpy(s->scaledBuffer.data(), src, bytes);
         if (s->format == AAUDIO_FORMAT_PCM_I16) {
-            int16_t *p = reinterpret_cast<int16_t *>(tmp.data());
+            int16_t *p = reinterpret_cast<int16_t *>(s->scaledBuffer.data());
             int samples = frames * s->channels;
             for (int i = 0; i < samples; i++) p[i] = static_cast<int16_t>(p[i] * s->volume);
         } else if (s->format == AAUDIO_FORMAT_PCM_FLOAT) {
-            float *p = reinterpret_cast<float *>(tmp.data());
+            float *p = reinterpret_cast<float *>(s->scaledBuffer.data());
             int samples = frames * s->channels;
             for (int i = 0; i < samples; i++) p[i] *= s->volume;
         }
-        src = tmp.data();
+        src = s->scaledBuffer.data();
     }
 
     while (total < frames) {
@@ -285,7 +290,12 @@ Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativePositionUs(JNIEnv *
     // framesRead 才是硬件已经消费的量，进度条应与实际声音同步。
     int64_t frames = AAudioStream_getFramesRead(s->stream);
     int64_t rel = frames - s->baseFrames;
-    if (rel < 0) rel = 0;
+    if (rel < 0) {
+        // 部分 ROM 在 flush 后会把 framesRead 计数器归零；此时旧 base 已经失效，
+        // 继续用旧 base 会让进度长时间卡在 0 再突然跳。重新锚定到当前计数。
+        s->baseFrames = frames;
+        rel = 0;
+    }
     return static_cast<jlong>(rel * 1000000LL / s->sampleRate);
 }
 

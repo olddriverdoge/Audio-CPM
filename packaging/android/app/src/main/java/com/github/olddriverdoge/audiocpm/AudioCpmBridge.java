@@ -192,8 +192,9 @@ public class AudioCpmBridge {
             sb.append(",\"player\":true");
                     sb.append(",\"playing\":").append(p.isPlaying());
                     sb.append(",\"playbackState\":").append(p.getPlaybackState());
-                    String sf = onMain(() -> sourceFormat(p), "{\"sampleRate\":0,\"channels\":0,\"encoding\":0}");
-                    sb.append(",\"sourceFormat\":").append(sf);
+                    // 250ms 轮询里不再调 getCurrentTracks（它要求主线程且开销大）；
+                    // 音源格式由 1.5s 的 audioInfo 单独提供，state 这里只保留字段兼容。
+                    sb.append(",\"sourceFormat\":{\"sampleRate\":0,\"channels\":0,\"encoding\":0}");
                     float sp = p.getPlaybackParameters().speed;
                     if (Float.isNaN(sp) || Float.isInfinite(sp)) sp = 1.0f;
                     sb.append(",\"speed\":").append(sp);
@@ -385,7 +386,7 @@ public class AudioCpmBridge {
                 return new Object[]{
                         p.getCurrentPosition(), p.getDuration(), p.isPlaying(),
                         p.getCurrentMediaItemIndex(), p.getPlaybackState(), p.getVolume(), path,
-                        sourceFormat(p)
+                        "{\"sampleRate\":0,\"channels\":0,\"encoding\":0}"
                 };
             }, null);
             if (snap == null || snap.length < 8) return "{\"ok\":false,\"error\":\"state timeout\"}";

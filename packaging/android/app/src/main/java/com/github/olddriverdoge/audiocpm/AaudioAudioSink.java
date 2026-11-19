@@ -49,6 +49,8 @@ public final class AaudioAudioSink implements AudioSink {
     private long streamOffsetUs;
     /** 当前 seek/起播之后第一帧的媒体时间；进度必须从这里加，不能固定从 0 加。 */
     private long startMediaTimeUs = C.TIME_UNSET;
+    /** 非 direct 的管线输出复制到这一块，反复使用，避免每个音频 buffer 都 allocateDirect。 */
+    private ByteBuffer directScratch = ByteBuffer.allocateDirect(0);
     private PlaybackParameters playbackParameters = PlaybackParameters.DEFAULT;
     private boolean skipSilence;
     private AudioAttributes audioAttributes;
@@ -341,10 +343,13 @@ public final class AaudioAudioSink implements AudioSink {
             if (out.isDirect()) {
                 written = nativeWrite(nativeHandle, out, remaining);
             } else {
-                ByteBuffer direct = ByteBuffer.allocateDirect(remaining);
-                direct.put(out.duplicate());
-                direct.flip();
-                written = nativeWrite(nativeHandle, direct, remaining);
+                if (directScratch.capacity() < remaining) {
+                    directScratch = ByteBuffer.allocateDirect(remaining);
+                }
+                directScratch.clear();
+                directScratch.put(out.duplicate());
+                directScratch.flip();
+                written = nativeWrite(nativeHandle, directScratch, remaining);
             }
             if (written < 0) {
                 throw new WriteException(written, null, true);

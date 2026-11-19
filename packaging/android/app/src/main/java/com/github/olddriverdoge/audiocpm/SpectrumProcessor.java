@@ -66,6 +66,14 @@ public class SpectrumProcessor extends BaseAudioProcessor {
     private float[] linPrev = new float[barCount];
     private float[] specPrev = new float[0];
     private int fill = 0;
+    /** 音频线程每帧都要复制一份输入；反复用同一块 direct buffer，避免 GC/原生内存抖动。 */
+    private ByteBuffer copyBuffer = ByteBuffer.allocateDirect(0);
+    /* compute 的输出数组反复使用；否则 90Hz FFT 每秒会产生几百个小数组。 */
+    private float[] computeBands = new float[96];
+    private float[] computeLevels = new float[96];
+    private float[] computeBars = new float[64];
+    private float[] computeLin = new float[64];
+    private float[] computeSpec = new float[0];
 
     public SpectrumProcessor() {
         // 与 WebAudio AnalyserNode 一致用 Blackman 窗（低频泄漏更小，观感接近旧版）。
@@ -174,14 +182,15 @@ public class SpectrumProcessor extends BaseAudioProcessor {
         // ByteBuffer 对象当输入传进来，直接 out.put(inputBuffer) 会抛
         // IllegalArgumentException: The source buffer is this buffer（真机已复现）。
         // 所以先复制到独立的临时缓冲，再写回输出缓冲。
-        ByteBuffer tmp = ByteBuffer.allocateDirect(size).order(ByteOrder.LITTLE_ENDIAN);
-        tmp.put(inputBuffer.duplicate());
-        tmp.flip();
+        if (copyBuffer.capacity() < size) copyBuffer = ByteBuffer.allocateDirect(size);
+        copyBuffer.clear();
+        copyBuffer.put(inputBuffer.duplicate());
+        copyBuffer.flip();
         // 必须把输入消费掉：AudioProcessingPipeline 用 (输入前剩余 - 调用后剩余) 判断是否有进展，
         // 不消费会导致同一段 PCM 被反复喂进来，真机表现就是“一小段声音不停重复”。
         inputBuffer.position(inputBuffer.limit());
         ByteBuffer out = replaceOutputBuffer(size);
-        out.put(tmp);
+        out.put(copyBuffer);
         out.flip();
     }
 
@@ -218,8 +227,10 @@ public class SpectrumProcessor extends BaseAudioProcessor {
             im[i] = 0f;
         }
         fft(re, im);
-        float[] out = new float[96];
-        float[] outLevels = new float[96];
+        if (computeBands.length != 96) computeBands = new float[96];
+        if (computeLevels.length != 96) computeLevels = new float[96];
+        float[] out = computeBands;
+        float[] outLevels = computeLevels;
         // 线性频率分档（和 WebAudio getByteFrequencyData 的 1024 个线性 bin 同源，
         // 再用 96 档做平均；对数分档会让低频只有 1 个 bin，显得一根根柱子又高又跳）。
         final int half = FFT_N / 2;
@@ -256,7 +267,8 @@ public class SpectrumProcessor extends BaseAudioProcessor {
         final double cg = 0.42 * FFT_N;          // Blackman 相干增益
         final int n = barCount;
         if (barPrev.length != n) barPrev = new float[n];
-        float[] outBars = new float[n];
+        if (computeBars.length != n) computeBars = new float[n];
+        float[] outBars = computeBars;
         for (int b = 0; b < n; b++) {
             double f0 = Math.exp(logF0 + logSpan * b / n);
             double f1 = Math.exp(logF0 + logSpan * (b + 1) / n);
@@ -283,7 +295,8 @@ public class SpectrumProcessor extends BaseAudioProcessor {
 
         // ---- 同一份 FFT 的线性分档（Hz 等宽），供 X 轴切“线性”时使用 ----
         if (linPrev.length != n) linPrev = new float[n];
-        float[] outLin = new float[n];
+        if (computeLin.length != n) computeLin = new float[n];
+        float[] outLin = computeLin;
         double spanHz = BAR_F1 - BAR_F0;
         for (int b = 0; b < n; b++) {
             double f0 = BAR_F0 + spanHz * b / n;
@@ -309,7 +322,8 @@ public class SpectrumProcessor extends BaseAudioProcessor {
         int sc = specCount;
         if (sc > 0) {
             if (specPrev.length != sc) specPrev = new float[sc];
-            float[] outSpec = new float[sc];
+            if (computeSpec.length != sc) computeSpec = new float[sc];
+            float[] outSpec = computeSpec;
             for (int b = 0; b < sc; b++) {
                 int k0 = (int) ((long) b * half / sc);
                 int k1 = (int) ((long) (b + 1) * half / sc) - 1;

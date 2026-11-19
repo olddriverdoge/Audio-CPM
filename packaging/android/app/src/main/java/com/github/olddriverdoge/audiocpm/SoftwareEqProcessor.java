@@ -176,6 +176,7 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
     private float trebleAlpha = 0.4f;
     private float trebleGain = 0f;
     private float virtWidth = 0f;
+    private float[] frameScratch = new float[0];
 
     private float processSample(int ch, float x) {
         // 前级增益属于 EQ 链路；关闭 EQ 时必须连前级一起旁路。
@@ -227,7 +228,8 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
         if (frames <= 0) return;
 
         ByteBuffer out = replaceOutputBuffer(frames * frameSize);
-        float[] frame = new float[channels];
+        if (frameScratch.length < channels) frameScratch = new float[channels];
+        float[] frame = frameScratch;
         if (encoding == C.ENCODING_PCM_FLOAT) {
             FloatBuffer in = inputBuffer.asFloatBuffer();
             FloatBuffer ob = out.asFloatBuffer();
