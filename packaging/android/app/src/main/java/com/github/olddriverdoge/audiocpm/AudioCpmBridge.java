@@ -170,6 +170,11 @@ public class AudioCpmBridge {
                 if (rate <= 0) {
                     try { rate = AudioTrack.getNativeOutputSampleRate(AudioManager.STREAM_MUSIC); } catch (Throwable ignored) {}
                 }
+                // 有些 ROM/蓝牙路由下上面两个 API 都返回 0；如果 AAudio 已经打开，
+                // 直接用实际流采样率兜底，至少不会在面板上显示“未知”。
+                if (rate <= 0 && AaudioAudioSink.isActive() && AaudioAudioSink.getSampleRate() > 0) {
+                    rate = AaudioAudioSink.getSampleRate();
+                }
                 if (frames <= 0 && rate > 0) {
                     try {
                         int minBytes = AudioTrack.getMinBufferSize(rate, android.media.AudioFormat.CHANNEL_OUT_STEREO,
@@ -192,9 +197,10 @@ public class AudioCpmBridge {
             sb.append(",\"player\":true");
                     sb.append(",\"playing\":").append(p.isPlaying());
                     sb.append(",\"playbackState\":").append(p.getPlaybackState());
-                    // 250ms 轮询里不再调 getCurrentTracks（它要求主线程且开销大）；
-                    // 音源格式由 1.5s 的 audioInfo 单独提供，state 这里只保留字段兼容。
-                    sb.append(",\"sourceFormat\":{\"sampleRate\":0,\"channels\":0,\"encoding\":0}");
+                    // audioInfo 是 1.5s 一次的面板数据，可以承受在主线程读一次
+                    // getCurrentTracks；state 的 250ms 轮询才使用固定空值。
+                    String sf = onMain(() -> sourceFormat(p), "{\"sampleRate\":0,\"channels\":0,\"encoding\":0}");
+                    sb.append(",\"sourceFormat\":").append(sf);
                     float sp = p.getPlaybackParameters().speed;
                     if (Float.isNaN(sp) || Float.isInfinite(sp)) sp = 1.0f;
                     sb.append(",\"speed\":").append(sp);

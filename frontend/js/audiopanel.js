@@ -395,6 +395,21 @@ function createAudioPanel() {
     } catch (_) {}
     let hifi = false;
     try { hifi = !!(typeof Player !== 'undefined' && Player.hifiActive && Player.hifiActive()); } catch (_) {}
+    // 原生 ExoPlayer 的 getCurrentTracks 偶尔拿不到 selected audio group（尤其刚切歌），
+    // 但前端 probe 已经有当前文件的音频流信息；HiFi 模式也要用它补“音源格式”。
+    if (!info.sourceFormat || !info.sourceFormat.sampleRate) {
+      try {
+        const a0 = (Player.meta && Player.meta.audio) || null;
+        if (a0 && a0.sample_rate) {
+          info.sourceFormat = {
+            sampleRate: Number(a0.sample_rate) || 0,
+            channels: Number(a0.channels) || 0,
+            encoding: encFromBits(Number(a0.bits_per_sample) || 0)
+          };
+          if (a0.codec_name) info.sourceCodec = String(a0.codec_name);
+        }
+      } catch (_) {}
+    }
     if (hifi) return;
     info.web = !!(typeof Player !== 'undefined' && Player.current);
     if (!info.web) return;
