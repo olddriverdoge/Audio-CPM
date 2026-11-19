@@ -431,15 +431,18 @@ function createAudioPanel() {
   // audioInfo 的原生桥偶尔会因某个可选字段异常而整体回退；HiFi 活跃时用 state
   // 的 AAudio 实测参数补齐，保证面板至少能显示真实输出与 AAudio 状态。
   async function enrichNativeInfo(info) {
-    let hifi = false;
-    try { hifi = !!(typeof Player !== 'undefined' && Player.hifiActive && Player.hifiActive()); }
-    catch (_) {}
-    if (!hifi) return;
+    // 不要求前端 Player 还持有当前曲目：Activity/WebView 重建后，后台
+    // PlaybackService 可能仍在播放，此时只有 state 知道真实状态。
     try {
       const st = await Api.playbackState();
       if (!st || !st.ok) return;
       if (st.aaudio) info.aaudio = st.aaudio;
       const aa = info.aaudio || {};
+      if (st.playing) {
+        info.playing = true;
+        info.web = false;
+        info.nativeActive = true;
+      }
       if ((!info.format || !info.format.sampleRate) && aa.sampleRate) {
         info.format = {sampleRate: aa.sampleRate, channels: aa.channels,
           encoding: aa.encoding, enabled: true, configured: true};
