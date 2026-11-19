@@ -63,7 +63,10 @@ Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativeOpen(
         AAudioStreamBuilder_setChannelCount(b, channels);
         AAudioStreamBuilder_setSampleRate(b, sampleRate);
         if (deviceId > 0) AAudioStreamBuilder_setDeviceId(b, deviceId);
-        if (bufferFrames > 0) AAudioStreamBuilder_setBufferCapacityInFrames(b, bufferFrames);
+        // EXCLUSIVE 的默认缓冲很小，解码线程稍微晚一点就会 underrun（听起来一卡一卡）。
+        // 保留约 40ms 的硬件缓冲，兼顾低延迟和连续输出。
+        int target = bufferFrames > 0 ? bufferFrames : (sampleRate / 25); // ~40ms
+        AAudioStreamBuilder_setBufferCapacityInFrames(b, target * 2);
         return b;
     };
 
@@ -88,6 +91,10 @@ Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativeOpen(
             stream = nullptr;
             return false;
         }
+        // 部分 ROM 的 builder 只设置 capacity，不会自动把 size 提到目标值；
+        // 显式设置一次，避免实际可写空间仍然只有几毫秒。
+        int target = bufferFrames > 0 ? bufferFrames : (sampleRate / 25); // ~40ms
+        AAudioStream_setBufferSizeInFrames(stream, target);
         usedSharing = sharing;
         return true;
     };
