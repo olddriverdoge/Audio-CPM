@@ -58,6 +58,7 @@ public final class AaudioAudioSink implements AudioSink {
     private static volatile int sChannels;
     private static volatile int sEncoding;
     private static volatile String sDevice = "";
+    private static volatile boolean sExclusive = false;
     private static volatile int sInputRate;
     private static volatile int sInputChannels;
     private static volatile int sInputEncoding;
@@ -94,6 +95,12 @@ public final class AaudioAudioSink implements AudioSink {
     public static boolean isNativeActive() { return sActive; }
     public static String lastError() { return sError; }
 
+    public static boolean isActive() { return sActive; }
+    public static boolean isExclusive() { return sExclusive; }
+    public static int getSampleRate() { return sRate; }
+    public static int getChannels() { return sChannels; }
+    public static int getEncoding() { return sEncoding; }
+
     public static String describe() {
         StringBuilder sb = new StringBuilder("{\"active\":").append(sActive)
                 .append(",\"fallback\":").append(sFallback)
@@ -104,6 +111,7 @@ public final class AaudioAudioSink implements AudioSink {
                 .append("\",\"inputSampleRate\":").append(sInputRate)
                 .append(",\"inputChannels\":").append(sInputChannels)
                 .append(",\"inputEncoding\":").append(sInputEncoding)
+                .append(",\"exclusive\":").append(sExclusive)
                 .append(",\"error\":\"").append(esc(sError)).append("\"}");
         return sb.toString();
     }
@@ -213,6 +221,7 @@ public final class AaudioAudioSink implements AudioSink {
             int actualRate = nativeGetSampleRate(h);
             int actualCh = nativeGetChannels(h);
             int actualFmt = nativeGetFormat(h);
+            int sharing = nativeGetSharingMode(h);
             if (actualRate != out.sampleRate || actualCh != out.channelCount
                     || actualFmt != aaFormat) {
                 nativeClose(h);
@@ -227,10 +236,12 @@ public final class AaudioAudioSink implements AudioSink {
             sRate = actualRate;
             sChannels = actualCh;
             sEncoding = out.encoding;
-            sDevice = "AAudio exclusive";
+            sExclusive = (sharing == 1);
+            sDevice = sExclusive ? "AAudio exclusive" : "AAudio shared";
             sError = "";
             nativeSetVolume(h, 1.0f); // 由 Media3 setVolume 覆盖
-            Log.i(TAG, "AAudio exclusive opened " + actualRate + "Hz/" + actualCh + "ch/fmt=" + actualFmt);
+            Log.i(TAG, "AAudio opened " + actualRate + "Hz/" + actualCh + "ch/fmt=" + actualFmt
+                    + " sharing=" + sharing);
             return;
         } catch (Throwable t) {
             try { pipeline.reset(); } catch (Throwable ignored) {}
@@ -484,5 +495,6 @@ public final class AaudioAudioSink implements AudioSink {
     private static native int nativeGetSampleRate(long handle);
     private static native int nativeGetChannels(long handle);
     private static native int nativeGetFormat(long handle);
+    private static native int nativeGetSharingMode(long handle);
     private static native String nativeLastError();
 }

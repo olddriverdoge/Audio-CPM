@@ -401,6 +401,17 @@ public class AudioCpmBridge {
                 if (nm != null) notif = nm.areNotificationsEnabled();
             } catch (Throwable ignored) {
             }
+            boolean aaActive = AaudioAudioSink.isActive();
+            boolean aaExclusive = AaudioAudioSink.isExclusive();
+            int aaRate = AaudioAudioSink.getSampleRate();
+            int aaChannels = AaudioAudioSink.getChannels();
+            int aaEncoding = AaudioAudioSink.getEncoding();
+            String mode = aaActive ? (aaExclusive ? "aaudio_exclusive" : "aaudio_shared") : "shared";
+            int outRate = aaActive && aaRate > 0 ? aaRate : sSampleRate;
+            int outChannels = aaActive && aaChannels > 0 ? aaChannels : sChannels;
+            int outBits = aaActive
+                    ? (aaEncoding == 4 ? 32 : (aaEncoding == 21 ? 24 : 16))
+                    : sBitDepth;
             return "{\"ok\":true,\"positionMs\":" + pos + ",\"durationMs\":" + dur
                     + ",\"playing\":" + playing + ",\"index\":" + idx
                     + ",\"path\":\"" + esc(cur) + "\""
@@ -408,9 +419,10 @@ public class AudioCpmBridge {
                     + ",\"error\":\"" + esc(PlaybackService.getLastError()) + "\""
                     + ",\"errorSeq\":" + PlaybackService.getErrorSeq()
                     + ",\"notifEnabled\":" + notif
-                    + ",\"sampleRate\":" + sSampleRate + ",\"bitDepth\":" + sBitDepth
-                    + ",\"channels\":" + sChannels
-                    + ",\"outputMode\":\"shared\",\"isResampling\":false,\"dacName\":\"\"}";
+                    + ",\"sampleRate\":" + outRate + ",\"bitDepth\":" + outBits
+                    + ",\"channels\":" + outChannels
+                    + ",\"outputMode\":\"" + mode + "\",\"isResampling\":false,\"dacName\":\"\""
+                    + ",\"aaudio\":" + AaudioAudioSink.describe() + "}";
         } catch (Throwable t) {
             return "{\"ok\":false,\"error\":\"" + esc(String.valueOf(t)) + "\"}";
         }

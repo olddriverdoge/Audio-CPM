@@ -22,6 +22,7 @@ struct Sink {
     int bytesPerFrame = 2;
     int64_t baseFrames = 0;
     bool playing = false;
+    int sharingMode = 0;
     float volume = 1.0f;
 };
 
@@ -50,26 +51,56 @@ Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativeOpen(
         setError("invalid format");
         return 0;
     }
-    AAudioStreamBuilder *builder = nullptr;
-    auto r = AAudio_createStreamBuilder(&builder);
-    if (r != AAUDIO_OK || builder == nullptr) {
-        setError("AAudio_createStreamBuilder failed: " + std::to_string(r));
-        return 0;
-    }
-    AAudioStreamBuilder_setDirection(builder, AAUDIO_DIRECTION_OUTPUT);
-    AAudioStreamBuilder_setSharingMode(builder, AAUDIO_SHARING_MODE_EXCLUSIVE);
-    AAudioStreamBuilder_setPerformanceMode(builder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
-    AAudioStreamBuilder_setFormat(builder, static_cast<decltype(AAUDIO_FORMAT_PCM_I16)>(format));
-    AAudioStreamBuilder_setChannelCount(builder, channels);
-    AAudioStreamBuilder_setSampleRate(builder, sampleRate);
-    if (deviceId > 0) AAudioStreamBuilder_setDeviceId(builder, deviceId);
-    if (bufferFrames > 0) AAudioStreamBuilder_setBufferCapacityInFrames(builder, bufferFrames);
+
+    auto makeBuilder = [&](int sharing) -> AAudioStreamBuilder * {
+        AAudioStreamBuilder *b = nullptr;
+        auto r = AAudio_createStreamBuilder(&b);
+        if (r != AAUDIO_OK || b == nullptr) return nullptr;
+        AAudioStreamBuilder_setDirection(b, AAUDIO_DIRECTION_OUTPUT);
+        AAudioStreamBuilder_setSharingMode(b, static_cast<decltype(AAUDIO_SHARING_MODE_EXCLUSIVE)>(sharing));
+        AAudioStreamBuilder_setPerformanceMode(b, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+        AAudioStreamBuilder_setFormat(b, static_cast<decltype(AAUDIO_FORMAT_PCM_I16)>(format));
+        AAudioStreamBuilder_setChannelCount(b, channels);
+        AAudioStreamBuilder_setSampleRate(b, sampleRate);
+        if (deviceId > 0) AAudioStreamBuilder_setDeviceId(b, deviceId);
+        if (bufferFrames > 0) AAudioStreamBuilder_setBufferCapacityInFrames(b, bufferFrames);
+        return b;
+    };
 
     AAudioStream *stream = nullptr;
-    r = AAudioStreamBuilder_openStream(builder, &stream);
-    AAudioStreamBuilder_delete(builder);
-    if (r != AAUDIO_OK || stream == nullptr) {
-        setError("AAudio open failed: " + std::to_string(r));
+    int usedSharing = AAUDIO_SHARING_MODE_EXCLUSIVE;
+    auto openWith = [&](int sharing) -> bool {
+        AAudioStreamBuilder *b = makeBuilder(sharing);
+        if (!b) return false;
+        auto r = AAudioStreamBuilder_openStream(b, &stream);
+        AAudioStreamBuilder_delete(b);
+        if (r != AAUDIO_OK || stream == nullptr) return false;
+        int actualRate = AAudioStream_getSampleRate(stream);
+        int actualCh = AAudioStream_getChannelCount(stream);
+        auto actualFmtValue = AAudioStream_getFormat(stream);
+        int actualFmt = static_cast<int>(actualFmtValue);
+        if (actualRate != sampleRate || actualCh != channels || actualFmt != format) {
+            setError("AAudio actual mismatch: " + std::to_string(actualRate) + "/" +
+                     std::to_string(actualCh) + "/" + std::to_string(actualFmt) +
+                     " need " + std::to_string(sampleRate) + "/" +
+                     std::to_string(channels) + "/" + std::to_string(format));
+            AAudioStream_close(stream);
+            stream = nullptr;
+            return false;
+        }
+        usedSharing = sharing;
+        return true;
+    };
+
+    // 很多设备/ROM 不支持 EXCLUSIVE。先试独占，失败自动退到 AAudio SHARED，
+    // 不再直接掉到 DefaultAudioSink；这样至少能拿到 AAudio 低延迟输出。
+    bool opened = openWith(AAUDIO_SHARING_MODE_EXCLUSIVE);
+    if (!opened) {
+        LOGW("AAudio exclusive unavailable, retry shared: %s", gLastError.c_str());
+        opened = openWith(AAUDIO_SHARING_MODE_SHARED);
+    }
+    if (!opened || stream == nullptr) {
+        if (gLastError.empty()) setError("AAudio open failed");
         return 0;
     }
 
@@ -77,16 +108,6 @@ Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativeOpen(
     int actualCh = AAudioStream_getChannelCount(stream);
     auto actualFmtValue = AAudioStream_getFormat(stream);
     int actualFmt = static_cast<int>(actualFmtValue);
-    if (actualRate != sampleRate || actualCh != channels || actualFmt != format) {
-        std::string msg = "AAudio actual mismatch: " + std::to_string(actualRate) + "/" +
-                          std::to_string(actualCh) + "/" + std::to_string(actualFmt) +
-                          " need " + std::to_string(sampleRate) + "/" +
-                          std::to_string(channels) + "/" + std::to_string(format);
-        setError(msg);
-        AAudioStream_close(stream);
-        return 0;
-    }
-
     Sink *sink = new Sink();
     sink->stream = stream;
     sink->sampleRate = actualRate;
@@ -96,8 +117,9 @@ Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativeOpen(
     sink->baseFrames = 0;
     sink->playing = false;
     sink->volume = 1.0f;
+    sink->sharingMode = usedSharing;
     setError("");
-    LOGI("open %d Hz %d ch format %d", actualRate, actualCh, actualFmt);
+    LOGI("open %d Hz %d ch format %d sharing %d", actualRate, actualCh, actualFmt, usedSharing);
     return static_cast<jlong>(reinterpret_cast<intptr_t>(sink));
 }
 
@@ -138,6 +160,12 @@ Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativeFlush(JNIEnv *, jcl
         auto r = AAudioStream_requestStart(s->stream);
         if (r == AAUDIO_OK) s->playing = true;
     }
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativeGetSharingMode(JNIEnv *, jclass, jlong handle) {
+    Sink *s = sinkOf(handle);
+    return (s && s->sharingMode == AAUDIO_SHARING_MODE_EXCLUSIVE) ? 1 : 0;
 }
 
 extern "C" JNIEXPORT void JNICALL

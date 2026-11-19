@@ -236,8 +236,11 @@ function createAudioPanel() {
     if (outputReady) html += row('重采样', isResample ? '是（' + (f.sampleRate / 1000).toFixed(1) + ' → ' + (devRate / 1000).toFixed(1) + ' kHz）' : '否');
     html += row('输出方式', externalMode ? '外部播放器（目标 App）'
       : (webMode ? '网页内播放（WebView / 系统混音）'
-        : (aa.active ? 'AAudio 独占（ExoPlayer）'
+        : (aa.active ? (aa.exclusive ? 'AAudio 独占（ExoPlayer）' : 'AAudio 共享（ExoPlayer）')
           : (aa.error ? '共享混音（AAudio 不可用）' : '共享混音（ExoPlayer）'))));
+    if (aa.error) {
+      html += '<div class="af-na">AAudio: ' + Utils.escapeHtml(String(aa.error)) + '</div>';
+    }
     if (externalMode) {
       html += '<div class="af-na">外部播放器模式下，解码与输出由目标播放器负责；本应用只能确认播放请求已发送，读不到它的实际采样率/位深。需要精确输出信息请切回网页内播放。</div>';
     } else if (webMode) {
@@ -425,6 +428,26 @@ function createAudioPanel() {
     } catch (_) {}
   }
 
+  // audioInfo 的原生桥偶尔会因某个可选字段异常而整体回退；HiFi 活跃时用 state
+  // 的 AAudio 实测参数补齐，保证面板至少能显示真实输出与 AAudio 状态。
+  async function enrichNativeInfo(info) {
+    let hifi = false;
+    try { hifi = !!(typeof Player !== 'undefined' && Player.hifiActive && Player.hifiActive()); }
+    catch (_) {}
+    if (!hifi) return;
+    try {
+      const st = await Api.playbackState();
+      if (!st || !st.ok) return;
+      if (st.aaudio) info.aaudio = st.aaudio;
+      const aa = info.aaudio || {};
+      if ((!info.format || !info.format.sampleRate) && aa.sampleRate) {
+        info.format = {sampleRate: aa.sampleRate, channels: aa.channels,
+          encoding: aa.encoding, enabled: true, configured: true};
+      }
+      if (st.error) info.error = st.error;
+    } catch (_) {}
+  }
+
   let refreshTimer = 0, lastInfoKey = '';
 
   function paintTrack() {
@@ -479,6 +502,7 @@ function createAudioPanel() {
       return;
     }
     await enrichWebInfo(info);
+    await enrichNativeInfo(info);
     paintTrack();
     const f = info.format || {};
     if (info.playing && !info.web && (!f.sampleRate || f.configured === false)) {
