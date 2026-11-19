@@ -229,11 +229,15 @@ const App = (() => {
     if (!bar) return;
     const list = favs();
     const cur = currentPath;
-    bar.innerHTML = list.map((p, i) =>
-      '<span class="fav-chip' + (p === cur ? ' on' : '') + '" data-fav="' + i + '" title="' +
-      Utils.escapeHtml(p) + '"><b>' + Utils.escapeHtml(treeBaseName(p) || p) + '</b>' +
-      '<i data-fav-del="' + i + '" title="移除">✕</i></span>').join('') +
-      '<button type="button" class="fav-add" id="fav-add" title="收藏当前目录">＋收藏</button>';
+    bar.innerHTML =
+      '<div class="fav-scroll">' +
+      list.map((p, i) =>
+        '<button type="button" class="tree-tab fav-chip' + (p === cur ? ' active' : '') +
+        '" data-fav="' + i + '" title="' + Utils.escapeHtml(p) + '">' +
+        '<b>' + Utils.escapeHtml(treeBaseName(p) || p) + '</b>' +
+        '<i data-fav-del="' + i + '" title="移除">✕</i></button>').join('') +
+      '</div>' +
+      '<button type="button" class="fav-add" id="fav-add" title="收藏当前目录">+</button>';
   }
   function addFavCurrent() {
     const uri = currentPath;
@@ -390,8 +394,6 @@ const App = (() => {
     return c === 'aiff' ? 'aif' : c;
   };
   const UI_SCALE_MIN = 0.5, UI_SCALE_MAX = 3.0;
-  /* 单模块内容缩放增益：比全局略钝，避免两指稍微一动文字就跳很大。 */
-  const MODULE_ZOOM_GAIN = 0.7;
   const CANVAS_MIN = -4096, CANVAS_MAX = 4096;
   const CANVAS_PAN_KEY = 'ac3_canvas_pan';
   function canvasPan() {
@@ -523,7 +525,8 @@ const App = (() => {
       if (targetCtl && !targetCtl.rect) { try { targetCtl.apply(); } catch (_) {} }
       pinch = {d: dist(e.touches), scale: currentUiScale(), cx: p.x, cy: p.y, mx, my,
                targetWin, targetCtl,
-               baseRect: targetCtl && targetCtl.rect ? Object.assign({}, targetCtl.rect) : null};
+               baseRect: targetCtl && targetCtl.rect ? Object.assign({}, targetCtl.rect) : null,
+               baseScale: targetCtl ? targetCtl.scale : 1};
     }, {passive: false});
     lock.addEventListener('touchmove', e => {
       if (pinch && e.touches.length >= 2) {
@@ -532,9 +535,8 @@ const App = (() => {
         const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
         const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
         if (pinch.targetCtl && pinch.baseRect) {
-          // 双指距离比例先收敛，再交给窗口内容缩放；不会比全局更冲。
-          const moduleRatio = 1 + (ratio - 1) * MODULE_ZOOM_GAIN;
-          WinMgr.zoomWindow(pinch.targetWin, pinch.baseRect, moduleRatio, mx, my);
+          // 传手势起点比例；增益和“不复利累乘”都由 WinMgr 统一处理。
+          WinMgr.zoomWindow(pinch.targetWin, pinch.baseRect, ratio, mx, my, pinch.baseScale);
           return;
         }
         const s = Math.max(UI_SCALE_MIN, Math.min(UI_SCALE_MAX, pinch.scale * ratio));

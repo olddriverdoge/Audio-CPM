@@ -8,6 +8,8 @@ const WinMgr = (() => {
   let zTop = zBase;
   const regs = [];
   const GAP = 6;
+  /* 单模块内容缩放增益：两指位移先收敛，避免文字跳动过猛。 */
+  const MODULE_ZOOM_GAIN = 0.7;
   // 大画布：模块不再被夹在当前视口里，允许拖到视口外，再由手掌模式平移回来。
   const CANVAS = {left: -2048, top: -768, right: 4096, bottom: 3072};
 
@@ -193,7 +195,7 @@ const WinMgr = (() => {
       const [a, b] = [...ptrs.values()];
       const dist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
       const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
-      pinch0 = {dist, cx, cy, rect: {...rect}};
+      pinch0 = {dist, cx, cy, rect: {...rect}, scale: winScale(win)};
       mode = 'pinch';
     }
 
@@ -219,21 +221,9 @@ const WinMgr = (() => {
         const [a, b] = [...ptrs.values()];
         const dist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
         const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
-        const s = Math.max(0.35, Math.min(2.2, dist / pinch0.dist));
-        const b0 = bounds();
-        const p = canvasPan();
-        const maxW = b0.right - b0.left, maxH = b0.bottom - b0.top;
-        const nw = Math.max(minW, Math.min(pinch0.rect.w * s, maxW));
-        const nh = Math.max(minH, Math.min(pinch0.rect.h * s, maxH));
-        rect = clampRect({
-          x: cx - p.x - nw / 2,
-          y: cy - p.y - nh / 2,
-          w: nw, h: nh
-        }, minW, minH);
-        rect.x = Math.min(rect.x, b0.right - nw);
-        rect.y = Math.min(rect.y, b0.bottom - nh);
-        if (contentSized) { win.style.left = rect.x + 'px'; win.style.top = rect.y + 'px'; }
-        else setRect(win, rect);
+        const ratio = Math.max(0.35, Math.min(2.2, dist / pinch0.dist));
+        // 和手形锁走同一条路径：文字/控件/窗口一起缩放，且从手势起点计算。
+        zoomAt(pinch0.rect, ratio, cx, cy, pinch0.scale);
         if (e.cancelable) e.preventDefault();
         return;
       }
@@ -339,12 +329,16 @@ const WinMgr = (() => {
     if (!win.classList.contains('hidden')) apply();   // 收起时量不到尺寸，等展开由 observer 夹取
     /* 只缩放当前窗口：双指在某个模块上捏合时由手形锁代理到这里，
        不修改全局 --ui-scale，其他模块保持原样。 */
-    function zoomAt(base, factor, sx, sy) {
+    function zoomAt(base, factor, sx, sy, baseScale) {
       if (!rect || !base) return;
       // 不是只改窗口尺寸：同时改 --win-scale，让模块里的文字、按钮、列表
       // 和窗口边框一起缩放；其他模块保持原样。
+      // factor 是相对手势开始时的总比例，必须从 baseScale 计算；
+      // 若从当前 cur 累乘，每次 touchmove 都会复利放大，手感会越捏越快。
       const cur = winScale(win);
-      const next = Math.max(0.5, Math.min(3, cur * factor));
+      const start = Number.isFinite(Number(baseScale)) ? Number(baseScale) : cur;
+      const damped = 1 + (factor - 1) * MODULE_ZOOM_GAIN;
+      const next = Math.max(0.5, Math.min(3, start * damped));
       const f = cur > 0 ? next / cur : 1;
       const p = canvasPan();
       const nw = Math.max(minW, base.w * f);
@@ -370,7 +364,8 @@ const WinMgr = (() => {
       zoomAt,
       persist: () => persist(),
       raise: () => raise(win),
-      get rect() { return rect; }
+      get rect() { return rect; },
+      get scale() { return winScale(win); }
     };
     regs.push(ctl);
     return ctl;
@@ -396,9 +391,9 @@ const WinMgr = (() => {
   function reapplyAll() { regs.forEach(r => { try { r.refresh(); } catch (_) {} }); }
   function syncRects() { regs.forEach(r => { try { r.sync(); } catch (_) {} }); }
   function find(win) { return regs.find(r => r.win === win) || null; }
-  function zoomWindow(win, base, factor, sx, sy) {
+  function zoomWindow(win, base, factor, sx, sy, baseScale) {
     const c = find(win);
-    if (c) c.zoomAt(base, factor, sx, sy);
+    if (c) c.zoomAt(base, factor, sx, sy, baseScale);
   }
   return {register, raise, reclampAll, reapplyAll, syncRects, bounds, find, zoomWindow};
 })();
