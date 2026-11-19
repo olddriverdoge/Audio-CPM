@@ -25,8 +25,9 @@ function createAudioPanel() {
   const encFromBits = b => (b === 24 ? 21 : b === 32 ? 22 : b === 8 ? 3 : 2);
   let cfg = Store.get('ac3_audio_cfg', {}) || {};
   if (Array.isArray(cfg.bands)) {
-    cfg.bands = cfg.bands.map(v => Math.max(-2000, Math.min(2000, Number(v) || 0)));
+    cfg.bands = cfg.bands.map(v => Math.max(-1000, Math.min(1000, Number(v) || 0)));
   }
+  cfg.preamp = Math.max(-10, Math.min(10, Number(cfg.preamp) || 0));
   let info = null;
 
   function save() { Store.set('ac3_audio_cfg', cfg); }
@@ -188,7 +189,7 @@ function createAudioPanel() {
       html += '<div class="af-bands' + (cfg.eqOn ? '' : ' off') + '">';
       (d.freqs || []).forEach((hz, i) => {
         let lv = Array.isArray(cfg.bands) && cfg.bands[i] != null ? cfg.bands[i] : (d.levels ? d.levels[i] : 0);
-        lv = Math.max(Number(d.minLevel ?? -2000), Math.min(Number(d.maxLevel ?? 2000), Number(lv) || 0));
+        lv = Math.max(Number(d.minLevel ?? -1000), Math.min(Number(d.maxLevel ?? 1000), Number(lv) || 0));
         const label = hz >= 1000 ? (hz / 1000) + 'k' : hz + '';
         html += '<div class="af-band"><span class="af-db">' + (lv / 100).toFixed(1) + 'dB</span>' +
           '<input type="range" class="af-slider af-vslider" data-band="' + i + '" min="' + d.minLevel +
@@ -197,7 +198,7 @@ function createAudioPanel() {
           '<span class="af-f">' + label + '</span></div>';
       });
       html += '</div>';
-      html += '<div class="af-pre' + (cfg.eqOn ? '' : ' off') + '"><span>前级增益</span><input type="range" class="af-slider" id="af-preamp" min="-20" max="20" step="0.5" value="' + (cfg.preamp || 0) + '"' + (cfg.eqOn ? '' : ' disabled') + '><span class="af-db" id="af-preamp-v">' + fmtDb(cfg.preamp || 0) + '</span></div>';
+      html += '<div class="af-pre' + (cfg.eqOn ? '' : ' off') + '"><span>前级增益</span><input type="range" class="af-slider" id="af-preamp" min="-10" max="10" step="0.5" value="' + (cfg.preamp || 0) + '"' + (cfg.eqOn ? '' : ' disabled') + '><span class="af-db" id="af-preamp-v">' + fmtDb(cfg.preamp || 0) + '</span></div>';
     } else {
       html += '<div class="af-na">EQ 参数读取失败，可尝试关掉再打开本模块</div>';
     }

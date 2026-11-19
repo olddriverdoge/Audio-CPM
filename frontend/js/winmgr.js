@@ -10,6 +10,9 @@ const WinMgr = (() => {
   const GAP = 6;
   /* 单模块内容缩放增益：两指位移先收敛，避免文字跳动过猛。 */
   const MODULE_ZOOM_GAIN = 0.7;
+  function palmLocked() {
+    try { return !!window.AUDIOCPM_PALM_LOCKED; } catch (_) { return false; }
+  }
   // 大画布：模块不再被夹在当前视口里，允许拖到视口外，再由手掌模式平移回来。
   const CANVAS = {left: -2048, top: -768, right: 4096, bottom: 3072};
 
@@ -191,6 +194,7 @@ const WinMgr = (() => {
     function activeCount() { return ptrs.size; }
 
     function beginPinch() {
+      if (palmLocked()) return;
       if (!rect) apply();
       const [a, b] = [...ptrs.values()];
       const dist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
@@ -200,6 +204,7 @@ const WinMgr = (() => {
     }
 
     function onWinDown(e) {
+      if (palmLocked()) return;
       if (e.pointerType === 'mouse') return;
       // 新的一次单指手势开始时，清掉上一次可能没收到 pointerup 的残留触点。
       // 否则残留触点 + 当前单指会被算成“双指”，把拖动误判成缩放。
@@ -215,6 +220,7 @@ const WinMgr = (() => {
       }
     }
     function onWinMove(e) {
+      if (palmLocked()) return;
       if (!ptrs.has(e.pointerId)) return;
       ptrs.set(e.pointerId, {x: e.clientX, y: e.clientY});
       if (mode === 'pinch' && ptrs.size >= 2 && pinch0) {
@@ -270,6 +276,7 @@ const WinMgr = (() => {
     /* 标题栏单指拖动（与上面双指互斥） */
     if (head) {
       head.addEventListener('pointerdown', e => {
+        if (palmLocked()) return;
         if (e.target.closest('button')) return;
         if (ptrs.size >= 2) return;
         if (!rect) apply();
@@ -292,6 +299,7 @@ const WinMgr = (() => {
     /* 右下角单指缩放 */
     if (resize) {
       resize.addEventListener('pointerdown', e => {
+        if (palmLocked()) return;
         if (!rect) apply();
         rz0 = {x: e.clientX, y: e.clientY, rx: rect.x, ry: rect.y, rw: rect.w, rh: rect.h};
         raise(win);
@@ -360,6 +368,10 @@ const WinMgr = (() => {
     const ctl = {
       win,
       apply,
+      cancelGestures: () => {
+        ptrs.clear();
+        mode = null; drag0 = null; pinch0 = null; rz0 = null;
+      },
       refresh,
       sync,
       fit,
@@ -392,10 +404,11 @@ const WinMgr = (() => {
 
   function reapplyAll() { regs.forEach(r => { try { r.refresh(); } catch (_) {} }); }
   function syncRects() { regs.forEach(r => { try { r.sync(); } catch (_) {} }); }
+  function cancelGestures() { regs.forEach(r => { try { r.cancelGestures(); } catch (_) {} }); }
   function find(win) { return regs.find(r => r.win === win) || null; }
   function zoomWindow(win, base, factor, sx, sy, baseScale) {
     const c = find(win);
     if (c) c.zoomAt(base, factor, sx, sy, baseScale);
   }
-  return {register, raise, reclampAll, reapplyAll, syncRects, bounds, find, zoomWindow};
+  return {register, raise, reclampAll, reapplyAll, syncRects, cancelGestures, bounds, find, zoomWindow};
 })();

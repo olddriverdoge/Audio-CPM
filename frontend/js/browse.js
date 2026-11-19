@@ -434,8 +434,8 @@ function createBrowseView(cfg) {
         if (one.status === 'ok') { ok++; st.sel.delete(one.src || one.path || ''); }
         else { bad++; lg('err', '删除失败: ' + Utils.basename(one.src || one.path || '') + ' ' + (one.reason || '')); }
       }
-      for (const p of paths) {
-        try { if (typeof Player !== 'undefined' && Player.current === p) Player.close(); } catch (_) {}
+      if (cfg.onDeleted) {
+        try { await cfg.onDeleted({paths: paths, results: r.results || []}); } catch (_) {}
       }
       lg(bad ? 'warn' : 'ok', '删除完成: 成功 ' + ok + ' / 失败 ' + bad);
       Utils.toast(bad ? ('删除完成，' + bad + ' 项失败') : ('已删除 ' + ok + ' 项'));

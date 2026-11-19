@@ -35,7 +35,7 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
     private static volatile int bassAmount = 0;               // 0..1000（软件低音增强）
     private static volatile int trebleAmount = 0;             // 0..1000（软件高音增强）
     private static volatile int virtAmount = 0;               // 0..1000（软件立体声扩展）
-    private static final int MAX_BAND_MB = 2000;              // 单个频段最多 +20.0 dB，防止破音
+    private static final int MAX_BAND_MB = 1000;              // 单个频段最多 ±10.0 dB，防止破音
     private static volatile long rev = 0;
 
     private int channels = 2, sampleRate = 48000, encoding = C.ENCODING_PCM_16BIT;
@@ -71,7 +71,7 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
     }
 
     public static void setPreamp(int mb) {
-        preampMb = Math.max(-24000, Math.min(24000, mb));
+        preampMb = Math.max(-1000, Math.min(1000, mb));
         rev++;
     }
 
@@ -96,7 +96,7 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
 
     public static String infoJson() {
         StringBuilder sb = new StringBuilder("{\"ok\":true,\"mode\":\"software\",\"bands\":")
-                .append(BANDS).append(",\"minLevel\":-2000,\"maxLevel\":2000,\"eqOn\":").append(enabled)
+                .append(BANDS).append(",\"minLevel\":-1000,\"maxLevel\":1000,\"eqOn\":").append(enabled)
                 .append(",\"preamp\":").append(preampMb).append(",\"freqs\":[");
         for (int i = 0; i < BANDS; i++) { if (i > 0) sb.append(','); sb.append((int) FREQ[i]); }
         sb.append("],\"levels\":[");

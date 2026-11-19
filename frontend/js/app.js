@@ -581,129 +581,116 @@ const App = (() => {
   function commitUiScale(value) { return setUiScale(value, true); }
   function currentUiScale() { return Number(window.AUDIOCPM_UI_SCALE || 1); }
 
-  /* 手形锁定：遮住 header 以下所有模块，禁止单指点击，只保留双指缩放 */
+  /* 手掌按钮：
+     - 开启：只锁定/拖动。空白处单指平移画布，禁止缩放任何浮窗；模块内部点击、
+       滚动和按钮全部保留。
+     - 关闭：空白处双指缩放全部组件。 */
   function initHandLock() {
     const hand = document.getElementById('btn-hand');
-    const lock = document.getElementById('ui-lock');
-    const hdr = document.getElementById('app-hdr');
-    if (!hand || !lock || !hdr) return;
-    let locked = false, pinch = null, pan0 = null;
-    function moduleAt(x, y) {
-      // ui-lock 盖在所有模块之上，elementFromPoint 只会返回它；
-      // elementsFromPoint 能继续看到下面的模块，用于把双指缩放代理到具体窗口。
-      try {
-        const stack = document.elementsFromPoint(x, y) || [];
-        for (const el of stack) {
-          const w = el.closest && el.closest('.fw-win,.play-float,.audio-float,.meta-float,.spectrum-float,.log-float');
-          if (w && !w.classList.contains('hidden')) return w;
-        }
-      } catch (_) {}
-      return null;
-    }
-    function positionLock() {
-      lock.style.top = Math.round(hdr.getBoundingClientRect().bottom) + 'px';
-    }
+    if (!hand) return;
+    let locked = false, pan = null, pinch = null;
+
     function dist(touches) {
       const dx = touches[0].clientX - touches[1].clientX;
       const dy = touches[0].clientY - touches[1].clientY;
       return Math.max(1, Math.sqrt(dx * dx + dy * dy));
     }
+    function blankTarget(t) {
+      if (!t || !t.closest) return false;
+      // 任何浮窗、顶栏/模块条、播放条、设置层都不归画布手势处理。
+      return !t.closest('#app-hdr,.hdr,.modbar,#player-bar,.fw-win,.play-float,' +
+        '.audio-float,.meta-float,.spectrum-float,.log-float,#sheet-overlay,' +
+        '#menu-overlay,#toast-wrap');
+    }
     function commitCanvas() {
       const p = canvasPan();
       setCanvasPan(p.x, p.y, true);
     }
-    function finishPinch(e) {
+    function finish(e) {
       if (pinch) {
-        const target = pinch.targetCtl;
         pinch = null;
-        if (target) {
-          // 只缩放当前模块：不写全局 --ui-scale，其他模块完全不动。
-          try { target.persist(); } catch (_) {}
-        } else {
-          const s = currentUiScale();
-          commitUiScale(s);
-          commitCanvas();
-        }
-      }
-      if (pan0 && (!e || !e.touches || e.touches.length === 0)) {
-        pan0 = null;
+        commitUiScale(currentUiScale());
+        commitCanvas();
+      } else if (pan) {
+        pan = null;
         commitCanvas();
       }
       if (e && e.cancelable) e.preventDefault();
     }
     function setLocked(on) {
       locked = !!on;
+      window.AUDIOCPM_PALM_LOCKED = locked;
+      try { WinMgr.cancelGestures(); } catch (_) {}
       hand.classList.toggle('on', locked);
       hand.setAttribute('aria-pressed', locked ? 'true' : 'false');
-      hand.title = locked ? '缩放（双指在模块上缩放该模块，空白处缩放整体）' : '缩放';
+      hand.title = locked
+        ? '已锁定：空白处拖动平移，缩放已禁用，模块可正常点击'
+        : '空白处双指缩放全部组件';
       const lbl = hand.querySelector('.b-lbl');
-      if (lbl) lbl.textContent = '缩放';
+      if (lbl) lbl.textContent = locked ? '锁定' : '缩放';
       if (locked) {
-        positionLock();
-        lock.classList.remove('hidden');
-        lock.setAttribute('aria-hidden', 'false');
         document.body.classList.add('ui-locked');
-        Utils.toast('工作台已锁定：单指平移；双指在模块上缩放该模块，空白处缩放整体');
+        Utils.toast('已锁定：空白处拖动平移，缩放已禁用；模块可正常点击');
       } else {
-        finishPinch(null);
-        lock.classList.add('hidden');
-        lock.setAttribute('aria-hidden', 'true');
+        finish(null);
         document.body.classList.remove('ui-locked');
-        Utils.toast('工作台已解锁');
+        Utils.toast('已解锁：空白处双指缩放全部组件');
       }
     }
+
     hand.addEventListener('click', () => setLocked(!locked));
-    window.addEventListener('resize', () => { if (locked) positionLock(); });
-    window.addEventListener('orientationchange', () => { if (locked) setTimeout(positionLock, 120); });
-    lock.addEventListener('touchstart', e => {
-      if (e.touches.length === 1) {
-        e.preventDefault();
+
+    document.addEventListener('touchstart', e => {
+      if (!blankTarget(e.target)) return;   // 模块内触摸完全不拦截
+      if (locked) {
         pinch = null;
-        const p = canvasPan();
-        pan0 = {x: e.touches[0].clientX, y: e.touches[0].clientY, cx: p.x, cy: p.y};
+        if (e.touches.length === 1) {
+          e.preventDefault();
+          const p = canvasPan();
+          pan = {x: e.touches[0].clientX, y: e.touches[0].clientY, cx: p.x, cy: p.y};
+        } else {
+          // 锁定时即使双指落在空白处也不缩放，只阻止浏览器原生缩放。
+          pan = null;
+          if (e.cancelable) e.preventDefault();
+        }
         return;
       }
-      if (e.touches.length !== 2) { pinch = null; pan0 = null; return; }
-      e.preventDefault();
-      pan0 = null;
-      const p = canvasPan();
-      const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      const targetWin = moduleAt(mx, my);
-      const targetCtl = targetWin ? WinMgr.find(targetWin) : null;
-      if (targetCtl && !targetCtl.rect) { try { targetCtl.apply(); } catch (_) {} }
-      pinch = {d: dist(e.touches), scale: currentUiScale(), cx: p.x, cy: p.y, mx, my,
-               targetWin, targetCtl,
-               baseRect: targetCtl && targetCtl.rect ? Object.assign({}, targetCtl.rect) : null,
-               baseScale: targetCtl ? targetCtl.scale : 1};
-    }, {passive: false});
-    lock.addEventListener('touchmove', e => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        pan = null;
+        const p = canvasPan();
+        const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        pinch = {d: dist(e.touches), scale: currentUiScale(), cx: p.x, cy: p.y, mx, my};
+      }
+    }, {passive: false, capture: true});
+
+    document.addEventListener('touchmove', e => {
       if (pinch && e.touches.length >= 2) {
         e.preventDefault();
         const ratio = dist(e.touches) / pinch.d;
+        const s = Math.max(UI_SCALE_MIN, Math.min(UI_SCALE_MAX, pinch.scale * ratio));
         const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
         const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-        if (pinch.targetCtl && pinch.baseRect) {
-          // 传手势起点比例；增益和“不复利累乘”都由 WinMgr 统一处理。
-          WinMgr.zoomWindow(pinch.targetWin, pinch.baseRect, ratio, mx, my, pinch.baseScale);
-          return;
-        }
-        const s = Math.max(UI_SCALE_MIN, Math.min(UI_SCALE_MAX, pinch.scale * ratio));
-        // 以双指中心为锚点缩放：中心下面的画布内容保持不动，实现局部放大。
         const ax = (pinch.mx - pinch.cx) / pinch.scale;
         const ay = (pinch.my - pinch.cy) / pinch.scale;
         previewUiScale(s);
         applyCanvasPan(mx - ax * s, my - ay * s, false);
         return;
       }
-      if (pan0 && e.touches.length === 1) {
+      if (pan && locked && e.touches.length === 1) {
         e.preventDefault();
-        applyCanvasPan(pan0.cx + (e.touches[0].clientX - pan0.x),
-                       pan0.cy + (e.touches[0].clientY - pan0.y), false);
+        applyCanvasPan(pan.cx + (e.touches[0].clientX - pan.x),
+                       pan.cy + (e.touches[0].clientY - pan.y), false);
       }
     }, {passive: false});
-    lock.addEventListener('touchend', finishPinch, {passive: false});
-    lock.addEventListener('touchcancel', finishPinch, {passive: false});
+
+    document.addEventListener('touchend', e => {
+      if (pinch || pan) finish(e);
+    }, {passive: false});
+    document.addEventListener('touchcancel', e => {
+      if (pinch || pan) finish(e);
+    }, {passive: false});
   }
 
   async function applyCapabilities() {
@@ -924,6 +911,16 @@ const App = (() => {
       onRowClick: (path, e, rowEl) => playRowClick(path, e, rowEl),
       onCounts: () => {},
       onSelectionChange: updateSelInfo,
+      onDeleted: async (info) => {
+        if (!info || !Player.current) return;
+        const hit = (info.results || []).some(x =>
+          x.status === 'ok' && pathInSrc(Player.current, x.src || x.path));
+        if (hit) {
+          try { Player.close(); } catch (_) {}
+          Utils.toast('当前播放文件已被删除，已停止播放');
+          Utils.log('warn', '当前播放文件被删除，已停止播放: ' + Player.current, 'organize');
+        }
+      },
       onRender: () => { try { Player.paintRows(); } catch (_) {} }
     });
     tree = createTreeView({
@@ -1021,15 +1018,15 @@ const App = (() => {
       getSources: () => (bv ? bv.selected() : []),
       getTarget: () => (tree ? tree.selected : ''),
       afterMove: async (info) => {
-        // 移动会把正在播放的文件从原路径拿走；先暂停，不要让 ExoPlayer
-        // 继续读一个已经失效/正在被移动的路径，表现成无休止的一卡一卡。
+        // 移动会把正在播放的文件从原路径拿走；必须停止，而不只是暂停。
+        // 否则 ExoPlayer 仍持有失效路径/旧文件句柄，表现为持续一卡一卡。
         if (info && info.op === 'move' && Player.current) {
           const moved = (info.results || []).some(x =>
             x.status === 'ok' && pathInSrc(Player.current, x.src));
           if (moved) {
-            try { Player.pause(); } catch (_) {}
-            Utils.toast('当前播放文件已被移动，已暂停');
-            Utils.log('warn', '当前播放文件被移动，已暂停: ' + Player.current, 'organize');
+            try { Player.close(); } catch (_) {}
+            Utils.toast('当前播放文件已被移动，已停止播放');
+            Utils.log('warn', '当前播放文件被移动，已停止播放: ' + Player.current, 'organize');
           }
         }
         await browse(currentPath);
