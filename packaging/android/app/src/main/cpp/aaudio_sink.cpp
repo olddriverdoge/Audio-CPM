@@ -126,10 +126,18 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativeFlush(JNIEnv *, jclass, jlong handle) {
     Sink *s = sinkOf(handle);
     if (!s) return;
+    // AAudio 要求先 pause 再 flush；直接在播放中 flush 部分 ROM 会阻塞，
+    // 表现就是拖动/点指定位置后整个 UI 卡死。
+    bool wasPlaying = s->playing;
+    s->playing = false;
+    AAudioStream_requestPause(s->stream);
     int64_t before = AAudioStream_getFramesWritten(s->stream);
     AAudioStream_requestFlush(s->stream);
     s->baseFrames = before;
-    if (s->playing) AAudioStream_requestStart(s->stream);
+    if (wasPlaying) {
+        auto r = AAudioStream_requestStart(s->stream);
+        if (r == AAUDIO_OK) s->playing = true;
+    }
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -152,6 +160,12 @@ Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativeWrite(
 
     int frames = bytes / s->bytesPerFrame;
     if (frames <= 0) return 0;
+    // 某些调用顺序下 Media3 先写数据、后调用 play()，AAudio 未 start 时 write 会失败或静音。
+    // 这里做一次幂等启动，避免“显示播放但没声音”。
+    if (!s->playing) {
+        auto r = AAudioStream_requestStart(s->stream);
+        if (r == AAUDIO_OK) s->playing = true;
+    }
     int64_t total = 0;
 
     if (std::fabs(s->volume - 1.0f) > 0.001f) {

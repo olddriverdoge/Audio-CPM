@@ -78,7 +78,7 @@ const TaskRunner = (() => {
     delete p.only_files;
     taskPresets.presets[name] = p;
     try {
-      await Api.saveTaskPresets(presets);
+      await Api.saveTaskPresets(taskPresets);
       await loadTaskPresets();
       document.getElementById('preset-select').value = name;
       lg('ok', '预设已保存: ' + name);
@@ -90,7 +90,7 @@ const TaskRunner = (() => {
     if (!confirm('删除预设 "' + name + '" ？')) return;
     delete taskPresets.presets[name];
     try {
-      await Api.saveTaskPresets(presets);
+      await Api.saveTaskPresets(taskPresets);
       await loadTaskPresets();
       lg('info', '已删除预设: ' + name);
     } catch (e) { lg('err', '删除失败: ' + e.message); }
@@ -267,8 +267,18 @@ const TaskRunner = (() => {
   }
 
   function init() {
+    // 之前这里只绑了取消，开始按钮完全没有 click 监听：
+    // 选中目录后点“开始执行”不会有任何请求，看起来就是没反应。
+    const startBtn = document.getElementById('start-btn');
+    if (startBtn) startBtn.addEventListener('click', start);
     const cb = document.getElementById('cancel-btn');
     if (cb) cb.addEventListener('click', cancel);
+    const savePreset = document.getElementById('btn-save-preset');
+    if (savePreset) savePreset.addEventListener('click', saveAsPreset);
+    const delPreset = document.getElementById('btn-del-preset');
+    if (delPreset) delPreset.addEventListener('click', deletePreset);
+    const presetSel = document.getElementById('preset-select');
+    if (presetSel) presetSel.addEventListener('change', applyPreset);
     // 任务类型切换必须刷新各自的配置面板；之前只在模块打开时 syncUI，
     // 导致“重命名 / 替换封面”的界面切过去看不到。
     document.querySelectorAll('input[name="task"]').forEach(r => {

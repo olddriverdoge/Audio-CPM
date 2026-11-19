@@ -14,7 +14,6 @@ import androidx.media3.common.PlaybackParameters;
 import androidx.media3.common.audio.AudioProcessor;
 import androidx.media3.common.audio.AudioProcessor.AudioFormat;
 import androidx.media3.common.audio.AudioProcessingPipeline;
-import androidx.media3.common.audio.SonicAudioProcessor;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.common.util.Util;
 import androidx.media3.exoplayer.audio.AudioSink;
@@ -38,7 +37,6 @@ public final class AaudioAudioSink implements AudioSink {
 
     private final DefaultAudioSink fallback;
     private final AudioProcessor[] processors;
-    private final SonicAudioProcessor sonic = new SonicAudioProcessor();
     private AudioProcessingPipeline pipeline;
     private volatile AudioSink.Listener listener;
 
@@ -87,7 +85,9 @@ public final class AaudioAudioSink implements AudioSink {
     private AudioProcessingPipeline newPipeline() {
         ImmutableList.Builder<AudioProcessor> b = ImmutableList.builder();
         for (AudioProcessor p : processors) b.add(p);
-        b.add(sonic);
+        // 不把 Sonic 放进 AAudio 管线：Sonic 在部分输入上会先缓存一段数据，
+        // 叠加 native blocking write 后容易出现“显示播放但没声音”。
+        // 变速/变调请求直接回退 DefaultAudioSink，由它处理。
         return new AudioProcessingPipeline(b.build());
     }
 
@@ -104,7 +104,7 @@ public final class AaudioAudioSink implements AudioSink {
                 .append("\",\"inputSampleRate\":").append(sInputRate)
                 .append(",\"inputChannels\":").append(sInputChannels)
                 .append(",\"inputEncoding\":").append(sInputEncoding)
-                .append("\",\"error\":\"").append(esc(sError)).append("\"}");
+                .append(",\"error\":\"").append(esc(sError)).append("\"}");
         return sb.toString();
     }
 
@@ -175,6 +175,11 @@ public final class AaudioAudioSink implements AudioSink {
             nativeHandle = 0;
         }
 
+        // 变速/变调交给 DefaultAudioSink 的 Sonic，不在 AAudio 管线里做。
+        if (playbackParameters.speed != 1.0f || playbackParameters.pitch != 1.0f) {
+            configureFallback(inputFormat, specifiedBufferSize, outputChannels);
+            return;
+        }
         // 自定义 channel map 走默认 sink，避免 AAudio 写入声道错位。
         if (outputChannels != null && !isIdentityMap(outputChannels, inputFormat.channelCount)) {
             configureFallback(inputFormat, specifiedBufferSize, outputChannels);
@@ -355,8 +360,6 @@ public final class AaudioAudioSink implements AudioSink {
     @Override
     public void setPlaybackParameters(PlaybackParameters playbackParameters) {
         this.playbackParameters = playbackParameters;
-        sonic.setSpeed(playbackParameters.speed);
-        sonic.setPitch(playbackParameters.pitch);
         fallback.setPlaybackParameters(playbackParameters);
     }
 

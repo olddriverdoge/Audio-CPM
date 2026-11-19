@@ -301,8 +301,10 @@ public class AudioCpmBridge {
             Boolean ok = onMain(() -> {
                 ExoPlayer p = PlaybackService.getPlayer();
                 p.setMediaItem(MediaItem.fromUri(Uri.fromFile(f)));
-                p.prepare();
+                // 先 seek 再 prepare：对已有 Sink 直接 seek 会触发 flush，
+                // 部分 AAudio 设备会阻塞；新起播场景在 prepare 前设置起点最稳。
                 if (startMs > 0) p.seekTo(startMs);
+                p.prepare();
                 p.play();
                 return true;
             }, false);

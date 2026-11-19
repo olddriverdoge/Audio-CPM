@@ -122,6 +122,7 @@ public class PlaybackService extends MediaSessionService {
             public void onPlaybackStateChanged(int state) {
                 lastError = state == Player.STATE_IDLE ? lastError : "";
                 Log.i(TAG, "playback state -> " + state);
+                refreshNotification();
             }
 
             @Override
@@ -133,6 +134,9 @@ public class PlaybackService extends MediaSessionService {
             @Override
             public void onIsPlayingChanged(boolean isPlaying) {
                 Log.i(TAG, "isPlaying -> " + isPlaying);
+                // 通知栏按钮/图标必须跟着实际播放状态走；只依赖 MediaSession
+                // 的默认刷新在部分 ROM 上会滞后甚至不刷新。
+                refreshNotification();
             }
 
             @Override
@@ -140,6 +144,7 @@ public class PlaybackService extends MediaSessionService {
                 // 换曲：把谱系清零，前端切歌窗口里取到的是干净的 0，不会画出上一首的残影
                 SpectrumProcessor.clear();
                 Log.i(TAG, "media item transition reason=" + reason);
+                refreshNotification();
             }
         });
         player.setSkipSilenceEnabled(false);
@@ -192,6 +197,18 @@ public class PlaybackService extends MediaSessionService {
         } catch (Throwable t) {
             Log.w(TAG, "own notification failed", t);
             super.onUpdateNotification(session, startInForegroundRequired);
+        }
+    }
+
+    private void refreshNotification() {
+        MediaSession s = session;
+        if (s == null || player == null) return;
+        try {
+            Notification n = buildNotification(s);
+            NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            if (nm != null) nm.notify(NOTIF_ID, n);
+        } catch (Throwable t) {
+            Log.w(TAG, "refresh notification failed", t);
         }
     }
 

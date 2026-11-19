@@ -157,7 +157,19 @@ const Player = (() => {
     for (const cb of metaSubs) { try { cb(cur, info); } catch (_) {} }
   }
   function onMeta(cb) { if (typeof cb === 'function') metaSubs.push(cb); }
+  function clearWebMediaSession() {
+    // HiFi 播放走原生 MediaSession，WebView 的 navigator.mediaSession
+    // 不能再挂一份 metadata，否则系统媒体卡片可能选到 WebView 这一路，
+    // 表现就是通知栏状态和 app 内部不一致、按钮也控制不到 ExoPlayer。
+    try {
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = null;
+        navigator.mediaSession.playbackState = 'none';
+      }
+    } catch (_) {}
+  }
   function updateMediaSession(path, tags, hasCover) {
+    if (hifi) { clearWebMediaSession(); return; }
     if (!('mediaSession' in navigator) || !window.MediaMetadata) return;
     try {
       const art = [];
@@ -257,6 +269,7 @@ const Player = (() => {
     if (metaEl) { metaEl.textContent = ''; metaEl.title = ''; }
     curInfo = null;
     notifyMeta();
+    clearWebMediaSession();
     setToggle(false);
     setCover('');
     paintButtons('');
@@ -288,6 +301,7 @@ const Player = (() => {
           : await Api.playbackOpen(path, startMs, 0, 0, 0);
         if (r && r.ok) {
           hifi = true; hifiPlaying = true; hifiPos = 0; hifiDur = 0;
+          clearWebMediaSession();
           try { if (typeof App !== 'undefined' && App.applyPlayMode) App.applyPlayMode(); } catch (_) {}
           setWave(path); paintRows(); show(); startHifiPoll(); setToggle(true);
           return;
