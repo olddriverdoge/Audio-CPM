@@ -28,6 +28,15 @@ const Player = (() => {
   let hifi = false, hifiPlaying = false, hifiPos = 0, hifiDur = 0, hifiTimer = 0;
   /* 点击文件行时带了比例但时长未知：等原生返回 durationMs 后补一次 seek */
   let pendingRatio = 0;
+  let reportedError = '';
+  function reportPlaybackError(err) {
+    if (!err || err === reportedError) return;
+    reportedError = err;
+    // 所有 ExoPlayer/MediaSession 错误统一进日志模块，不只依赖 HiFi 轮询。
+    Utils.log('err', '播放错误: ' + err, 'workbench');
+    // 本轮会话已确认 HiFi 有问题；继续让网页播放兜底，避免反复起原生播放器。
+    window.__ac2HifiBroken = true;
+  }
 
   function fmt(t) {
     if (!isFinite(t) || t < 0) t = 0;
@@ -77,10 +86,9 @@ const Player = (() => {
           try { await Api.playbackSeek(ms); } catch (_) {}
         }
         if (s.error) {
-          window.__ac2HifiBroken = true;
+          reportPlaybackError(s.error);
           stopHifiPoll();
           hifi = false;
-          Utils.log('err', 'HiFi 播放失败: ' + s.error);
           Utils.toast('HiFi 播放失败，已切回网页播放', 'warn');
           audio.src = '/api/stream?path=' + encodeURIComponent(cur || '');
           audio.play().catch(() => {});
@@ -519,6 +527,16 @@ const Player = (() => {
   document.getElementById('pb-close').addEventListener('click', close);
 
   // 行内点击（含播放行按横向比例跳转）统一由 BrowseView.onRowClick → App.playRowClick 处理
+
+  // 即使当前不是 HiFi（例如已回退网页、或用户在别的模块），也持续检查原生错误。
+  // 这样 ExoPlayer 的 Source error 不会只落在 player_error.txt 里。
+  setInterval(async () => {
+    try {
+      const s = await Api.playbackState();
+      if (!s || !s.ok || !s.error) return;
+      reportPlaybackError(s.error);
+    } catch (_) {}
+  }, 2000);
 
   return {open, toggle, close, external, syncBar, paintRows, pct, seekRatio, onMeta,
           position: positionSec, duration: durationSec, isPlaying, setVolume, seekSec, replay,

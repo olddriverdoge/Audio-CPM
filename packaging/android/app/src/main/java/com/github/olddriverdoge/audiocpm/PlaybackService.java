@@ -39,6 +39,7 @@ public class PlaybackService extends MediaSessionService {
     private static volatile ExoPlayer player;
     private static volatile MediaSession session;
     private static volatile String lastError = "";
+    private static volatile long errorSeq = 0;
     private static volatile int audioSessionId = 0;
     private static volatile int preferredDeviceId = 0;
 
@@ -78,6 +79,7 @@ public class PlaybackService extends MediaSessionService {
         return false;
     }
     public static String getLastError() { return lastError; }
+    public static long getErrorSeq() { return errorSeq; }
     public static int getAudioSessionId() { return audioSessionId; }
 
     @Override
@@ -114,13 +116,17 @@ public class PlaybackService extends MediaSessionService {
             @Override
             public void onPlayerError(PlaybackException error) {
                 lastError = error.getErrorCodeName() + " / " + describe(error);
+                errorSeq++;
                 Log.e(TAG, "player error " + lastError, error);
                 dumpError(error);
             }
 
             @Override
             public void onPlaybackStateChanged(int state) {
-                lastError = state == Player.STATE_IDLE ? lastError : "";
+                // 只有真正 READY 才清错误。以前 state != IDLE 就清空，
+                // ExoPlayer 报错后经常短暂回到 BUFFERING，错误被抹掉，
+                // 前端日志和自动回退都看不到。
+                if (state == Player.STATE_READY) lastError = "";
                 Log.i(TAG, "playback state -> " + state);
                 refreshNotification();
             }

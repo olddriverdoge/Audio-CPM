@@ -406,6 +406,7 @@ public class AudioCpmBridge {
                     + ",\"path\":\"" + esc(cur) + "\""
                     + ",\"playbackState\":" + pbState + ",\"volume\":" + vol
                     + ",\"error\":\"" + esc(PlaybackService.getLastError()) + "\""
+                    + ",\"errorSeq\":" + PlaybackService.getErrorSeq()
                     + ",\"notifEnabled\":" + notif
                     + ",\"sampleRate\":" + sSampleRate + ",\"bitDepth\":" + sBitDepth
                     + ",\"channels\":" + sChannels
