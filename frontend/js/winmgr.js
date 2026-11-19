@@ -403,6 +403,7 @@ const WinMgr = (() => {
   });
 
   function reapplyAll() { regs.forEach(r => { try { r.refresh(); } catch (_) {} }); }
+  function persistAll() { regs.forEach(r => { try { r.persist(); } catch (_) {} }); }
   function syncRects() { regs.forEach(r => { try { r.sync(); } catch (_) {} }); }
   function cancelGestures() { regs.forEach(r => { try { r.cancelGestures(); } catch (_) {} }); }
   function find(win) { return regs.find(r => r.win === win) || null; }
@@ -410,5 +411,5 @@ const WinMgr = (() => {
     const c = find(win);
     if (c) c.zoomAt(base, factor, sx, sy, baseScale);
   }
-  return {register, raise, reclampAll, reapplyAll, syncRects, cancelGestures, bounds, find, zoomWindow};
+  return {register, raise, reclampAll, reapplyAll, persistAll, syncRects, cancelGestures, bounds, find, zoomWindow};
 })();

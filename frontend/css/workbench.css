@@ -236,8 +236,9 @@
   .scene-chip{flex:0 0 auto;padding:3px 10px;border-radius:999px;border:1px solid var(--border);
     background:rgba(17,24,32,.9);color:var(--muted);font-size:11px;font-family:inherit;cursor:pointer}
   .scene-chip.on{color:var(--accent);border-color:rgba(56,189,248,.55);background:rgba(56,189,248,.1)}
-  .scene-add{flex:0 0 auto;width:26px;height:24px;border-radius:7px;border:1px solid var(--border);
-    background:transparent;color:var(--muted);font-size:15px;line-height:1;font-family:inherit;cursor:pointer}
+  .scene-add{flex:0 0 auto;width:auto;min-width:70px;height:24px;padding:0 9px;
+    border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);
+    font-size:11.5px;line-height:1;font-family:inherit;cursor:pointer;white-space:nowrap}
   .scene-add:hover{color:var(--accent);border-color:rgba(56,189,248,.5)}
 
   .module-fab{position:fixed;right:14px;bottom:108px;z-index:2147483001;width:46px;height:46px;
@@ -259,8 +260,8 @@
   .scene-name{display:inline-block}
 
 
-  .scene-add{display:inline-flex;align-items:center;justify-content:center;padding:0;
-    line-height:1;font-size:16px;font-weight:600;transform:translateY(-0.5px)}
+  .scene-add{display:inline-flex;align-items:center;justify-content:center;padding:0 9px;
+    line-height:1;font-size:11.5px;font-weight:500}
   .scene-add span{display:block;line-height:1}
 
   /* 音频输出里的外部播放器配置 */

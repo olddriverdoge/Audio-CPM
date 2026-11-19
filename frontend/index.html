@@ -39,18 +39,30 @@
   <!-- 顶部只放场景（模块选择在右下角的模块坞） -->
   <div class="modbar scene-bar" id="scene-bar">
     <div class="scene-tabs" id="scene-tabs"></div>
-    <button type="button" class="scene-add" id="scene-add" title="把当前模块布局保存为场景">＋</button>
+    <button type="button" class="scene-add" id="scene-add" title="保存当前布局到已有场景或新建场景">保存场景</button>
   </div>
 
   <!-- 大工作台：所有功能都以浮窗形式叠在这里 -->
   <div class="workbench" id="workbench">
     <div class="scene-home" id="scene-home">
       <div class="sh-head">
-        <div class="sh-title"><b>场景</b><span>一套场景对应一组模块；顶部 ＋ 保存当前布局</span></div>
+        <div class="sh-title"><b>场景</b><span>一套场景对应一组模块；顶部“保存场景”保存当前布局</span></div>
       </div>
       <div class="sh-grid" id="sh-grid"></div>
       <div class="sh-foot"><button type="button" class="scene-restore hidden" id="scene-restore">恢复默认场景</button>
         模块浮窗可自由拖动 / 缩放 / 互相覆盖；收起后点这里换场景。</div>
+    </div>
+  </div>
+
+  <!-- 保存场景：列出现有场景；＋ 新建，点已有场景覆盖 -->
+  <div id="scene-save-overlay" class="sheet-overlay hidden" aria-hidden="true">
+    <div class="sheet scene-save-sheet" id="scene-save-sheet">
+      <h3>保存场景</h3>
+      <div class="ss-sub">点 <b>＋ 新建场景</b> 用当前布局新建；点已有场景行则覆盖它。覆盖会保存窗口位置、大小和缩放。</div>
+      <div class="ss-list" id="ss-list"></div>
+      <div class="ss-actions">
+        <button type="button" class="small" id="ss-cancel">取消</button>
+      </div>
     </div>
   </div>
 
