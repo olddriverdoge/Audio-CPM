@@ -192,7 +192,8 @@ public class AudioCpmBridge {
             sb.append(",\"player\":true");
                     sb.append(",\"playing\":").append(p.isPlaying());
                     sb.append(",\"playbackState\":").append(p.getPlaybackState());
-                    sb.append(",\"sourceFormat\":").append(sourceFormat(p));
+                    String sf = onMain(() -> sourceFormat(p), "{\"sampleRate\":0,\"channels\":0,\"encoding\":0}");
+                    sb.append(",\"sourceFormat\":").append(sf);
                     float sp = p.getPlaybackParameters().speed;
                     if (Float.isNaN(sp) || Float.isInfinite(sp)) sp = 1.0f;
                     sb.append(",\"speed\":").append(sp);
@@ -383,10 +384,11 @@ public class AudioCpmBridge {
                 }
                 return new Object[]{
                         p.getCurrentPosition(), p.getDuration(), p.isPlaying(),
-                        p.getCurrentMediaItemIndex(), p.getPlaybackState(), p.getVolume(), path
+                        p.getCurrentMediaItemIndex(), p.getPlaybackState(), p.getVolume(), path,
+                        sourceFormat(p)
                 };
             }, null);
-            if (snap == null || snap.length < 7) return "{\"ok\":false,\"error\":\"state timeout\"}";
+            if (snap == null || snap.length < 8) return "{\"ok\":false,\"error\":\"state timeout\"}";
             long pos = ((Long) snap[0]);
             long rawDur = ((Long) snap[1]);
             long dur = (rawDur <= 0 || rawDur == androidx.media3.common.C.TIME_UNSET) ? 0 : rawDur;
@@ -395,6 +397,7 @@ public class AudioCpmBridge {
             int pbState = ((Integer) snap[4]);
             float vol = ((Float) snap[5]);
             String cur = ((String) snap[6]);
+            String sourceFmt = ((String) snap[7]);
             boolean notif = true;
             try {
                 Context ctx0 = AudioCpmApp.get();
@@ -424,6 +427,7 @@ public class AudioCpmBridge {
                     + ",\"sampleRate\":" + outRate + ",\"bitDepth\":" + outBits
                     + ",\"channels\":" + outChannels
                     + ",\"outputMode\":\"" + mode + "\",\"isResampling\":false,\"dacName\":\"\""
+                    + ",\"sourceFormat\":" + sourceFmt
                     + ",\"aaudio\":" + AaudioAudioSink.describe() + "}";
         } catch (Throwable t) {
             return "{\"ok\":false,\"error\":\"" + esc(String.valueOf(t)) + "\"}";

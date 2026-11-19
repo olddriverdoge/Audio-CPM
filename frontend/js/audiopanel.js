@@ -447,6 +447,9 @@ function createAudioPanel() {
         info.format = {sampleRate: aa.sampleRate, channels: aa.channels,
           encoding: aa.encoding, enabled: true, configured: true};
       }
+      if ((!info.sourceFormat || !info.sourceFormat.sampleRate) && st.sourceFormat && st.sourceFormat.sampleRate) {
+        info.sourceFormat = st.sourceFormat;
+      }
       if (st.error) info.error = st.error;
     } catch (_) {}
   }

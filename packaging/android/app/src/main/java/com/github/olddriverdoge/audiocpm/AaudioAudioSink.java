@@ -45,6 +45,7 @@ public final class AaudioAudioSink implements AudioSink {
     private boolean ended;
     private boolean released;
     private int preferredDeviceId;
+    private float currentVolume = 1.0f;
     private long streamOffsetUs;
     private PlaybackParameters playbackParameters = PlaybackParameters.DEFAULT;
     private boolean skipSilence;
@@ -156,7 +157,7 @@ public final class AaudioAudioSink implements AudioSink {
     }
 
     @Override
-    public long getCurrentPositionUs(boolean sourceEnded) {
+    public synchronized long getCurrentPositionUs(boolean sourceEnded) {
         if (!nativeActive) return fallback.getCurrentPositionUs(sourceEnded);
         long pos = nativePositionUs(nativeHandle);
         if (pos < 0) return CURRENT_POSITION_NOT_SET;
@@ -164,7 +165,7 @@ public final class AaudioAudioSink implements AudioSink {
     }
 
     @Override
-    public void configure(Format inputFormat, int specifiedBufferSize, @Nullable int[] outputChannels)
+    public synchronized void configure(Format inputFormat, int specifiedBufferSize, @Nullable int[] outputChannels)
             throws ConfigurationException {
         sFallback = true;
         sActive = false;
@@ -283,7 +284,7 @@ public final class AaudioAudioSink implements AudioSink {
     }
 
     @Override
-    public void play() {
+    public synchronized void play() {
         if (nativeActive) {
             nativeStart(nativeHandle);
             AudioSink.Listener l = listener;
@@ -299,7 +300,7 @@ public final class AaudioAudioSink implements AudioSink {
     }
 
     @Override
-    public boolean handleBuffer(ByteBuffer buffer, long presentationTimeUs, int encodedAccessUnitCount)
+    public synchronized boolean handleBuffer(ByteBuffer buffer, long presentationTimeUs, int encodedAccessUnitCount)
             throws InitializationException, WriteException {
         if (!nativeActive) return fallback.handleBuffer(buffer, presentationTimeUs, encodedAccessUnitCount);
         try {
@@ -410,10 +411,45 @@ public final class AaudioAudioSink implements AudioSink {
     }
 
     @Override
-    public void setPreferredDevice(@Nullable AudioDeviceInfo audioDeviceInfo) {
-        preferredDeviceId = audioDeviceInfo == null ? 0 : audioDeviceInfo.getId();
+    public synchronized void setPreferredDevice(@Nullable AudioDeviceInfo audioDeviceInfo) {
+        int id = audioDeviceInfo == null ? 0 : audioDeviceInfo.getId();
         fallback.setPreferredDevice(audioDeviceInfo);
-        // 已开流不重建；下一次 configure（切歌/格式变化）会使用新设备。
+        int old = preferredDeviceId;
+        preferredDeviceId = id;
+        if (!nativeActive || nativeHandle == 0 || id == old) return;
+        // AAudio 的设备只能在 open 时指定，已经开着的流不会跟着 ExoPlayer 的
+        // preferredDevice 走，所以这里用同格式开一条新流再交换。先开新的、
+        // 成功了才关旧的，失败时旧流继续播，不会把正在播的歌打断。
+        long oldHandle = nativeHandle;
+        int rate = sRate, ch = sChannels, fmt = (sEncoding == C.ENCODING_PCM_FLOAT) ? 2 : 1;
+        try {
+            long nh = nativeOpen(rate, ch, fmt, id, 0);
+            if (nh == 0) {
+                sError = "AAudio device open failed: " + nativeLastError();
+                return;
+            }
+            int ar = nativeGetSampleRate(nh);
+            int ac = nativeGetChannels(nh);
+            int af = nativeGetFormat(nh);
+            if (ar != rate || ac != ch || af != fmt) {
+                nativeClose(nh);
+                sError = "AAudio device mismatch: " + ar + "/" + ac + "/" + af;
+                return;
+            }
+            nativeHandle = nh;
+            nativeActive = true;
+            nativeSetVolume(nh, currentVolume);
+            sRate = ar;
+            sChannels = ac;
+            sExclusive = nativeGetSharingMode(nh) == 1;
+            sDevice = sExclusive ? "AAudio exclusive" : "AAudio shared";
+            sError = "";
+            nativeClose(oldHandle);
+            Log.i(TAG, "AAudio device switched to " + id + " " + ar + "Hz/" + ac + "ch");
+        } catch (Throwable t) {
+            sError = String.valueOf(t);
+            Log.w(TAG, "AAudio device switch failed", t);
+        }
     }
 
     @Override
@@ -438,18 +474,19 @@ public final class AaudioAudioSink implements AudioSink {
 
     @Override
     public void setVolume(float volume) {
-        if (nativeActive) nativeSetVolume(nativeHandle, volume);
+        currentVolume = Math.max(0f, Math.min(1f, volume));
+        if (nativeActive) nativeSetVolume(nativeHandle, currentVolume);
         fallback.setVolume(volume);
     }
 
     @Override
-    public void pause() {
+    public synchronized void pause() {
         if (nativeActive) nativePause(nativeHandle);
         else fallback.pause();
     }
 
     @Override
-    public void flush() {
+    public synchronized void flush() {
         if (nativeActive) {
             nativeFlush(nativeHandle);
             try { pipeline.flush(); } catch (Throwable ignored) {}
@@ -460,7 +497,7 @@ public final class AaudioAudioSink implements AudioSink {
     }
 
     @Override
-    public void reset() {
+    public synchronized void reset() {
         if (nativeActive && nativeHandle != 0) {
             nativeClose(nativeHandle);
             nativeHandle = 0;
@@ -474,7 +511,7 @@ public final class AaudioAudioSink implements AudioSink {
     }
 
     @Override
-    public void release() {
+    public synchronized void release() {
         if (released) return;
         released = true;
         if (nativeHandle != 0) {
