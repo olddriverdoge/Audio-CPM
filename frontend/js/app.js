@@ -213,9 +213,42 @@ const App = (() => {
     try {
       await tree.setRoot(p);
       Store.set(K.targetPath, p);
+      renderTreePath(p);
     } catch (e) {
       Utils.toast('目标目录读取失败: ' + e.message, 'err');
     }
+  }
+
+  /* 目标目录的上级路径：保留 local:/ 或 dav:source 前缀。 */
+  function targetParent(p) {
+    const parts = refParts(p);
+    const rest = String(parts.rest || '/').replace(/\/+$/, '');
+    if (!rest || rest === '/') return '';
+    const i = rest.lastIndexOf('/');
+    if (i <= 0) return refPrefix(parts) + '/';
+    return refPrefix(parts) + rest.slice(0, i);
+  }
+
+  function renderTreePath(p) {
+    renderCrumbs('tree-crumbs', p, q => openTargetPath(q).catch(e => Utils.toast('切换路径失败: ' + (e.message || e), 'err')));
+    const up = document.getElementById('tree-up');
+    if (!up) return;
+    const parent = targetParent(p);
+    up.dataset.path = parent || '';
+    up.disabled = !parent;
+    up.title = parent ? ('上级目录：' + parent) : '已在最上层';
+  }
+
+  /* 面包屑/上级入口：已在标签里就切换，不在就新增一个标签。 */
+  async function openTargetPath(p) {
+    if (!p) return;
+    const i = treeRoots.indexOf(p);
+    if (i >= 0) return activateTreeRoot(i);
+    treeRoots.push(p);
+    treeActive = treeRoots.length - 1;
+    saveTreeRoots();
+    renderTreeTabs();
+    return activateTreeRoot(treeActive);
   }
 
   /* 加号：把目标目录树里当前选中的文件夹追加成标签，不再弹输入框。 */
@@ -888,6 +921,23 @@ const App = (() => {
     });
     bindFavs();
     bindTreeTabs();
+    const treeUp = document.getElementById('tree-up');
+    if (treeUp) treeUp.addEventListener('click', async e => {
+      e.preventDefault();
+      const p = treeUp.dataset.path;
+      if (!p) return;
+      try { await openTargetPath(p); Utils.toast('已切换到上级：' + (treeBaseName(p) || p)); }
+      catch (err) { Utils.toast('切换上级失败: ' + (err && err.message || err), 'err'); }
+    });
+    /* 文件浏览选择工具栏：全选 / 清空 / 删除之前没有绑定，按钮点了没反应 */
+    const selAll = document.getElementById('btn-selall');
+    const selClear = document.getElementById('btn-selclear');
+    const selDel = document.getElementById('btn-del');
+    if (selAll) selAll.addEventListener('click', () => { if (bv) bv.selectAll(true); });
+    if (selClear) selClear.addEventListener('click', () => { if (bv) bv.clearSelection(); });
+    if (selDel) selDel.addEventListener('click', () => {
+      if (bv) Promise.resolve(bv.deleteSelected()).catch(e => Utils.toast('删除失败: ' + (e && e.message || e), 'err'));
+    });
     /* 目标目录树头部的“展开/收起”：之前只有函数没有绑定按钮，点了完全没反应 */
     const treeExpand = document.getElementById('tree-expand-one');
     const treeCollapse = document.getElementById('tree-collapse-all');

@@ -509,6 +509,7 @@ function createBrowseView(cfg) {
     setPlayedOnly(v) { st.playedOnly = !!v; render(); },
     selected() { return Array.from(st.sel); },
     count() { return st.sel.size; },
+    selectAll(v) { selectAll(!!v); },
     clearSelection() { st.sel.clear(); st.selMode = false; render(); },
     deleteSelected,
     setSelMode(v) { st.selMode = !!v; render(); },
