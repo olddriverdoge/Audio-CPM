@@ -89,6 +89,9 @@ public class PlaybackService extends MediaSessionService {
         super.onCreate();
         Log.i(TAG, "PlaybackService.onCreate");
         ensureChannel();
+        // 每次新进程启动都清掉上次的诊断残留，避免旧 errorLog 被误当成
+        // 当前播放错误（旧文件只在 onPlayerError 时覆盖，不会自动清空）。
+        clearStaleDiagnostics();
         /*
          * ExoPlayer.Builder 没有公开的 setAudioSink（1.5.x），
          * 官方扩展点是 DefaultRenderersFactory#buildAudioSink。
@@ -327,6 +330,17 @@ public class PlaybackService extends MediaSessionService {
     }
 
     /** 完整堆栈落盘，便于 adb/诊断接口取。 */
+    private void clearStaleDiagnostics() {
+        try {
+            File f = new File(getFilesDir(), "player_error.txt");
+            if (f.exists() && f.delete()) Log.i(TAG, "stale player_error.txt removed");
+            File old = new File(getFilesDir(), "player_error.txt.old");
+            if (old.exists()) old.delete();
+        } catch (Throwable ignored) {
+        }
+        lastError = "";
+    }
+
     private void dumpError(Throwable error) {
         try {
             StringWriter sw = new StringWriter();

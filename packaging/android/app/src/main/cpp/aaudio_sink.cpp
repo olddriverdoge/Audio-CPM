@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <unistd.h>
 #include <cmath>
 #include <algorithm>
 #include <mutex>
@@ -22,6 +23,7 @@ struct Sink {
     int bytesPerFrame = 2;
     int64_t baseFrames = 0;
     bool playing = false;
+    bool paused = false;
     int sharingMode = 0;
     float volume = 1.0f;
 };
@@ -123,6 +125,7 @@ Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativeOpen(
     sink->bytesPerFrame = bytesForFormat(actualFmt) * actualCh;
     sink->baseFrames = 0;
     sink->playing = false;
+    sink->paused = false;
     sink->volume = 1.0f;
     sink->sharingMode = usedSharing;
     setError("");
@@ -134,6 +137,14 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativeStart(JNIEnv *, jclass, jlong handle) {
     Sink *s = sinkOf(handle);
     if (!s) return;
+    // 从 PAUSING 状态立刻 start 在部分 ROM 会返回 INVALID_STATE，
+    // 表现为恢复播放后反复 underrun/一卡一卡；等状态真正到 PAUSED 再启动。
+    s->paused = false;
+    for (int i = 0; i < 50; i++) {
+        auto st = AAudioStream_getState(s->stream);
+        if (st != AAUDIO_STREAM_STATE_PAUSING && st != AAUDIO_STREAM_STATE_STARTING) break;
+        usleep(2000);
+    }
     auto r = AAudioStream_requestStart(s->stream);
     if (r != AAUDIO_OK) {
         setError("AAudio start failed: " + std::to_string(r));
@@ -147,8 +158,16 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativePause(JNIEnv *, jclass, jlong handle) {
     Sink *s = sinkOf(handle);
     if (!s) return;
-    AAudioStream_requestPause(s->stream);
+    // 先标记 paused，避免 pause 未完成时 handleBuffer 里的 auto-start
+    // 又把流拉起来，造成“暂停后自己恢复/恢复后反复卡顿”。
+    s->paused = true;
     s->playing = false;
+    AAudioStream_requestPause(s->stream);
+    // 等 PAUSED 落定再返回，恢复时不会撞上 PAUSING。
+    for (int i = 0; i < 50; i++) {
+        if (AAudioStream_getState(s->stream) == AAUDIO_STREAM_STATE_PAUSED) break;
+        usleep(2000);
+    }
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -159,10 +178,16 @@ Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativeFlush(JNIEnv *, jcl
     // 表现就是拖动/点指定位置后整个 UI 卡死。
     bool wasPlaying = s->playing;
     s->playing = false;
+    if (wasPlaying) s->paused = false; else s->paused = true;
     AAudioStream_requestPause(s->stream);
-    int64_t before = AAudioStream_getFramesWritten(s->stream);
+    for (int i = 0; i < 50; i++) {
+        if (AAudioStream_getState(s->stream) == AAUDIO_STREAM_STATE_PAUSED) break;
+        usleep(2000);
+    }
+    // 用 framesRead 做 seek 后的基准，不能用 framesWritten：
+    // 写入量比实际听到的量多一个硬件缓冲，用 written 会让进度条整体提前。
+    s->baseFrames = AAudioStream_getFramesRead(s->stream);
     AAudioStream_requestFlush(s->stream);
-    s->baseFrames = before;
     if (wasPlaying) {
         auto r = AAudioStream_requestStart(s->stream);
         if (r == AAUDIO_OK) s->playing = true;
@@ -172,7 +197,7 @@ Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativeFlush(JNIEnv *, jcl
 extern "C" JNIEXPORT jint JNICALL
 Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativePendingFrames(JNIEnv *, jclass, jlong handle) {
     Sink *s = sinkOf(handle);
-    if (!s) return 0;
+    if (!s || s->paused) return 0;
     int64_t written = AAudioStream_getFramesWritten(s->stream);
     int64_t read = AAudioStream_getFramesRead(s->stream);
     int64_t pending = written - read;
@@ -212,6 +237,9 @@ Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativeWrite(
 
     int frames = bytes / s->bytesPerFrame;
     if (frames <= 0) return 0;
+    // 暂停期间 ExoPlayer 仍可能补一帧 preroll；直接丢弃，不能在这里 start，
+    // 否则 pause 会被 handleBuffer 的 auto-start 顶回去。
+    if (s->paused) return bytes;
     // 某些调用顺序下 Media3 先写数据、后调用 play()，AAudio 未 start 时 write 会失败或静音。
     // 这里做一次幂等启动，避免“显示播放但没声音”。
     if (!s->playing) {
@@ -253,8 +281,9 @@ Java_com_github_olddriverdoge_audiocpm_AaudioAudioSink_nativePositionUs(JNIEnv *
     Sink *s = sinkOf(handle);
     if (!s) return -1;
     // 不使用 AAudioTimestamp：部分 NDK 版本的 timestamp 类型/API 级别不稳定。
-    // framesWritten 足够支撑 Media3 的进度和 seek 恢复。
-    int64_t frames = AAudioStream_getFramesWritten(s->stream);
+    // framesWritten 是“已提交给硬件”的量，比耳朵听到的多一个缓冲；
+    // framesRead 才是硬件已经消费的量，进度条应与实际声音同步。
+    int64_t frames = AAudioStream_getFramesRead(s->stream);
     int64_t rel = frames - s->baseFrames;
     if (rel < 0) rel = 0;
     return static_cast<jlong>(rel * 1000000LL / s->sampleRate);
