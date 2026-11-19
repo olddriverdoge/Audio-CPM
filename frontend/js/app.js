@@ -239,16 +239,21 @@ const App = (() => {
     up.title = parent ? ('上级目录：' + parent) : '已在最上层';
   }
 
-  /* 面包屑/上级入口：已在标签里就切换，不在就新增一个标签。 */
+  /* 面包屑/上级入口：已在标签里就切换；不在标签里只临时浏览，
+     绝不自动创建快捷按钮。新增只能通过标签栏左侧的 ＋。 */
   async function openTargetPath(p) {
-    if (!p) return;
+    if (!p || !tree) return;
     const i = treeRoots.indexOf(p);
     if (i >= 0) return activateTreeRoot(i);
-    treeRoots.push(p);
-    treeActive = treeRoots.length - 1;
-    saveTreeRoots();
-    renderTreeTabs();
-    return activateTreeRoot(treeActive);
+    try {
+      await tree.setRoot(p);
+      Store.set(K.targetPath, p);
+      renderTreePath(p);
+      const track = document.getElementById('tree-track');
+      if (track) track.textContent = p;
+    } catch (e) {
+      Utils.toast('切换路径失败: ' + (e.message || e), 'err');
+    }
   }
 
   /* 加号：把目标目录树里当前选中的文件夹追加成标签，不再弹输入框。 */
