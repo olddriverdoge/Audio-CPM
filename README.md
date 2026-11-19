@@ -43,14 +43,11 @@ Audio-CPM 的核心不是“再做一个播放器”，而是把日常音乐文�
 - 移动 / 复制 / 撤销，支持同名冲突策略
 - 目标目录树惰性加载，支持新建、重命名、删除空目录
 
-### 批量任务
+### 批处理
 
 - 格式转换
 - 整理标签
 - 替换封面
-- 检查标签
-- SSE 实时进度与任务日志
-- 批处理输出目录支持一键填入当前路径
 
 ### 工作台与场景
 
@@ -89,7 +86,6 @@ Audio-CPM 的核心不是“再做一个播放器”，而是把日常音乐文�
 从 GitHub Releases 下载最新 APK：
 
 - 发布页：<https://github.com/olddriverdoge/Audio-CPM/releases>
-- 当前版本直链：<https://github.com/olddriverdoge/Audio-CPM/releases/download/v0.4.0/Audio-CPM-0.4.0.apk>
 
 APK 使用固定调试签名，适合侧载安装，不是应用商店发布签名。当前只打 `arm64-v8a`。
 
@@ -138,16 +134,6 @@ packaging/tests/           前端回归脚本
 requirements.txt           Python 依赖
 ```
 
-## 文档
-
-- [packaging/docs/HANDOVER.md](packaging/docs/HANDOVER.md)：代码结构、接口契约、运行与排障
-- [packaging/docs/APP_PACKAGING_HANDOFF.md](packaging/docs/APP_PACKAGING_HANDOFF.md)：打包交接与验收
-- [packaging/README.md](packaging/README.md)：当前 Android 构建说明与历史文档索引
-- [packaging/docs/OFFLINE_APP_PLAN_V3.md](packaging/docs/OFFLINE_APP_PLAN_V3.md)：离线 App 业务层方案
-- [packaging/docs/P4A_MIGRATION_PLAN.md](packaging/docs/P4A_MIGRATION_PLAN.md)：p4a 路线历史存档
-- [packaging/docs/PACKAGING_OPTIONS_WEBTOAPP_P4A.md](packaging/docs/PACKAGING_OPTIONS_WEBTOAPP_P4A.md)：壳选型对比历史存档
-
-> `packaging/docs/` 中的 p4a、WebToApp 等文档是路线评估记录，当前实际构建以 Gradle + Chaquopy 工程为准。
 
 ## 当前限制
 
