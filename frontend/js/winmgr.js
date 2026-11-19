@@ -339,12 +339,14 @@ const WinMgr = (() => {
       const start = Number.isFinite(Number(baseScale)) ? Number(baseScale) : cur;
       const damped = 1 + (factor - 1) * MODULE_ZOOM_GAIN;
       const next = Math.max(0.5, Math.min(3, start * damped));
-      const f = cur > 0 ? next / cur : 1;
+      // base 是手势开始时的视觉 rect；宽高/位置必须按“相对起点”的总比例算，
+      // 不能用相邻两次的增量 f，否则第二个 touchmove 起尺寸会从错误基准累加。
+      const total = start > 0 ? next / start : 1;
       const p = canvasPan();
-      const nw = Math.max(minW, base.w * f);
-      const nh = Math.max(minH, base.h * f);
-      const nx = base.x + (sx - p.x - base.x) * (1 - f);
-      const ny = base.y + (sy - p.y - base.y) * (1 - f);
+      const nw = Math.max(minW, base.w * total);
+      const nh = Math.max(minH, base.h * total);
+      const nx = base.x + (sx - p.x - base.x) * (1 - total);
+      const ny = base.y + (sy - p.y - base.y) * (1 - total);
       win.style.setProperty('--win-scale', String(Math.round(next * 1000) / 1000));
       rect = clampRect({x: nx, y: ny, w: nw, h: nh}, minW, minH);
       if (contentSized) {
