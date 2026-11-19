@@ -193,11 +193,12 @@ const App = (() => {
   function renderTreeTabs() {
     const box = document.getElementById('tree-tabs');
     if (!box) return;
-    box.innerHTML = treeRoots.map((p, i) =>
-      '<button type="button" class="tree-tab' + (i === treeActive ? ' active' : '') +
-      '" data-i="' + i + '" title="' + Utils.escapeHtml(p) + '">' +
-      Utils.escapeHtml(treeBaseName(p)) + '</button>').join('') +
-      '<button type="button" class="tree-tab tree-tab-add" id="tree-tab-add" title="新增目标目录标签">＋</button>';
+    box.innerHTML =
+      '<button type="button" class="tree-tab tree-tab-add" id="tree-tab-add" title="把目标目录里选中的文件夹加为标签">＋</button>' +
+      treeRoots.map((p, i) =>
+        '<button type="button" class="tree-tab' + (i === treeActive ? ' active' : '') +
+        '" data-i="' + i + '" title="' + Utils.escapeHtml(p) + '">' +
+        Utils.escapeHtml(treeBaseName(p)) + '</button>').join('');
     const track = document.getElementById('tree-track');
     if (track) track.textContent = treeRoots[treeActive] || '';
   }
@@ -217,6 +218,81 @@ const App = (() => {
     }
   }
 
+  /* 加号：把目标目录树里当前选中的文件夹追加成标签，不再弹输入框。 */
+  async function addSelectedTreeRoot() {
+    const p = tree && tree.selected;
+    if (!p) { Utils.toast('先在目标目录里选中一个文件夹', 'warn'); return; }
+    const i = treeRoots.indexOf(p);
+    if (i >= 0) {
+      await activateTreeRoot(i);
+      Utils.toast('该文件夹已在目标目录标签里');
+      return;
+    }
+    treeRoots.push(p);
+    treeActive = treeRoots.length - 1;
+    saveTreeRoots();
+    renderTreeTabs();
+    await activateTreeRoot(treeActive);
+    Utils.toast('已加入目标目录：' + (treeBaseName(p) || p));
+  }
+
+  /* 目标目录标签：点击切换；长按删除（不显示 ✕，避免误触）。 */
+  function deleteTreeRoot(i) {
+    if (i < 0 || i >= treeRoots.length) return;
+    if (treeRoots.length <= 1) {
+      Utils.toast('至少保留一个目标目录', 'warn');
+      return;
+    }
+    const oldActive = treeActive;
+    const oldPath = treeRoots[i];
+    treeRoots.splice(i, 1);
+    if (i < oldActive) treeActive--;
+    else if (i === oldActive) treeActive = Math.min(i, treeRoots.length - 1);
+    saveTreeRoots();
+    renderTreeTabs();
+    if (i === oldActive) activateTreeRoot(treeActive).catch(() => {});
+    Utils.toast('已移除目标目录：' + (treeBaseName(oldPath) || oldPath));
+  }
+
+  function bindTreeTabs() {
+    const box = document.getElementById('tree-tabs');
+    if (!box) return;
+    let holdTimer = null, holdStart = null, holdEl = null, suppressClickUntil = 0;
+    const clearHold = () => {
+      if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+      holdStart = null; holdEl = null;
+    };
+    box.addEventListener('pointerdown', e => {
+      const el = e.target.closest('.tree-tab[data-i]');
+      if (!el) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      holdStart = {x: e.clientX, y: e.clientY};
+      holdEl = el;
+      clearTimeout(holdTimer);
+      holdTimer = setTimeout(() => {
+        holdTimer = null;
+        if (!holdStart || !holdEl) return;
+        suppressClickUntil = Date.now() + 500;
+        deleteTreeRoot(Number(holdEl.dataset.i));
+        try { if (navigator.vibrate) navigator.vibrate(30); } catch (_) {}
+      }, 500);
+    });
+    box.addEventListener('pointermove', e => {
+      if (!holdStart) return;
+      if (Math.abs(e.clientX - holdStart.x) > 10 || Math.abs(e.clientY - holdStart.y) > 10) clearHold();
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => box.addEventListener(t, clearHold));
+    box.addEventListener('contextmenu', e => {
+      if (e.target.closest('.tree-tab[data-i]')) e.preventDefault();
+    });
+    box.addEventListener('click', e => {
+      if (Date.now() < suppressClickUntil) { e.preventDefault(); e.stopPropagation(); return; }
+      if (e.target.closest('#tree-tab-add')) { addSelectedTreeRoot(); return; }
+      const tab = e.target.closest('.tree-tab[data-i]');
+      if (tab) activateTreeRoot(Number(tab.dataset.i));
+    }, true);
+  }
+
   /* ---- 文件浏览快捷入口（收藏当前目录） ---- */
   function favKey() { return 'ac2_favs_' + curSourceId(); }
   function favs() {
@@ -230,14 +306,13 @@ const App = (() => {
     const list = favs();
     const cur = currentPath;
     bar.innerHTML =
+      '<button type="button" class="fav-add" id="fav-add" title="收藏当前目录">+</button>' +
       '<div class="fav-scroll">' +
       list.map((p, i) =>
         '<button type="button" class="tree-tab fav-chip' + (p === cur ? ' active' : '') +
         '" data-fav="' + i + '" title="' + Utils.escapeHtml(p) + '">' +
-        '<b>' + Utils.escapeHtml(treeBaseName(p) || p) + '</b>' +
-        '<i data-fav-del="' + i + '" title="移除">✕</i></button>').join('') +
-      '</div>' +
-      '<button type="button" class="fav-add" id="fav-add" title="收藏当前目录">+</button>';
+        '<b>' + Utils.escapeHtml(treeBaseName(p) || p) + '</b></button>').join('') +
+      '</div>';
   }
   function addFavCurrent() {
     const uri = currentPath;
@@ -252,21 +327,50 @@ const App = (() => {
   function bindFavs() {
     const bar = document.getElementById('fav-bar');
     if (!bar) return;
-    bar.addEventListener('click', e => {
-      const del = e.target.closest('[data-fav-del]');
-      if (del) {
-        e.stopPropagation();
+    let holdTimer = null, holdStart = null, holdEl = null, suppressClickUntil = 0;
+    const clearHold = () => {
+      if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+      holdStart = null; holdEl = null;
+    };
+    bar.addEventListener('pointerdown', e => {
+      const chip = e.target.closest('.fav-chip[data-fav]');
+      if (!chip) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      holdStart = {x: e.clientX, y: e.clientY};
+      holdEl = chip;
+      clearTimeout(holdTimer);
+      holdTimer = setTimeout(() => {
+        holdTimer = null;
+        if (!holdStart || !holdEl) return;
+        suppressClickUntil = Date.now() + 500;
         const list = favs();
-        list.splice(Number(del.dataset.favDel), 1);
-        saveFavs(list); renderFavs(); return;
-      }
+        const i = Number(holdEl.dataset.fav);
+        if (i >= 0 && i < list.length) {
+          const p = list.splice(i, 1)[0];
+          saveFavs(list);
+          renderFavs();
+          Utils.toast('已移除收藏：' + (treeBaseName(p) || p));
+          try { if (navigator.vibrate) navigator.vibrate(30); } catch (_) {}
+        }
+      }, 500);
+    });
+    bar.addEventListener('pointermove', e => {
+      if (!holdStart) return;
+      if (Math.abs(e.clientX - holdStart.x) > 10 || Math.abs(e.clientY - holdStart.y) > 10) clearHold();
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => bar.addEventListener(t, clearHold));
+    bar.addEventListener('contextmenu', e => {
+      if (e.target.closest('.fav-chip')) e.preventDefault();
+    });
+    bar.addEventListener('click', e => {
+      if (Date.now() < suppressClickUntil) { e.preventDefault(); e.stopPropagation(); return; }
       if (e.target.closest('#fav-add')) { addFavCurrent(); return; }
       const chip = e.target.closest('.fav-chip');
       if (chip) {
         const p = favs()[Number(chip.dataset.fav)];
         if (p) loadDir(p).catch(err => Utils.toast('打开失败: ' + (err && err.message || err), 'err'));
       }
-    });
+    }, true);
   }
 
   /* 一键把当前浏览目录加进目标目录（与现有标签去重，直接切过去） */
@@ -783,6 +887,7 @@ const App = (() => {
       onTreeChanged: () => MoveMgr.update()
     });
     bindFavs();
+    bindTreeTabs();
     /* 目标目录树头部的“展开/收起”：之前只有函数没有绑定按钮，点了完全没反应 */
     const treeExpand = document.getElementById('tree-expand-one');
     const treeCollapse = document.getElementById('tree-collapse-all');
