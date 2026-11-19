@@ -39,7 +39,7 @@ function createPlayPanel() {
     const m = Player.meta || {title: tr('未在播放'), artist: '', album: ''};
     const rawTitle = m.title || Utils.basename(Player.current) || '未在播放';
     titleEl.textContent = (rawTitle === '未在播放') ? tr('未在播放') : rawTitle;
-    const sub = [m.artist, m.album].filter(Boolean).join(' · ');
+    const sub = [m.artist, m.composer, m.album].filter(Boolean).join(' · ');
     subEl.textContent = sub || (Player.current ? '' : tr('从文件浏览里点一首开始'));
     trackEl.textContent = Player.current ? Utils.basename(Player.current) : tr('未在播放');
     const p = Player.current || '';

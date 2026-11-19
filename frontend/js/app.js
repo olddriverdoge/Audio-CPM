@@ -435,6 +435,18 @@ const App = (() => {
     const hdr = document.getElementById('app-hdr');
     if (!hand || !lock || !hdr) return;
     let locked = false, pinch = null, pan0 = null;
+    function moduleAt(x, y) {
+      // ui-lock 盖在所有模块之上，elementFromPoint 只会返回它；
+      // elementsFromPoint 能继续看到下面的模块，用于把双指缩放代理到具体窗口。
+      try {
+        const stack = document.elementsFromPoint(x, y) || [];
+        for (const el of stack) {
+          const w = el.closest && el.closest('.fw-win,.play-float,.audio-float,.meta-float,.spectrum-float,.log-float');
+          if (w && !w.classList.contains('hidden')) return w;
+        }
+      } catch (_) {}
+      return null;
+    }
     function positionLock() {
       lock.style.top = Math.round(hdr.getBoundingClientRect().bottom) + 'px';
     }
@@ -449,10 +461,16 @@ const App = (() => {
     }
     function finishPinch(e) {
       if (pinch) {
-        const s = currentUiScale();
+        const target = pinch.targetCtl;
         pinch = null;
-        commitUiScale(s);
-        commitCanvas();
+        if (target) {
+          // 只缩放当前模块：不写全局 --ui-scale，其他模块完全不动。
+          try { target.persist(); } catch (_) {}
+        } else {
+          const s = currentUiScale();
+          commitUiScale(s);
+          commitCanvas();
+        }
       }
       if (pan0 && (!e || !e.touches || e.touches.length === 0)) {
         pan0 = null;
@@ -464,7 +482,7 @@ const App = (() => {
       locked = !!on;
       hand.classList.toggle('on', locked);
       hand.setAttribute('aria-pressed', locked ? 'true' : 'false');
-      hand.title = locked ? '整体缩放（已锁定，双指缩放 50%–300%）' : '整体缩放';
+      hand.title = locked ? '整体缩放（双指在模块上缩放该模块，空白处缩放整体）' : '整体缩放';
       const lbl = hand.querySelector('.b-lbl');
       if (lbl) lbl.textContent = '整体缩放';
       if (locked) {
@@ -472,7 +490,7 @@ const App = (() => {
         lock.classList.remove('hidden');
         lock.setAttribute('aria-hidden', 'false');
         document.body.classList.add('ui-locked');
-        Utils.toast('工作台已锁定：单指平移，双指缩放 50%–300%');
+        Utils.toast('工作台已锁定：单指平移；双指在模块上缩放该模块，空白处缩放整体');
       } else {
         finishPinch(null);
         lock.classList.add('hidden');
@@ -496,17 +514,26 @@ const App = (() => {
       e.preventDefault();
       pan0 = null;
       const p = canvasPan();
-      pinch = {d: dist(e.touches), scale: currentUiScale(), cx: p.x, cy: p.y,
-               mx: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-               my: (e.touches[0].clientY + e.touches[1].clientY) / 2};
+      const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      const targetWin = moduleAt(mx, my);
+      const targetCtl = targetWin ? WinMgr.find(targetWin) : null;
+      if (targetCtl && !targetCtl.rect) { try { targetCtl.apply(); } catch (_) {} }
+      pinch = {d: dist(e.touches), scale: currentUiScale(), cx: p.x, cy: p.y, mx, my,
+               targetWin, targetCtl,
+               baseRect: targetCtl && targetCtl.rect ? Object.assign({}, targetCtl.rect) : null};
     }, {passive: false});
     lock.addEventListener('touchmove', e => {
       if (pinch && e.touches.length >= 2) {
         e.preventDefault();
         const ratio = dist(e.touches) / pinch.d;
-        const s = Math.max(UI_SCALE_MIN, Math.min(UI_SCALE_MAX, pinch.scale * ratio));
         const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
         const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        if (pinch.targetCtl && pinch.baseRect) {
+          WinMgr.zoomWindow(pinch.targetWin, pinch.baseRect, ratio, mx, my);
+          return;
+        }
+        const s = Math.max(UI_SCALE_MIN, Math.min(UI_SCALE_MAX, pinch.scale * ratio));
         // 以双指中心为锚点缩放：中心下面的画布内容保持不动，实现局部放大。
         const ax = (pinch.mx - pinch.cx) / pinch.scale;
         const ay = (pinch.my - pinch.cy) / pinch.scale;
@@ -748,6 +775,17 @@ const App = (() => {
       container: document.getElementById('tree'),
       onSelect: () => MoveMgr.update(),
       onTreeChanged: () => MoveMgr.update()
+    });
+    /* 目标目录树头部的“展开/收起”：之前只有函数没有绑定按钮，点了完全没反应 */
+    const treeExpand = document.getElementById('tree-expand-one');
+    const treeCollapse = document.getElementById('tree-collapse-all');
+    if (treeExpand) treeExpand.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      if (tree) tree.expandOneLevel();
+    });
+    if (treeCollapse) treeCollapse.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      if (tree) tree.collapseAll();
     });
     metaFloat = createMetaFloat();
     /* 元数据 / 频谱 / 日志：同样交给 WinMgr，标题拖动、双指缩放、点击置顶一致 */

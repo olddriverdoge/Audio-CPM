@@ -7,6 +7,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.media.AudioDeviceInfo;
 import android.media.AudioManager;
+import android.media.MediaMetadataRetriever;
 import android.os.PowerManager;
 import android.content.Intent;
 import android.os.Build;
@@ -44,6 +45,8 @@ public class PlaybackService extends MediaSessionService {
     private static volatile int audioSessionId = 0;
     private static volatile int preferredDeviceId = 0;
     private PowerManager.WakeLock wakeLock;
+    private volatile String metaPath = "";
+    private volatile String[] metaCache = null;
 
     /** 频谱旁路：挂在 AudioSink 上只读 PCM，不改音频数据 */
     private final SpectrumProcessor spectrum = new SpectrumProcessor();
@@ -252,14 +255,52 @@ public class PlaybackService extends MediaSessionService {
         }
     }
 
+    private String[] metadataFor(String path) {
+        if (path != null && path.equals(metaPath) && metaCache != null) return metaCache;
+        String[] tags = new String[4];
+        MediaMetadataRetriever r = null;
+        try {
+            r = new MediaMetadataRetriever();
+            r.setDataSource(path);
+            tags[0] = trimTag(r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE));
+            tags[1] = trimTag(r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST));
+            tags[2] = trimTag(r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_COMPOSER));
+            tags[3] = trimTag(r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM));
+        } catch (Throwable ignored) {
+        } finally {
+            if (r != null) { try { r.release(); } catch (Throwable ignored) {} }
+        }
+        metaPath = path == null ? "" : path;
+        metaCache = tags;
+        return tags;
+    }
+
+    private static String trimTag(String value) { return value == null ? "" : value.trim(); }
+
+    private static String joinMeta(String... parts) {
+        StringBuilder sb = new StringBuilder();
+        for (String s : parts) {
+            if (s == null || s.trim().isEmpty()) continue;
+            if (sb.length() > 0) sb.append(" · ");
+            sb.append(s.trim());
+        }
+        return sb.toString();
+    }
+
     private Notification buildNotification(MediaSession session) {
         Player p = session.getPlayer();
         String title = "Audio-CPM";
+        String metaLine = "Audio-CPM · HiFi";
         try {
             MediaItem mi = p.getCurrentMediaItem();
             if (mi != null && mi.localConfiguration != null && mi.localConfiguration.uri != null) {
                 String path = mi.localConfiguration.uri.getPath();
-                if (path != null) title = new File(path).getName();
+                if (path != null) {
+                    String[] tags = metadataFor(path);
+                    title = tags[0].isEmpty() ? new File(path).getName() : tags[0];
+                    String line = joinMeta(tags[1], tags[2], tags[3]);
+                    if (!line.isEmpty()) metaLine = line;
+                }
             }
         } catch (Throwable ignored) {
         }
@@ -273,7 +314,7 @@ public class PlaybackService extends MediaSessionService {
         NotificationCompat.Builder b = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_media_play)
                 .setContentTitle(title)
-                .setContentText("Audio-CPM · HiFi")
+                .setContentText(metaLine)
                 .setContentIntent(content)
                 .setOngoing(playing)
                 .setOnlyAlertOnce(true)

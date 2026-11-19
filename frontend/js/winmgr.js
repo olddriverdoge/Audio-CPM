@@ -325,11 +325,34 @@ const WinMgr = (() => {
     obs.observe(win, {attributes: true, attributeFilter: ['class']});
 
     if (!win.classList.contains('hidden')) apply();   // 收起时量不到尺寸，等展开由 observer 夹取
+    /* 只缩放当前窗口：双指在某个模块上捏合时由手形锁代理到这里，
+       不修改全局 --ui-scale，其他模块保持原样。 */
+    function zoomAt(base, factor, sx, sy) {
+      if (!rect || !base) return;
+      const z = uiScale();
+      const p = canvasPan();
+      const ax = (sx - p.x) / z, ay = (sy - p.y) / z;
+      const nw = Math.max(minW, base.w * factor);
+      const nh = Math.max(minH, base.h * factor);
+      const nx = ax - (ax - base.x) * factor;
+      const ny = ay - (ay - base.y) * factor;
+      rect = clampRect({x: nx, y: ny, w: nw, h: nh}, minW, minH);
+      if (contentSized) {
+        win.style.left = Math.round(rect.x) + 'px';
+        win.style.top = Math.round(rect.y) + 'px';
+      } else {
+        setRect(win, rect);
+      }
+      if (opts.onRectChange) { try { opts.onRectChange(rect); } catch (_) {} }
+    }
     const ctl = {
+      win,
       apply,
       refresh,
       sync,
       fit,
+      zoomAt,
+      persist: () => persist(),
       raise: () => raise(win),
       get rect() { return rect; }
     };
@@ -356,5 +379,10 @@ const WinMgr = (() => {
 
   function reapplyAll() { regs.forEach(r => { try { r.refresh(); } catch (_) {} }); }
   function syncRects() { regs.forEach(r => { try { r.sync(); } catch (_) {} }); }
-  return {register, raise, reclampAll, reapplyAll, syncRects, bounds};
+  function find(win) { return regs.find(r => r.win === win) || null; }
+  function zoomWindow(win, base, factor, sx, sy) {
+    const c = find(win);
+    if (c) c.zoomAt(base, factor, sx, sy);
+  }
+  return {register, raise, reclampAll, reapplyAll, syncRects, bounds, find, zoomWindow};
 })();
