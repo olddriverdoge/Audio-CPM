@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全漏洞报告
+    url: https://github.com/olddriverdoge/Audio-CPM/security/advisories/new
+    about: 请勿在公开 Issue 中报告安全漏洞；使用 GitHub 私密漏洞报告。
+  - name: 贡献指南
+    url: https://github.com/olddriverdoge/Audio-CPM/blob/main/CONTRIBUTING.md
+    about: 开发环境、测试、提交规范与 PR 流程。
+  - name: 使用与构建文档
+    url: https://github.com/olddriverdoge/Audio-CPM#readme
+    about: 安装 APK、源码运行、构建和当前限制。
