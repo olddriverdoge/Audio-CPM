@@ -50,8 +50,14 @@ UI 等待 7 秒：无更新横幅、无 page error，目录和其他功能不受
 
 ![更新设置与横幅](assets/update-settings-zh.png)
 
+## 构建与测试通道
+
+- GitHub Actions run `44757459798` 成功（提交 `c299d99`），debug APK 构建和 “Publish debug build to debug-latest” 步骤均通过。
+- 测试通道资产：`Audio-CPM-0.5.4-84-debug.apk`，22,574,727 字节，SHA256 `9d653d6513d0cf4e4e521b1007a1ba78b379c34007c9be3f0b0d85edf80b2cc2`。
+- APK 包名 `com.github.olddriverdoge.audiocpm.dev`，versionName `0.5.4`，versionCode `84`，因此会走 test 通道。
+- 用真实 Release 数据验证：release 通道选中 `Audio-CPM-0.4.33.apk`（不更新）；test 通道选中 `Audio-CPM-0.5.4-84-debug.apk`（0.5.3 更新、0.5.4 不更新）。
+
 ## 未覆盖 / 边界
 
 - 真实 Android `DownloadManager`、通知栏、APK 手动安装、WebView JS 桥尚未真机验证。
-- `debug-latest` 的版本化资产发布依赖 CI 实跑；“Publish debug build to debug-latest”步骤尚未在真实 GitHub Actions 上验证。
-- 0.5.4 尚未构建 APK；当前截图是浏览器 UI 回归视图。
+- 截图是 Chromium 移动视口回归视图，不是 Android 真机截图。
