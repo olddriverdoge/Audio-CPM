@@ -1,0 +1,3 @@
+0.5.1.1 hotfix:
+- Do not enumerate audio devices during startup; load them only when the Audio Output panel opens
+- Use reflection for the Android 13+ routing API to avoid class-load failures on older ROMs

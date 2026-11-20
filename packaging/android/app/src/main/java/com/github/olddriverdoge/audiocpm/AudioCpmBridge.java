@@ -125,21 +125,33 @@ public class AudioCpmBridge {
      * 从已连接 sink 里推断（USB/有线 > 蓝牙 > 扬声器），至少蓝牙不会再被显示成“系统默认”。
      */
     private static int activeOutputDeviceId(AudioManager am, AudioDeviceInfo[] devices) {
-        int selected = PlaybackService.getPreferredDeviceId();
+        int selected = preferredDeviceId();
         if (selected > 0) {
             for (AudioDeviceInfo d : devices) {
                 if (d.getId() == selected && d.isSink()) return selected;
             }
         }
+        /*
+         * 直接写 AudioManager.getAudioDevicesForAttributes(...) 会在部分旧 ART/ROM 的
+         * 类校验阶段解析不到 API 33 方法，表现为 App 启动黑屏。改成反射调用：
+         * 方法不存在时只是走下面的设备优先级回退，不会影响类加载。
+         */
         if (Build.VERSION.SDK_INT >= 33) {
             try {
                 AudioAttributes attrs = new AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_MEDIA)
                         .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                         .build();
-                List<AudioDeviceInfo> routed = am.getAudioDevicesForAttributes(attrs);
-                for (AudioDeviceInfo d : routed) {
-                    if (d != null && d.isSink()) return d.getId();
+                java.lang.reflect.Method routeMethod =
+                        AudioManager.class.getMethod("getAudioDevicesForAttributes", AudioAttributes.class);
+                Object routedObj = routeMethod.invoke(am, attrs);
+                if (routedObj instanceof List) {
+                    for (Object item : (List<?>) routedObj) {
+                        if (item instanceof AudioDeviceInfo) {
+                            AudioDeviceInfo d = (AudioDeviceInfo) item;
+                            if (d.isSink()) return d.getId();
+                        }
+                    }
                 }
             } catch (Throwable ignored) {}
         }
@@ -171,6 +183,18 @@ public class AudioCpmBridge {
         }
     }
 
+    /** 读取用户上次选择的设备；只读偏好，不触发 PlaybackService 类加载。 */
+    private static int preferredDeviceId() {
+        try {
+            Context c = AudioCpmApp.get();
+            if (c == null) return 0;
+            return Math.max(0, c.getSharedPreferences("ac2_audio_state", Context.MODE_PRIVATE)
+                    .getInt("preferred_device", 0));
+        } catch (Throwable ignored) {
+            return 0;
+        }
+    }
+
     /** 可用输出设备：USB DAC / 有线 / 蓝牙 / 扬声器。只返回 sink 设备。 */
     public static String audioDevices() {
         try {
@@ -195,7 +219,7 @@ public class AudioCpmBridge {
                 sb.append("],\"channels\":[");
                 int[] ch = d.getChannelCounts();
                 for (int i = 0; i < ch.length; i++) { if (i > 0) sb.append(','); sb.append(ch[i]); }
-                sb.append("],\"preferred\":").append(d.getId() == PlaybackService.getPreferredDeviceId())
+                sb.append("],\"preferred\":").append(d.getId() == preferredDeviceId())
                         .append(",\"active\":").append(d.getId() == activeId).append('}');
             }
             sb.append(']');
