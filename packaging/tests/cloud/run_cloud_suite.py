@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import os
 import shutil
 import socket
@@ -38,6 +40,57 @@ def free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         return int(s.getsockname()[1])
+
+
+def start_update_feed():
+    """本地假 GitHub feed，保证更新检查测试不依赖公网/限流。"""
+    release = {
+        "tag_name": "v0.5.3",
+        "name": "Audio-CPM 0.5.3",
+        "body": "Release fixture",
+        "html_url": "https://github.com/olddriverdoge/Audio-CPM/releases/tag/v0.5.3",
+        "published_at": "2026-11-20T10:00:00Z",
+        "prerelease": False,
+        "assets": [{
+            "name": "Audio-CPM-0.5.3.apk",
+            "browser_download_url": "https://github.com/olddriverdoge/Audio-CPM/releases/download/v0.5.3/Audio-CPM-0.5.3.apk",
+            "size": 1000,
+            "updated_at": "2026-11-20T10:00:00Z",
+        }],
+    }
+    test = {
+        "tag_name": "debug-latest",
+        "name": "Audio-CPM debug 0.5.4",
+        "body": "Debug fixture",
+        "html_url": "https://github.com/olddriverdoge/Audio-CPM/releases/tag/debug-latest",
+        "published_at": "2026-11-20T10:00:00Z",
+        "prerelease": True,
+        "assets": [{
+            "name": "Audio-CPM-0.5.4-84-debug.apk",
+            "browser_download_url": "https://github.com/olddriverdoge/Audio-CPM/releases/download/debug-latest/Audio-CPM-0.5.4-84-debug.apk",
+            "size": 1000,
+            "updated_at": "2026-11-20T10:00:00Z",
+        }],
+    }
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            data = release if self.path.startswith("/release.json") else test
+            body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    port = free_port()
+    srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    th = threading.Thread(target=srv.serve_forever, daemon=True)
+    th.start()
+    return srv, f"http://127.0.0.1:{port}"
 
 
 def wait_backend(base: str, proc: subprocess.Popen, timeout: float = 30.0):
@@ -87,6 +140,8 @@ def main() -> int:
         traceback.print_exc()
         return 2
 
+    feed_server, feed_base = start_update_feed()
+
     env = os.environ.copy()
     env.update({
         "AC2_ROOT": str(root),
@@ -95,6 +150,13 @@ def main() -> int:
         "AC2_PORT": str(port),
         "AC2_HOST": "127.0.0.1",
         "PYTHONUNBUFFERED": "1",
+        # 更新检查固定到本地假 feed，避免公网 GitHub 限流影响回归结果。
+        "AC2_APP_VERSION": "0.5.3",
+        "AC2_APP_VERSION_CODE": "83",
+        "AC2_UPDATE_CHANNEL": "release",
+        "AC2_UPDATE_RELEASE_FEED": feed_base + "/release.json",
+        "AC2_UPDATE_TEST_FEED": feed_base + "/test.json",
+        "AC2_UPDATE_CACHE_TTL": "600",
     })
     log_handle = open(server_log, "w", encoding="utf-8")
     try:
@@ -150,6 +212,11 @@ def main() -> int:
             except Exception:
                 server.kill()
         log_handle.close()
+        try:
+            feed_server.shutdown()
+            feed_server.server_close()
+        except Exception:
+            pass
         if not args.keep:
             shutil.rmtree(temp, ignore_errors=True)
 

@@ -8,6 +8,7 @@ ac2_ui_config.json
 ac2_storage.json
 ac2_presets.json
 ac2_tasks.json
+ac2_update_cache.json
 local:/
 
 # build outputs

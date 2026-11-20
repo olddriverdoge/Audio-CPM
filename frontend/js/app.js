@@ -913,6 +913,7 @@ const App = (() => {
     if (typeof Logs !== 'undefined') Logs.init();
     Layout.init();
     Settings.init();
+    if (typeof UpdateChecker !== 'undefined') UpdateChecker.init();
     Columns.bindSheet();
     const columns1 = Columns.create(K.columns);
     bv = createBrowseView({
@@ -1096,6 +1097,11 @@ const App = (() => {
       softResume();
     });
     window.addEventListener('focus', softResume);
+
+    // 更新检查完全异步：启动后延迟触发，不阻塞目录、播放或任何首屏交互。
+    if (typeof UpdateChecker !== 'undefined') {
+      setTimeout(() => { try { UpdateChecker.autoCheck(); } catch (_) {} }, 2500);
+    }
   }
 
   async function defaultRoot() {

@@ -69,6 +69,12 @@ const Api = (() => {
     audioInfo: () => jfetch('/api/audio/info'),
     audioDevices: () => jfetch('/api/audio/devices'),
     setAudioDevice: id => jpost('/api/audio/device', {id: Number(id) || 0}),
-    renamePreview: cfg => jpost('/api/tasks/rename-preview', cfg)
+    renamePreview: cfg => jpost('/api/tasks/rename-preview', cfg),
+    appUpdate: force => {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 6000);
+      return jfetch('/api/app_update' + (force ? '?force=1' : ''), {signal: ctrl.signal})
+        .finally(() => clearTimeout(timer));
+    }
   };
 })();

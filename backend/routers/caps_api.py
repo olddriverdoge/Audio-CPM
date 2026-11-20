@@ -8,6 +8,7 @@ from starlette.routing import Route
 from ..simple import J
 from .. import ffbin
 from .. import native_bridge
+from ..update import app_meta
 
 routes = []
 logger = logging.getLogger("ac2.caps")
@@ -39,6 +40,7 @@ async def api_capabilities(request: Request):
     caps['hifi'] = native_bridge.playback_available()
     caps['notification'] = native_bridge.playback_available()
     caps['android'] = ffbin.is_android()
+    caps.update(app_meta())
     return J(caps)
 
 

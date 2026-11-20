@@ -6,7 +6,7 @@
 
 Audio-CPM 是一个面向 Android 本地与 WebDAV 音乐库的音频管理、播放和整理工作台。它把目录浏览、播放、标签/封面查看、批量转换、元数据整理和文件移动放进同一套可自定义的浮窗界面，适合管理手机、SD 卡或 NAS 上的音乐收藏。
 
-当前版本：**0.5.3**（`versionCode 83`，`minSdk 24`，`arm64-v8a`）。
+当前版本：**0.5.4**（`versionCode 84`，`minSdk 24`，`arm64-v8a`）。
 
 ## 为什么是 Audio-CPM
 
@@ -110,6 +110,10 @@ Audio-CPM 不只是“再做一个播放器”。它把日常音乐文件处理�
 发布 APK 使用固定调试签名，适合侧载安装，**不是应用商店发布签名**。当前只提供 `arm64-v8a`。
 
 Android 11+ 若需要访问 `/sdcard` 任意目录，需要在系统设置中授予“所有文件访问权限”；Android 13+ 读取媒体库还需要音频读取权限。
+
+### App 内更新检查
+
+App 会在启动后异步检查更新，不阻塞首屏。正式发布包查 GitHub 的 `releases/latest`；debug / `.dev` / Action 测试包查 `releases/tags/debug-latest`，测试资产名为 `Audio-CPM-<versionName>-<versionCode>-debug.apk`。网络不可用、GitHub 限流或超时只会显示“检查失败”，不会卡住 App；设置页仍可手动重试，下载交给 Android `DownloadManager`。
 
 ### 从源码运行（Termux / PC）
 

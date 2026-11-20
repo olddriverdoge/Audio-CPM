@@ -1,5 +1,8 @@
 name: build-audio-cpm
 
+permissions:
+  contents: write
+
 on:
   workflow_dispatch:
     inputs:
@@ -155,6 +158,29 @@ jobs:
         with:
           name: audio-cpm-apk
           path: packaging/android/app/build/outputs/apk/debug/*.apk
+
+      - name: Publish debug build to debug-latest
+        if: ${{ github.ref_type != 'tag' && github.event.inputs.build_release != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION=$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' packaging/android/app/build.gradle.kts | head -1)
+          CODE=$(sed -n 's/.*versionCode = \([0-9]*\).*/\1/p' packaging/android/app/build.gradle.kts | head -1)
+          test -n "$VERSION" -a -n "$CODE"
+          SRC="packaging/android/app/build/outputs/apk/debug/Audio-CPM-debug.apk"
+          ASSET="Audio-CPM-${VERSION}-${CODE}-debug.apk"
+          test -f "$SRC"
+          cp "$SRC" "$ASSET"
+          NOTES="测试通道最新 Action 构建：${VERSION} / versionCode ${CODE}。正式版请使用 GitHub Release。"
+          if gh release view debug-latest >/dev/null 2>&1; then
+            gh release upload debug-latest "$ASSET" --clobber
+            gh release edit debug-latest --prerelease --title "Audio-CPM debug ${VERSION} (${CODE})" --notes "$NOTES"
+          else
+            gh release create debug-latest "$ASSET" --prerelease --title "Audio-CPM debug ${VERSION} (${CODE})" --notes "$NOTES"
+          fi
+          echo "published debug-latest asset: $ASSET"
+
 
       - uses: actions/upload-artifact@v4
         if: ${{ github.ref_type == 'tag' || github.event.inputs.build_release == 'true' }}

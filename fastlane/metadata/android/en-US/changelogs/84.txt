@@ -1,0 +1,3 @@
+0.5.4:
+- Added in-app update checks and download prompts; a failed check never blocks the app.
+- Release builds check GitHub Releases; test builds check the debug-latest Action build.

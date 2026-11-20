@@ -520,6 +520,29 @@ class ApiRegression:
         self.check("task SSE stream", task_stream)
 
     # ---------- Android bridge fallbacks ----------
+    def test_update_api(self):
+        def release_channel():
+            d = self.jget("/api/app_update?channel=release&force=1")
+            self.require(d.get("ok") is True, f"release update endpoint: {d}")
+            self.require(d.get("channel") == "release", f"channel: {d}")
+            self.require(d.get("current_version") == "0.5.3", f"current: {d}")
+            self.require(d.get("update_available") is False, f"same release should not update: {d}")
+            return "release feed: 0.5.3, up to date"
+        self.check("update check: release feed matches current", release_channel)
+
+        def test_channel():
+            d = self.jget("/api/app_update?channel=test&force=1")
+            self.require(d.get("ok") is True, f"test update endpoint: {d}")
+            self.require(d.get("channel") == "test", f"channel: {d}")
+            self.require(d.get("update_available") is True, f"test build should update: {d}")
+            self.require(d.get("latest_version") == "0.5.4", f"latest: {d}")
+            self.require(d.get("latest_version_code") == 84, f"code: {d}")
+            self.require((d.get("asset") or {}).get("name") == "Audio-CPM-0.5.4-84-debug.apk", f"asset: {d}")
+            self.require(str((d.get("asset") or {}).get("url", "")).startswith(
+                "https://github.com/olddriverdoge/Audio-CPM/releases/download/"), f"url: {d}")
+            return "test feed: 0.5.4 / 84, update available"
+        self.check("update check: test feed uses versioned debug APK", test_channel)
+
     def test_native_fallbacks(self):
         def audio():
             info = self.jget("/api/audio/info")
@@ -569,6 +592,7 @@ class ApiRegression:
         self.test_filesystem()
         self.test_storage_sources()
         self.test_tasks()
+        self.test_update_api()
         self.test_native_fallbacks()
         self.client.close()
         return self.results

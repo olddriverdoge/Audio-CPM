@@ -2,11 +2,14 @@ package com.github.olddriverdoge.audiocpm;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.DownloadManager;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.ActivityNotFoundException;
 import android.database.Cursor;
 import android.content.SharedPreferences;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.net.Uri;
@@ -145,6 +148,36 @@ public class MainActivity extends Activity {
              * 调起系统文件选择器选封面。结果通过 window.AudioCpmPickResult(json) 异步回传。
              * 不用应用内自绘选择器：用户明确要求系统组件，而且系统选择器能到最前台。
              */
+            /**
+             * 下载更新 APK：交给系统 DownloadManager，完成后通知栏可点开安装。
+             * 只允许本仓库 releases/download/http(s) 地址，避免任意 URL 被注入下载。
+             */
+            @android.webkit.JavascriptInterface
+            public String downloadUpdate(String url, String filename) {
+                try {
+                    if (!isAllowedUpdateUrl(url)) {
+                        return "{\"ok\":false,\"error\":\"untrusted url\"}";
+                    }
+                    String safe = safeApkName(filename);
+                    DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+                    if (dm == null) return "{\"ok\":false,\"error\":\"download manager unavailable\"}";
+                    DownloadManager.Request req = new DownloadManager.Request(Uri.parse(url));
+                    req.setTitle("Audio-CPM update");
+                    req.setDescription("Audio-CPM " + safe);
+                    req.setMimeType("application/vnd.android.package-archive");
+                    req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+                    req.setAllowedOverMetered(true);
+                    req.setAllowedOverRoaming(false);
+                    String unique = safe.replaceAll("(?i)\\.apk$", "") + "-" + System.currentTimeMillis() + ".apk";
+                    req.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS,
+                            "Audio-CPM/" + unique);
+                    long id = dm.enqueue(req);
+                    return "{\"ok\":true,\"id\":" + id + "}";
+                } catch (Throwable t) {
+                    return "{\"ok\":false,\"error\":" + JSONObject.quote(String.valueOf(t)) + "}";
+                }
+            }
+
             @android.webkit.JavascriptInterface
             public String pickImage() {
                 if (pickerActive) return "{\"ok\":false,\"error\":\"busy\"}";
@@ -213,11 +246,28 @@ public class MainActivity extends Activity {
             Log.e(TAG, "copy frontend failed", e);
         }
 
+        String appVersion = "0.0.0";
+        long appVersionCode = 0;
+        try {
+            PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
+            appVersion = pi.versionName == null ? "0.0.0" : pi.versionName;
+            appVersionCode = Build.VERSION.SDK_INT >= 28 ? pi.getLongVersionCode() : pi.versionCode;
+        } catch (Throwable t) {
+            Log.w(TAG, "read app version failed", t);
+        }
+        boolean debuggable = (getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+        // 只有真正的稳定 release 包走生产通道；debug / .dev 构建都走测试通道。
+        String updateChannel = (debuggable || getPackageName().endsWith(".dev")) ? "test" : "release";
+
         File config = new File(data, "ac2_boot.json");
         String json = "{\"AC2_DATA_DIR\":\"" + esc(data.getAbsolutePath()) + "\","
                 + "\"AC2_FRONTEND_DIR\":\"" + esc(frontend.getAbsolutePath()) + "\","
                 + "\"AC2_ROOT\":\"/sdcard\",\"AC2_HOST\":\"127.0.0.1\","
                 + "\"AC2_PORT\":\"" + PORT + "\",\"AC2_ANDROID\":\"1\","
+                + "\"AC2_APP_VERSION\":\"" + esc(appVersion) + "\","
+                + "\"AC2_APP_VERSION_CODE\":\"" + appVersionCode + "\","
+                + "\"AC2_APP_PACKAGE\":\"" + esc(getPackageName()) + "\","
+                + "\"AC2_UPDATE_CHANNEL\":\"" + updateChannel + "\","
                 + "\"AC2_NATIVE_LIB_DIR\":\"" + esc(getApplicationInfo().nativeLibraryDir) + "\"}";
         try (FileOutputStream out = new FileOutputStream(config)) {
             out.write(json.getBytes(StandardCharsets.UTF_8));
@@ -416,6 +466,27 @@ public class MainActivity extends Activity {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},
                     REQ_NOTIFICATIONS);
         }
+    }
+
+    /** 只允许仓库 release 资产页；GitHub API 返回的 browser_download_url 就是这个前缀。 */
+    private static boolean isAllowedUpdateUrl(String url) {
+        try {
+            Uri u = Uri.parse(String.valueOf(url));
+            return "https".equalsIgnoreCase(u.getScheme())
+                    && "github.com".equalsIgnoreCase(u.getHost())
+                    && u.getPath() != null
+                    && u.getPath().startsWith("/olddriverdoge/Audio-CPM/releases/download/");
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    private static String safeApkName(String name) {
+        String n = name == null ? "" : new File(name).getName();
+        n = n.replaceAll("[^A-Za-z0-9._-]", "_");
+        if (n.length() > 100) n = n.substring(n.length() - 100);
+        if (!n.toLowerCase().endsWith(".apk")) n = "Audio-CPM-update.apk";
+        return n;
     }
 
     private void openNotificationSettings() {

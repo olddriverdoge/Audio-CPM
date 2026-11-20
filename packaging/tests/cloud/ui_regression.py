@@ -172,6 +172,49 @@ class UiRegression:
             self.page.locator("#cfg-cancel").click()
             self.page.wait_for_timeout(250)
 
+    def test_update_ui(self):
+        def settings_update():
+            if not self.page.locator("#player-sheet").is_visible():
+                self.page.locator("#btn-player-cfg").click()
+                self.page.locator("#player-sheet").wait_for(state="visible", timeout=5000)
+            current = self.page.locator("#upd-current").inner_text().strip()
+            channel = self.page.locator("#upd-channel-badge").inner_text().strip()
+            self.require(current == "v0.5.3", f"current version: {current!r}")
+            self.require("正式版" in channel, f"channel: {channel!r}")
+            self.page.locator("#upd-check").click()
+            self.page.wait_for_function(
+                "() => { const b=document.querySelector('#upd-check'); "
+                "return b && !b.disabled && document.querySelector('#upd-status').textContent.includes('已是最新版本'); }",
+                timeout=10000,
+            )
+            status = self.page.locator("#upd-status").inner_text().strip()
+            self.require("0.5.3" in status, f"status: {status!r}")
+            self.shot("update-settings")
+            if self.page.locator("#player-sheet").is_visible():
+                self.page.locator("#cfg-cancel").click()
+                self.page.locator("#player-sheet").wait_for(state="hidden", timeout=3000)
+            return f"{current} / {channel} / {status}"
+        self.check("update settings shows current version and up-to-date", settings_update, "update-settings")
+
+        def banner_component():
+            self.page.evaluate(
+                """() => UpdateChecker.paint({
+                    ok: true, channel: 'test', current_version: '0.5.3',
+                    latest_version: '0.5.4', latest_version_code: 84,
+                    update_available: true,
+                    asset: {name: 'Audio-CPM-0.5.4-84-debug.apk',
+                      url: 'https://github.com/olddriverdoge/Audio-CPM/releases/download/debug-latest/Audio-CPM-0.5.4-84-debug.apk'},
+                    release: {body: 'fixture notes', published_at: '2026-11-20T10:00:00Z'}
+                })"""
+            )
+            banner = self.page.locator("#update-banner")
+            self.require(banner.is_visible(), "update banner hidden")
+            self.require("0.5.4" in banner.inner_text(), f"banner: {banner.inner_text()!r}")
+            self.page.locator("#ub-close").click()
+            self.require(not banner.is_visible(), "update banner did not dismiss")
+            return "banner shown and dismissed"
+        self.check("update banner renders and dismisses", banner_component, "update-banner")
+
     def test_scene_modules_and_task_panels(self):
         def modules():
             self.click_scene("builtin-convert")
@@ -401,6 +444,8 @@ class UiRegression:
             self.fresh_page()
             try:
                 self.test_home_and_settings()
+                self.fresh_page()
+                self.test_update_ui()
                 self.fresh_page()
                 self.test_scene_modules_and_task_panels()
                 self.fresh_page()

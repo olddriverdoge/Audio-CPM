@@ -30,5 +30,6 @@ const K = {
   metaPos:'ac2_meta_pos', metaSize:'ac2_meta_size', movePos:'ac2_move_pos',
   fabSpectrum:'ac2_fab_spectrum', fabMeta:'ac2_fab_meta', fabMove:'ac2_fab_move',
   winSpectrum:'ac2_win_spectrum',
-  fabLog:'ac2_fab_log', winLog:'ac2_win_log'
+  fabLog:'ac2_fab_log', winLog:'ac2_win_log',
+  updateLast:'ac2_update_last_check', updateDismissed:'ac2_update_dismissed'
 };

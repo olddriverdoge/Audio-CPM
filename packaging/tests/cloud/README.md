@@ -42,7 +42,7 @@ python3 packaging/tests/cloud/run_cloud_suite.py --keep --report /tmp/ac2-report
 
 ## 覆盖范围
 
-`api_regression.py`（46 项）：
+`api_regression.py`（48 项）：
 
 - 静态页面、`capabilities`、`roots`、存储源列表/保存/测试/删除
 - 浏览、目录树、音频/图片元数据、缺失目录回退、缺失文件 404
@@ -51,9 +51,10 @@ python3 packaging/tests/cloud/run_cloud_suite.py --keep --report /tmp/ac2-report
 - `mkdir`/`rmdir`/`rename_dir`/`copy`/`move`/`delete` 及冲突策略
 - 任务：重命名预览、转换、标签整理、无 composer 重命名、检查标签、替换封面
 - 任务预设持久化、启动参数校验、任务列表、状态、取消不存在任务的 404、SSE
+- 更新检查：release 通道同版本不更新、test 通道按带 versionCode 的 debug 资产判断更新
 - 原生音频/播放接口在云端全部降级路径（不返回 500，不伪装成功）
 
-`ui_regression.py`（18 项）：
+`ui_regression.py`（20 项）：
 
 - 首页三张内置场景卡、设置弹层、语言提示、切换语言后整页重载提示仍正确
 - 转换场景模块、任务类型切换、列设置面板
@@ -62,13 +63,14 @@ python3 packaging/tests/cloud/run_cloud_suite.py --keep --report /tmp/ac2-report
 - 长按进入选择模式、选择计数、确认删除
 - UI 发起的转换任务真实完成，并检查磁盘输出文件
 - 音频输出面板、保存场景、390×844 移动端布局
+- 更新设置卡显示当前版本/通道/已是最新，更新横幅渲染与关闭
 
 ## 测试结构
 
 - `fixtures.py`：用 ffmpeg 合成确定性音频/封面，建立 `api` 与 `ui` 两套互不干扰的目录。
 - `api_regression.py`：用 `httpx` 直接打真实 HTTP 路由；每个任务都通过 SSE/轮询等待完成。
 - `ui_regression.py`：Playwright 真实浏览器操作；失败时自动截图，成功时保留关键步骤截图。
-- `run_cloud_suite.py`：分配空闲端口、设置隔离环境变量、启动/关闭后端、汇总结果、写 JSON 报告。
+- `run_cloud_suite.py`：分配空闲端口、启动本地假 GitHub 更新 feed、设置隔离环境变量、启动/关闭后端、汇总结果、写 JSON 报告。
 
 ## 已知边界
 
