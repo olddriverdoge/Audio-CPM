@@ -35,3 +35,12 @@ python3 packaging/tests/cloud/run_cloud_suite.py --keep --report /tmp/ac2_v056_s
 ## 待办
 
 - `frontend/defaults.json` 当前仍是空占位；需用户在本机 0.5.6 测试包导出真实 JSON 后替换，再重新打包，才能让生产包/测试包带上人工调好的默认场景。
+
+## 主干包名迁移包
+
+为了读取用户正式版（`com.github.olddriverdoge.audiocpm`）里已经调好的 3 个场景，CI 增加 `workflow_dispatch` 输入 `main_package=true`：用主干包名构建 debug APK，签名仍为固定 `ac2-debug.keystore`，versionCode 86 可覆盖 0.5.5（85），且不写入 `debug-latest`。
+
+- 构建 run：`44770313754`
+- APK：`Audio-CPM-0.5.6-86-main-debug.apk`，包名 `com.github.olddriverdoge.audiocpm`，versionName 0.5.6 / code 86，debuggable true
+- SHA256：`cae5e47cabcf46849d71597282c0a340c9118f775a1e9c0156b7910916e6d6b9`
+- 证书 SHA256：`BB A5 DC 52 43 8B AE E4 C3 AF 9B 7F D9 F5 D4 C3 A4 64 E1 4D 95 BC A8 11 EA 18 42 23 BF 92 0D F9`（与 0.5.5 release 一致）

@@ -121,7 +121,7 @@ App 启动本地 `127.0.0.1:8765` 服务，并启动一个前台通知服务，�
 
 ### 界面默认配置导出
 
-设置页“界面配置迁移”可把当前 3 个内置场景、频谱/声谱参数、文件列表表头导出成 JSON；也可以直接在控制台调用 `AC2ExportDefaults()`。导出接口为 `POST /api/ui/defaults/export`，导出后通过 `GET /api/ui/defaults/export` 下载。生成的 JSON 放到 `frontend/defaults.json` 后，生产包和测试包在首次启动时都会补入缺失配置，不会覆盖用户已经调好的本机配置。播放管理现在会用当前封面做虚化背景，播放列表标题栏支持收起/展开。
+设置页“界面配置迁移”可把当前 3 个内置场景、频谱/声谱参数、文件列表表头导出成 JSON；也可以直接在控制台调用 `AC2ExportDefaults()`。导出接口为 `POST /api/ui/defaults/export`，导出后通过 `GET /api/ui/defaults/export` 下载。生成的 JSON 放到 `frontend/defaults.json` 后，生产包和测试包在首次启动时都会补入缺失配置，不会覆盖用户已经调好的本机配置。播放管理现在会用当前封面做虚化背景，播放列表标题栏支持收起/展开。需要从已安装的正式版迁移本机配置时，可手动触发 CI 的 `main_package` 输入，构建同包名 debug APK；该包不会发布到测试通道。
 
 ### 从源码运行（Termux / PC）
 
