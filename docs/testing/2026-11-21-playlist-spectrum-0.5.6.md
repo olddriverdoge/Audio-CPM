@@ -40,3 +40,16 @@ python3 packaging/tests/cloud/run_cloud_suite.py --keep --report /tmp/ac2_v057j_
 
 GitHub Actions 使用默认 `main_package=false`；构建产物包名应为
 `com.github.olddriverdoge.audiocpm.dev`，与正式包可并存。
+
+## 构建结果
+
+- 推送提交：`d1aa89b`（`feat: polish playback manager and embed spectrum (0.5.6)`）
+- GitHub Actions：run `44790675669`，`main_package=false`，结论 success
+- 产物：`Audio-CPM-debug.apk`
+  - 包名 `com.github.olddriverdoge.audiocpm.dev`（测试包，可与正式包并存）
+  - versionName 0.5.6 / versionCode 86
+  - 大小 22,604,944 字节
+  - SHA256 `2d947a64cd4517ee1040071c4e5924b5f5b09b6dcab8bda0f252084f3c5cd3b7`
+  - 证书 SHA256 `BB A5 DC 52 43 8B AE E4 C3 AF 9B 7F D9 F5 D4 C3 A4 64 E1 4D 95 BC A8 11 EA 18 42 23 BF 92 0D F9`
+  - 下载：https://aka.doubaocdn.com/s/UXwg7zKUWF
+- 包内确认：`assets/frontend/defaults.json` 4299B、`playpanel.js` 19432B、`spectrum.js` 52214B、`index.html` 31460B。
