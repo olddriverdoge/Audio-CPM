@@ -316,6 +316,7 @@
   <b class="fw-resize" id="af-resize" title="拖动调整大小（或双指捏合）"></b>
 </div>
 <div class="play-float hidden" id="play-float">
+  <div class="pf-bg" id="pf-bg" aria-hidden="true"></div>
   <div class="mf-head" id="pf-head" title="拖动可移动 / 双指可缩放">
     <span class="mf-title">播放管理</span>
     <span class="mf-track" id="pf-track">未在播放</span>
@@ -350,7 +351,11 @@
       <input type="range" class="pf-range" id="pf-vol" min="0" max="1" step="0.01" value="1">
       <span class="pf-time" id="pf-vol-val">100%</span>
     </div>
-    <div class="pf-qhead"><span>当前目录</span><span id="pf-qcount">0 首</span></div>
+    <button type="button" class="pf-qhead" id="pf-q-toggle" aria-expanded="true" title="收起播放列表">
+      <span class="pf-qtitle">当前目录</span>
+      <span id="pf-qcount">0 首</span>
+      <span class="pf-q-caret" aria-hidden="true">⌃</span>
+    </button>
     <div class="pf-queue" id="pf-queue"><div class="detail-empty">当前目录没有音频文件</div></div>
   </div>
   <b class="fw-resize" id="pf-resize" title="拖动调整大小（或双指捏合）"></b>
@@ -462,6 +467,19 @@
     </div>
 
     <div style="border-top:1px solid var(--border);margin:12px 0 0"></div>
+    <div class="cfg-section">
+      <div class="upd-head">
+        <h3>界面配置迁移</h3>
+        <span id="cfg-export-state" class="upd-badge" data-i18n-skip></span>
+      </div>
+      <div class="hint">把当前 3 个内置场景、频谱/声谱参数和文件列表表头导出为 JSON；文件可直接作为仓库默认配置打进生产包和测试包。</div>
+      <div class="row upd-actions" style="justify-content:flex-start">
+        <button type="button" class="small primary" id="cfg-export">导出当前配置</button>
+        <a class="small cfg-export-link hidden" id="cfg-export-link" href="/api/ui/defaults/export" target="_blank" rel="noopener">下载配置 JSON</a>
+      </div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);margin:12px 0 0"></div>
     <h3 style="font-size:13px;margin:10px 0 4px">存储源（本地 / WebDAV）</h3>
     <div id="src-list" class="col-opts" style="gap:6px;margin-bottom:6px"></div>
     <div class="row" style="gap:6px;align-items:center">
@@ -516,6 +534,7 @@ WebDAV 支持浏览 / 播放 / 元数据 / 下载（后续）与远端内部移�
 <script src="/js/dock.js"></script>
 <script src="/js/winmgr.js"></script>
 <script src="/js/scene_store.js"></script>
+<script src="/js/defaults.js"></script>
 <script src="/js/floatwin.js"></script>
 <script src="/js/filepicker.js"></script>
 <script src="/js/player.js"></script>

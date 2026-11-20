@@ -519,6 +519,39 @@ class ApiRegression:
             return f"{len(text)} bytes"
         self.check("task SSE stream", task_stream)
 
+    # ---------- UI defaults export ----------
+    def test_ui_defaults(self):
+        def export_roundtrip():
+            payload = {
+                "schema": "audio-cpm-ui-defaults",
+                "schemaVersion": 1,
+                "defaultScenes": [{
+                    "id": "builtin-convert",
+                    "name": "文件转码",
+                    "desc": "文件选择 · 批处理 · 日志",
+                    "modules": ["browse", "task", "log"],
+                    "geo": {},
+                    "uiScale": 1,
+                    "canvas": {"x": 0, "y": 0},
+                }],
+                "prefs": {"ac2_columns": {"ids": ["name", "size", "mtime"], "widths": {}}},
+            }
+            d = self.jpost("/api/ui/defaults/export", payload)
+            self.require(d.get("ok") is True, f"export response: {d}")
+            self.require(d.get("download") == "/api/ui/defaults/export", f"download path: {d}")
+            self.require(d.get("scenes") == 1 and d.get("prefs") == 1, f"counts: {d}")
+            r = self.get("/api/ui/defaults/export")
+            self.require(r.status_code == 200, f"download -> {r.status_code}")
+            self.require("application/json" in (r.headers.get("content-type") or ""),
+                         f"download content-type: {r.headers.get('content-type')}")
+            got = r.json()
+            self.require(got.get("schema") == "audio-cpm-ui-defaults", f"roundtrip: {got}")
+            self.require(got.get("defaultScenes", [{}])[0].get("id") == "builtin-convert", f"roundtrip scene: {got}")
+            self.require(got.get("prefs", {}).get("ac2_columns", {}).get("ids") == ["name", "size", "mtime"],
+                         f"roundtrip prefs: {got}")
+            return f"{d['bytes']} bytes, 1 scene"
+        self.check("UI defaults export round-trips JSON", export_roundtrip)
+
     # ---------- Android bridge fallbacks ----------
     def test_update_api(self):
         def release_channel():
@@ -592,6 +625,7 @@ class ApiRegression:
         self.test_filesystem()
         self.test_storage_sources()
         self.test_tasks()
+        self.test_ui_defaults()
         self.test_update_api()
         self.test_native_fallbacks()
         self.client.close()

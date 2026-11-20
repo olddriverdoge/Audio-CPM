@@ -100,6 +100,49 @@ const SceneStore = (() => {
     return geo;
   }
 
+  /* 导出内置场景的当前版本：即使没有点“覆盖”，也把当前窗口几何一起带上。
+     这是给仓库默认配置用的快照，不改变本机任何设置。 */
+  function exportBuiltins() {
+    const ov = overrides();
+    return DEFAULTS.map(d => {
+      const o = ov[d.id] || {};
+      const modules = modulesOf(o).length ? modulesOf(o) : modulesOf(d);
+      const geo = (o.geo && Object.keys(o.geo).length) ? o.geo : snapshotGeo(modules);
+      const uiScale = Number.isFinite(Number(o.uiScale)) && Number(o.uiScale) > 0
+        ? Number(o.uiScale) : (Number(Store.get('ac3_ui_scale', 1)) || 1);
+      const canvas = o.canvas && Number.isFinite(Number(o.canvas.x)) && Number.isFinite(Number(o.canvas.y))
+        ? {x: Number(o.canvas.x), y: Number(o.canvas.y)}
+        : (Store.get('ac3_canvas_pan', null) || null);
+      return {
+        id: d.id, name: d.name, desc: d.desc, modules: modules,
+        geo: geo, uiScale: uiScale, canvas: canvas
+      };
+    });
+  }
+
+  /* 把仓库默认配置里的内置场景灌入用户覆盖表。只补缺失的 id，
+     绝不覆盖本机已经调好的场景。 */
+  function applyDefaults(scenes) {
+    if (!Array.isArray(scenes) || !scenes.length) return 0;
+    const ov = overrides();
+    let n = 0;
+    scenes.forEach(s => {
+      if (!s || !isBuiltin(s)) return;
+      if (!DEFAULTS.some(d => d.id === s.id)) return;
+      if (ov[s.id]) return;
+      const modules = modulesOf(s);
+      if (!modules.length) return;
+      ov[s.id] = {
+        id: s.id, name: s.name, desc: s.desc,
+        modules: modules, geo: s.geo || {},
+        uiScale: s.uiScale, canvas: s.canvas, updatedAt: 0
+      };
+      n++;
+    });
+    if (n) saveOverrides(ov);
+    return n;
+  }
+
   function currentLayout() {
     const modules = App.openModules ? App.openModules() : [];
     if (!modules.length) { Utils.toast('先打开几个模块再保存', 'warn'); return null; }
@@ -291,5 +334,6 @@ const SceneStore = (() => {
     }
   }
 
-  return {init, render, saveCurrent, renderTabs, openSave, closeSave};
+  return {init, render, saveCurrent, renderTabs, openSave, closeSave,
+          exportBuiltins, applyDefaults};
 })();

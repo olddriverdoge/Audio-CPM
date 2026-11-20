@@ -516,5 +516,16 @@
   "无法打开应用设置": "Unable to open app settings",
   "已打开系统设置，请选择“不限制后台”或关闭电池优化": "System settings opened. Choose “No restrictions” or disable battery optimization.",
   "浏览器访问 127.0.0.1:8765 时，系统可能回收后台；建议允许无限制后台并关闭电池优化。小米/华为还需允许自启动。": "When a browser uses 127.0.0.1:8765, Android may reclaim the background process. Allow unrestricted background and disable battery optimization; Xiaomi/Huawei also need autostart enabled.",
-  "无法打开浏览器，请手动访问 ": "Unable to open browser; visit "
+  "无法打开浏览器，请手动访问 ": "Unable to open browser; visit ",
+  "界面配置迁移": "UI config migration",
+  "把当前 3 个内置场景、频谱/声谱参数和文件列表表头导出为 JSON；文件可直接作为仓库默认配置打进生产包和测试包。": "Export the three built-in scenes, spectrum/waterfall settings, and file-list headers as JSON. The file can be used as the repository default for production and test builds.",
+  "导出当前配置": "Export current config",
+  "下载配置 JSON": "Download config JSON",
+  "导出中…": "Exporting…",
+  "已导出 {n} 个场景 / {p} 项设置": "Exported {n} scenes / {p} settings",
+  "配置已导出，可下载 JSON": "Config exported; download JSON available",
+  "导出失败": "Export failed",
+  "导出失败：{msg}": "Export failed: {msg}",
+  "收起播放列表": "Collapse playlist",
+  "展开播放列表": "Expand playlist"
 }

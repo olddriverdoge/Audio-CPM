@@ -8,7 +8,7 @@ from starlette.staticfiles import StaticFiles
 
 from .config import FRONTEND_DIR
 from .routers import (audio_api, browse_api, caps_api, fs_api, media_api, playback_api,
-                      storage_api, tags_api, tasks_api, update_api)
+                      storage_api, tags_api, tasks_api, ui_api, update_api)
 
 
 async def _no_cache(request, call_next):
@@ -24,7 +24,7 @@ async def _no_cache(request, call_next):
 def create_app() -> Starlette:
     routes = []
     for mod in (browse_api, tags_api, tasks_api, media_api, fs_api,
-                storage_api, playback_api, caps_api, audio_api, update_api):
+                storage_api, playback_api, caps_api, audio_api, ui_api, update_api):
         routes.extend(mod.routes)
     # 静态前端放最后挂载：未命中 API 的请求都交给 frontend/
     routes.append(Mount("/", app=StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend"))

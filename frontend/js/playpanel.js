@@ -11,6 +11,8 @@ function createPlayPanel() {
   const trackEl = document.getElementById('pf-track');
   const coverBox = document.getElementById('pf-cover');
   const coverImg = document.getElementById('pf-cover-img');
+  const bgEl = document.getElementById('pf-bg');
+  const qToggle = document.getElementById('pf-q-toggle');
   const seek = document.getElementById('pf-seek');
   const curEl = document.getElementById('pf-cur');
   const durEl = document.getElementById('pf-dur');
@@ -28,6 +30,34 @@ function createPlayPanel() {
 
   const MODE_LABEL = {order: '顺序', all: '列表循环', one: '单曲循环', shuffle: '随机'};
   let timer = 0, seeking = false;
+  let coverPath = '', coverSrc = '', coverFailed = '';
+  let queueCollapsed = Store.get('ac3_play_queue_collapsed', false) === true;
+
+  function cssUrl(url) {
+    return 'url("' + String(url || '').replace(/"/g, '%22').replace(/\)/g, '%29') + '")';
+  }
+
+  /* 封面虚化背景：只画一整张，不复制 extra <img>；失败时回到纯色渐变。 */
+  function setCoverBackground(url) {
+    if (!bgEl) return;
+    if (url) {
+      bgEl.style.backgroundImage =
+        'linear-gradient(180deg, rgba(7,12,18,.42), rgba(7,12,18,.90)), ' + cssUrl(url);
+      win.classList.add('has-cover');
+    } else {
+      bgEl.style.backgroundImage = '';
+      win.classList.remove('has-cover');
+    }
+  }
+
+  function applyQueueState() {
+    if (!qToggle) return;
+    win.classList.toggle('queue-collapsed', queueCollapsed);
+    qToggle.setAttribute('aria-expanded', queueCollapsed ? 'false' : 'true');
+    qToggle.title = tr(queueCollapsed ? '展开播放列表' : '收起播放列表');
+    const label = qToggle.querySelector('.pf-qtitle');
+    if (label) label.textContent = tr('当前目录');
+  }
 
   function fmt(t) {
     if (!isFinite(t) || t < 0) t = 0;
@@ -44,11 +74,21 @@ function createPlayPanel() {
     trackEl.textContent = Player.current ? Utils.basename(Player.current) : tr('未在播放');
     const p = Player.current || '';
     if (p && p.indexOf('dav:') !== 0) {
-      coverImg.src = Api.coverUrl(p);
-      coverBox.classList.add('on');
+      if (p !== coverPath && p !== coverFailed) {
+        coverPath = p;
+        coverFailed = '';
+        coverSrc = Api.coverUrl(p);
+        coverBox.classList.remove('on');
+        coverImg.src = coverSrc;
+        setCoverBackground(coverSrc);
+      }
     } else {
+      coverPath = '';
+      coverSrc = '';
+      coverFailed = '';
       coverImg.removeAttribute('src');
       coverBox.classList.remove('on');
+      setCoverBackground('');
     }
   }
 
@@ -120,8 +160,18 @@ function createPlayPanel() {
     renderState();
   }
 
-  coverImg.addEventListener('load', () => coverBox.classList.add('on'));
-  coverImg.addEventListener('error', () => { coverImg.removeAttribute('src'); coverBox.classList.remove('on'); });
+  coverImg.addEventListener('load', () => {
+    coverBox.classList.add('on');
+    if (coverSrc) win.classList.add('has-cover');
+  });
+  coverImg.addEventListener('error', () => {
+    coverFailed = coverPath;
+    coverImg.removeAttribute('src');
+    coverBox.classList.remove('on');
+    coverPath = '';
+    coverSrc = '';
+    setCoverBackground('');
+  });
   /* 播放管理封面也能进元数据：之前只有右下角 meta-fab 一个入口。 */
   if (coverBox) {
     coverBox.title = '点击查看元数据';
@@ -180,6 +230,14 @@ function createPlayPanel() {
     renderState();
   });
 
+  if (qToggle) {
+    qToggle.addEventListener('click', () => {
+      queueCollapsed = !queueCollapsed;
+      Store.set('ac3_play_queue_collapsed', queueCollapsed);
+      applyQueueState();
+    });
+  }
+
   qEl.addEventListener('click', e => {
     const row = e.target.closest('.pf-q');
     if (!row) return;
@@ -201,8 +259,9 @@ function createPlayPanel() {
     }
   });
 
+  applyQueueState();
   renderMeta();
   renderQueue();
   renderState();
-  return Object.assign(fw, {refresh: () => { renderMeta(); renderQueue(); renderState(); } });
+  return Object.assign(fw, {refresh: () => { renderMeta(); renderQueue(); renderState(); applyQueueState(); } });
 }

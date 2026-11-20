@@ -42,7 +42,7 @@ python3 packaging/tests/cloud/run_cloud_suite.py --keep --report /tmp/ac2-report
 
 ## 覆盖范围
 
-`api_regression.py`（48 项）：
+`api_regression.py`（49 项）：
 
 - 静态页面、`capabilities`、`roots`、存储源列表/保存/测试/删除
 - 浏览、目录树、音频/图片元数据、缺失目录回退、缺失文件 404
@@ -52,9 +52,10 @@ python3 packaging/tests/cloud/run_cloud_suite.py --keep --report /tmp/ac2-report
 - 任务：重命名预览、转换、标签整理、无 composer 重命名、检查标签、替换封面
 - 任务预设持久化、启动参数校验、任务列表、状态、取消不存在任务的 404、SSE
 - 更新检查：release 通道同版本不更新、test 通道按带 versionCode 的 debug 资产判断更新
+- 界面默认配置导出：`POST /api/ui/defaults/export` 落盘，`GET` 回读与 JSON 结构一致
 - 原生音频/播放接口在云端全部降级路径（不返回 500，不伪装成功）
 
-`ui_regression.py`（20 项）：
+`ui_regression.py`（22 项）：
 
 - 首页三张内置场景卡、设置弹层、语言提示、切换语言后整页重载提示仍正确
 - 转换场景模块、任务类型切换、列设置面板
@@ -64,6 +65,9 @@ python3 packaging/tests/cloud/run_cloud_suite.py --keep --report /tmp/ac2-report
 - UI 发起的转换任务真实完成，并检查磁盘输出文件
 - 音频输出面板、保存场景、390×844 移动端布局
 - 更新设置卡显示当前版本/通道/已是最新，更新横幅渲染与关闭
+- 设置里的导出按钮：POST 成功、下载链接与“已导出”状态
+- 播放面板：封面虚化背景、播放列表收起/展开与持久化
+- 默认配置注入：场景几何与偏好只补缺失项，重复启动不会二次注入
 - 设置里的英文语言链接可点击；浏览器无原生桥时后台运行按钮正确降级
 
 ## 测试结构

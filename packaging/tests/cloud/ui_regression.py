@@ -222,6 +222,16 @@ class UiRegression:
             self.require("电池优化未关闭" in bg, f"battery status: {bg!r}")
             self.require("受限" in self.page.locator("#bg-badge").inner_text(), "battery badge")
             self.require(not self.page.locator("#bg-allow").is_disabled(), "background action should be enabled with bridge")
+            # 配置导出：只断言 POST 成功与下载链接，不截图。
+            self.page.locator("#cfg-export").click()
+            self.page.wait_for_function(
+                "() => !document.querySelector('#cfg-export-link').classList.contains('hidden')",
+                timeout=8000,
+            )
+            state = self.page.locator("#cfg-export-state").inner_text().strip()
+            self.require("已导出" in state, f"export state: {state!r}")
+            href = self.page.locator("#cfg-export-link").get_attribute("href") or ""
+            self.require(href.endswith("/api/ui/defaults/export"), f"export link: {href!r}")
             if self.page.locator("#player-sheet").is_visible():
                 self.page.locator("#cfg-cancel").click()
                 self.page.locator("#player-sheet").wait_for(state="hidden", timeout=3000)
@@ -344,6 +354,41 @@ class UiRegression:
             return "2 tabs + canvas"
         self.check("spectrum float opens", spectrum, "spectrum")
 
+        def play_style():
+            # 切到 Album B 的带内嵌封面文件，确保背景图不是依赖目录 cover.jpg。
+            self.page.evaluate("(p) => App.browse(p)", self.fx["ui_album_b"])
+            self.raise_browse()
+            self.wait_file(self.fx["ui_covered"]).click(position={"x": 4, "y": 15})
+            self.page.wait_for_timeout(400)
+            self.page.evaluate("() => App.openModule('play')")
+            self.page.locator("#play-float").wait_for(state="visible", timeout=5000)
+            self.page.wait_for_function(
+                "() => document.querySelector('#play-float').classList.contains('has-cover')"
+                " && document.querySelector('#pf-cover').classList.contains('on')",
+                timeout=10000,
+            )
+            bg = self.page.evaluate(
+                "() => getComputedStyle(document.querySelector('#pf-bg')).backgroundImage"
+            )
+            self.require("api/cover" in bg, f"cover backdrop: {bg[:160]}")
+            toggle = self.page.locator("#pf-q-toggle")
+            self.require(toggle.get_attribute("aria-expanded") == "true", "queue should start expanded")
+            toggle.click()
+            self.page.wait_for_function(
+                "() => document.querySelector('#play-float').classList.contains('queue-collapsed')",
+                timeout=3000,
+            )
+            self.require(not self.page.locator("#pf-queue").is_visible(), "queue still visible after collapse")
+            self.require(toggle.get_attribute("aria-expanded") == "false", "aria-expanded after collapse")
+            self.require(self.page.evaluate("localStorage.getItem('ac3_play_queue_collapsed')") == "true",
+                         "queue collapse state not persisted")
+            toggle.click()
+            self.page.wait_for_timeout(200)
+            self.require(self.page.locator("#pf-queue").is_visible(), "queue did not expand")
+            self.require(toggle.get_attribute("aria-expanded") == "true", "aria-expanded after expand")
+            return "cover backdrop + persisted queue toggle"
+        self.check("play panel cover backdrop and collapsible queue", play_style, "play-style")
+
     def test_selection_and_delete(self):
         self.click_scene("builtin-organize")
         self.page.locator("#fw-browse").wait_for(state="visible", timeout=5000)
@@ -440,6 +485,57 @@ class UiRegression:
             return "scene persisted in localStorage"
         self.check("save current layout as scene", save, "scene-save")
 
+    def test_defaults_import(self):
+        def run():
+            bundle = {
+                "schema": "audio-cpm-ui-defaults",
+                "schemaVersion": 1,
+                "exportedAt": "2026-11-21T00:00:00.000Z",
+                "defaultScenes": [{
+                    "id": "builtin-convert",
+                    "name": "文件转码",
+                    "desc": "文件选择 · 批处理 · 日志",
+                    "modules": ["browse", "task", "log"],
+                    "geo": {"fw-browse": {"x": 4, "y": 70, "w": 420, "h": 300, "scale": 1}},
+                    "uiScale": 1,
+                    "canvas": {"x": 12, "y": -8},
+                }],
+                "prefs": {"ac2_autoplay": True},
+            }
+            # 模拟刚安装：没有场景覆盖、没有偏好、没有注入标记。
+            self.page.evaluate("""() => {
+              localStorage.removeItem('ac3_scene_overrides');
+              localStorage.removeItem('ac2_autoplay');
+              localStorage.removeItem('ac3_defaults_applied');
+            }""")
+            changed = self.page.evaluate("""async (b) => {
+              const realFetch = window.fetch;
+              window.fetch = (url, opts) => String(url).includes('/defaults.json')
+                ? Promise.resolve(new Response(JSON.stringify(b), {
+                    status: 200, headers: {'Content-Type': 'application/json'}
+                  }))
+                : realFetch(url, opts);
+              try { return await Defaults.apply(); } finally { window.fetch = realFetch; }
+            }""", bundle)
+            self.require(changed >= 2, f"defaults changed {changed}")
+            ov = self.page.evaluate("() => JSON.parse(localStorage.getItem('ac3_scene_overrides') || '{}')")
+            self.require("builtin-convert" in ov, "default scene not injected")
+            self.require(ov["builtin-convert"]["geo"]["fw-browse"]["w"] == 420, "default scene geo lost")
+            self.require(self.page.evaluate("() => localStorage.getItem('ac2_autoplay')") == "true",
+                         "default pref not injected")
+            again = self.page.evaluate("""async (b) => {
+              const realFetch = window.fetch;
+              window.fetch = (url, opts) => String(url).includes('/defaults.json')
+                ? Promise.resolve(new Response(JSON.stringify(b), {
+                    status: 200, headers: {'Content-Type': 'application/json'}
+                  }))
+                : realFetch(url, opts);
+              try { return await Defaults.apply(); } finally { window.fetch = realFetch; }
+            }""", bundle)
+            self.require(again == 0, f"defaults applied twice: {again}")
+            return "scene geo + pref injected once"
+        self.check("UI defaults import is one-shot and non-destructive", run)
+
     def test_mobile_layout(self):
         def run():
             mobile = self.browser.new_context(
@@ -490,6 +586,8 @@ class UiRegression:
                 self.test_audio_panel()
                 self.fresh_page()
                 self.test_scene_save()
+                self.fresh_page()
+                self.test_defaults_import()
                 self.fresh_page()
                 self.test_mobile_layout()
             finally:

@@ -80,11 +80,20 @@
 
   /* ---------- 播放管理浮窗 ---------- */
   .play-float{position:fixed;left:10px;bottom:96px;z-index:330;width:340px;height:440px;
-    display:flex;flex-direction:column;background:rgba(13,18,24,.97);
+    display:flex;flex-direction:column;background:linear-gradient(180deg,rgba(16,22,30,.94),rgba(9,13,19,.98));
     border:1px solid var(--border);border-radius:10px;
-    box-shadow:0 10px 30px rgba(0,0,0,.6);overflow:hidden}
+    box-shadow:0 18px 46px rgba(0,0,0,.62);overflow:hidden;isolation:isolate}
   .play-float.hidden{display:none}
-  .pf-body{flex:1 1 auto;display:flex;flex-direction:column;gap:8px;padding:8px 10px;overflow:hidden}
+  /* 封面虚化背景：用当前曲目的封面铺满，暗色渐变保证文字可读 */
+  .pf-bg{position:absolute;inset:-22px;z-index:0;background-position:center;background-size:cover;
+    filter:blur(24px) saturate(1.32) brightness(.82);opacity:0;transform:scale(1.08);
+    transition:opacity .35s ease;pointer-events:none}
+  .play-float.has-cover .pf-bg{opacity:.58}
+  .play-float .mf-head,.play-float .pf-body{position:relative;z-index:1}
+  .play-float.has-cover{background:rgba(8,13,19,.56)}
+  .play-float::after{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;
+    background:linear-gradient(180deg,rgba(8,13,19,.18),rgba(8,13,19,.60) 52%,rgba(8,13,19,.92))}
+  .pf-body{flex:1 1 auto;display:flex;flex-direction:column;gap:8px;padding:8px 10px;overflow:hidden;position:relative}
   .pf-now{display:flex;gap:10px;align-items:center;min-height:56px}
   .pf-cover{width:56px;height:56px;border-radius:8px;flex:0 0 auto;overflow:hidden;
     background:linear-gradient(135deg,#1e2833,#2a3644);display:flex;align-items:center;justify-content:center;
@@ -105,10 +114,19 @@
   .pf-main{flex:1.4 1 0;background:rgba(56,189,248,.12);border-color:rgba(56,189,248,.5);color:var(--accent)}
   .pf-mode{flex:1.6 1 0;font-size:11px;color:var(--muted)}
   .pf-ico{font-size:12px}
-  .pf-qhead{display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+  .pf-qhead{display:flex;align-items:center;gap:6px;width:100%;padding:5px 4px 4px;border:0;border-top:1px solid var(--border);
+    background:transparent;color:var(--muted);font:inherit;font-size:11px;text-align:left;cursor:pointer}
+.pf-qhead:hover{color:var(--text)}
+.pf-qtitle{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pf-q-caret{font-size:10px;opacity:.7;transition:transform .18s ease}
+.play-float.queue-collapsed .pf-q-caret{transform:rotate(180deg)}
+
   .pf-queue{flex:1 1 auto;min-height:40px;overflow:auto;-webkit-overflow-scrolling:touch;
     border-top:1px solid var(--border);padding-top:4px}
-  .pf-q{display:flex;gap:6px;align-items:center;padding:5px 4px;border-radius:6px;font-size:11.5px;color:var(--muted);cursor:pointer}
+  .play-float.queue-collapsed .pf-queue{display:none}
+  .play-float.queue-collapsed .pf-body{justify-content:center}
+  .pf-q{display:flex;gap:6px;align-items:center;padding:5px 4px;border-radius:6px;font-size:11.5px;color:var(--muted);cursor:pointer;
+    background:rgba(7,12,18,.28);margin:1px 0}
   .pf-q:hover{background:rgba(56,189,248,.06)}
   .pf-q.on{color:var(--accent);background:rgba(56,189,248,.1)}
   .pf-q-ico{width:14px;flex:0 0 auto;text-align:center}
@@ -288,3 +306,9 @@
               scale(var(--ui-scale,1)) scale(var(--win-scale,1));
     transform-origin:top left;
   }
+
+
+  /* 设置页：界面配置导出链接 */
+  .cfg-export-link{display:inline-flex;align-items:center;justify-content:center;height:28px;padding:0 10px;
+    border:1px solid var(--border);border-radius:8px;background:var(--panel2);color:var(--text);text-decoration:none;font-size:11px}
+  .cfg-export-link:hover{border-color:var(--accent);color:var(--accent)}

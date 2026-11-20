@@ -883,6 +883,11 @@ const App = (() => {
 
   async function init() {
     if (typeof I18n !== 'undefined') await I18n.init();
+    // 仓库默认配置只在缺失时补入，不能覆盖本机已调好的布局/表头/频谱参数。
+    if (typeof Defaults !== 'undefined') {
+      try { await Defaults.apply(); } catch (_) {}
+      try { Defaults.init(); } catch (_) {}
+    }
     if (typeof Sources !== 'undefined') await Sources.refresh();
     await applyCapabilities();
     if (typeof Sources !== 'undefined') {
