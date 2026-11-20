@@ -4,6 +4,8 @@ import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.ActivityNotFoundException;
+import android.database.Cursor;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
@@ -14,6 +16,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.Settings;
+import android.provider.OpenableColumns;
 import android.util.Log;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -31,12 +34,15 @@ import com.chaquo.python.Python;
 import com.chaquo.python.android.AndroidPlatform;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+
+import org.json.JSONObject;
 
 public class MainActivity extends Activity {
     private static final String TAG = "Audio-CPM";
@@ -46,6 +52,7 @@ public class MainActivity extends Activity {
     private static final int REQ_MEDIA_AUDIO = 1002;
     private static final int REQ_LEGACY_STORAGE = 1003;
     private static final int REQ_NOTIFICATIONS = 1004;
+    private static final int REQ_PICK_COVER = 1005;
 
     private static final String PREFS = "ac2_shell";
     private static final String KEY_ALL_FILES_PROMPTED = "all_files_prompted";
@@ -54,6 +61,8 @@ public class MainActivity extends Activity {
     private int insetTop, insetBottom, insetLeft, insetRight;
     /** 上次 onResume 时是否已有全盘读取权限，用于“授权返回后自动刷新页面” */
     private boolean lastStorageGranted = false;
+    /** 系统图片选择器是否正在前台，避免连续点击开多个系统页面。 */
+    private boolean pickerActive = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -131,6 +140,44 @@ public class MainActivity extends Activity {
             public String setParams(String json) {
                 try { return AudioCpmBridge.setParams(json); } catch (Throwable t) { return "{}"; }
             }
+
+            /**
+             * 调起系统文件选择器选封面。结果通过 window.AudioCpmPickResult(json) 异步回传。
+             * 不用应用内自绘选择器：用户明确要求系统组件，而且系统选择器能到最前台。
+             */
+            @android.webkit.JavascriptInterface
+            public String pickImage() {
+                if (pickerActive) return "{\"ok\":false,\"error\":\"busy\"}";
+                pickerActive = true;
+                runOnUiThread(() -> {
+                    Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                    intent.addCategory(Intent.CATEGORY_OPENABLE);
+                    intent.setType("image/*");
+                    intent.putExtra(Intent.EXTRA_MIME_TYPES,
+                            new String[]{"image/jpeg", "image/png", "image/webp", "image/bmp"});
+                    intent.putExtra(Intent.EXTRA_TITLE, getString(R.string.cover_picker_title));
+                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    try {
+                        startActivityForResult(intent, REQ_PICK_COVER);
+                    } catch (ActivityNotFoundException e) {
+                        // 极少数精简 ROM 没有 DocumentsUI：退回系统文件选择（不是应用内选择器）。
+                        try {
+                            Intent fallback = new Intent(Intent.ACTION_GET_CONTENT);
+                            fallback.addCategory(Intent.CATEGORY_OPENABLE);
+                            fallback.setType("image/*");
+                            fallback.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                            startActivityForResult(fallback, REQ_PICK_COVER);
+                        } catch (Throwable t) {
+                            pickerActive = false;
+                            callbackPick("{\"ok\":false,\"error\":\"system picker unavailable\"}");
+                        }
+                    } catch (Throwable t) {
+                        pickerActive = false;
+                        callbackPick("{\"ok\":false,\"error\":" + JSONObject.quote(String.valueOf(t)) + "}");
+                    }
+                });
+                return "{\"ok\":true}";
+            }
         }, "AudioCpmNative");
         WebView.setWebContentsDebuggingEnabled(true);
         root.addView(webView, new FrameLayout.LayoutParams(
@@ -194,6 +241,83 @@ public class MainActivity extends Activity {
 
         lastStorageGranted = hasStorageAccess();
         ensureStorageAccess();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQ_PICK_COVER) return;
+        pickerActive = false;
+        if (resultCode != RESULT_OK || data == null || data.getData() == null) {
+            callbackPick("{\"ok\":false,\"canceled\":true}");
+            return;
+        }
+        final android.net.Uri uri = data.getData();
+        try {
+            // 只读授权在当前进程里复制文件即可；仍申请持久授权，避免少数 provider 延迟读失败。
+            getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        } catch (Throwable ignored) {
+        }
+        new Thread(() -> importPickedImage(uri), "ac2-pick-cover").start();
+    }
+
+    /** 把系统选择器返回的 content:// 图片复制到 App 私有缓存，回传 Python/前端可读的绝对路径。 */
+    private void importPickedImage(android.net.Uri uri) {
+        String name = "";
+        try (Cursor c = getContentResolver().query(uri,
+                new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+            if (c != null && c.moveToFirst()) name = c.getString(0);
+        } catch (Throwable ignored) {
+        }
+        String mime = "";
+        try { mime = String.valueOf(getContentResolver().getType(uri)); } catch (Throwable ignored) {}
+        String ext = coverExtension(name, mime);
+        File dir = new File(getCacheDir(), "picked_covers");
+        if (!dir.isDirectory() && !dir.mkdirs()) {
+            callbackPick("{\"ok\":false,\"error\":\"cannot create cache dir\"}");
+            return;
+        }
+        File out = new File(dir, "cover-" + System.currentTimeMillis() + "." + ext);
+        try (InputStream in = getContentResolver().openInputStream(uri);
+             OutputStream os = new FileOutputStream(out)) {
+            if (in == null) throw new IOException("openInputStream returned null");
+            byte[] buf = new byte[16 * 1024];
+            int n;
+            while ((n = in.read(buf)) > 0) os.write(buf, 0, n);
+        } catch (Throwable t) {
+            try { out.delete(); } catch (Throwable ignored) {}
+            callbackPick("{\"ok\":false,\"error\":" + JSONObject.quote(String.valueOf(t)) + "}");
+            return;
+        }
+        if (out.length() <= 0) {
+            try { out.delete(); } catch (Throwable ignored) {}
+            callbackPick("{\"ok\":false,\"error\":\"empty image\"}");
+            return;
+        }
+        callbackPick("{\"ok\":true,\"path\":" + JSONObject.quote(out.getAbsolutePath())
+                + ",\"name\":" + JSONObject.quote(name.isEmpty() ? out.getName() : name) + "}");
+    }
+
+    private static String coverExtension(String name, String mime) {
+        String n = name == null ? "" : name.toLowerCase();
+        int dot = n.lastIndexOf('.');
+        if (dot >= 0 && dot < n.length() - 1) {
+            String e = n.substring(dot + 1);
+            if (e.matches("jpe?g|png|webp|bmp")) return e.equals("jpeg") ? "jpg" : e;
+        }
+        String m = mime == null ? "" : mime.toLowerCase();
+        if (m.contains("png")) return "png";
+        if (m.contains("webp")) return "webp";
+        if (m.contains("bmp")) return "bmp";
+        return "jpg";
+    }
+
+    private void callbackPick(String json) {
+        final String js = "window.AudioCpmPickResult&&window.AudioCpmPickResult("
+                + JSONObject.quote(json) + ")";
+        runOnUiThread(() -> {
+            if (webView != null) webView.evaluateJavascript(js, null);
+        });
     }
 
     @Override

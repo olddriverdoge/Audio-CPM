@@ -16,4 +16,5 @@
     <string name="action_pause">Pausieren</string>
     <string name="action_play">Wiedergeben</string>
     <string name="action_next">Weiter</string>
+    <string name="cover_picker_title">Cover-Bild auswählen</string>
 </resources>

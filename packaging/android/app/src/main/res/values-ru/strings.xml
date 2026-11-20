@@ -16,4 +16,5 @@
     <string name="action_pause">Пауза</string>
     <string name="action_play">Воспроизвести</string>
     <string name="action_next">Следующий</string>
+    <string name="cover_picker_title">Выберите обложку</string>
 </resources>

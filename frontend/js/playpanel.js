@@ -122,6 +122,22 @@ function createPlayPanel() {
 
   coverImg.addEventListener('load', () => coverBox.classList.add('on'));
   coverImg.addEventListener('error', () => { coverImg.removeAttribute('src'); coverBox.classList.remove('on'); });
+  /* 播放管理封面也能进元数据：之前只有右下角 meta-fab 一个入口。 */
+  if (coverBox) {
+    coverBox.title = '点击查看元数据';
+    coverBox.setAttribute('role', 'button');
+    coverBox.setAttribute('tabindex', '0');
+    const openMeta = () => {
+      const p = Player.current;
+      if (!p) return;
+      if (p.indexOf('dav:') === 0) { Utils.toast('WebDAV 文件暂不支持元数据详情', 'warn'); return; }
+      if (typeof App !== 'undefined' && App.openMeta) App.openMeta(p);
+    };
+    coverBox.addEventListener('click', openMeta);
+    coverBox.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMeta(); }
+    });
+  }
 
   playBtn.addEventListener('click', () => {
     // 播放管理第一次打开时不一定已经选中过文件。以前这里直接 Player.toggle()，

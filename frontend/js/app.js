@@ -452,9 +452,18 @@ const App = (() => {
 
   function refreshColumns() { if (bv) bv.render(); }
 
+  function openMeta(path) {
+    if (!metaFloat) return;
+    if (path) metaFloat.load(path);
+    openModule('meta');
+  }
+
   function onPlayed(path) {
     if (bv) bv.onExternalPlayed(path);
     if (metaFloat) metaFloat.load(path);
+    // 切歌后重新下发一次音效参数：原生静态状态通常还在，但播放器/Sink 重建
+    // 或进程被系统回收时不能依赖“上次已经设过”。
+    try { if (window.__ac2ReapplyAudioFx) window.__ac2ReapplyAudioFx(); } catch (_) {}
     updateSelInfo();
     /* 内置播放器起播：自动展开声谱；网格视图再自动调出播放管理 */
     if (Player.current && Player.current === path) {
@@ -1114,7 +1123,9 @@ const App = (() => {
   return {
     init, browse, onPlayed, updateMoveBar: () => MoveMgr.update(), isGridView, refreshColumns,
     playNext, playPrev, autoplayNext, autoplayOn, applyPlayMode, playMode, cyclePlayMode,
-    openModule, openModules, closeAllModules, openMod: openModule, setUiScale, previewUiScale, commitUiScale, currentUiScale, setCanvasPan, applyCanvasPan, canvasPan, addTargetCurrent, addFavCurrent,
+    openModule, openModules, closeAllModules, openMod: openModule, openMeta,
+    openCoverEditor: path => { if (typeof TaskRunner !== 'undefined') TaskRunner.openCoverEditor(path); },
+    setUiScale, previewUiScale, commitUiScale, currentUiScale, setCanvasPan, applyCanvasPan, canvasPan, addTargetCurrent, addFavCurrent,
     playbackQueueList: () => playbackList().slice(), hifiQueue, toggleModule,
     get path() { return currentPath; },
     selection: () => (bv ? bv.selected() : []),

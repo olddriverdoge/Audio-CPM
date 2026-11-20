@@ -4,6 +4,8 @@ const TaskRunner = (() => {
   let evtSource = null, startTime = 0, totalFiles = 0, doneFiles = 0;
   let taskId = null;
   let taskPresets = {presets: {}};
+  /* 元数据“编辑封面”进来时，只处理当前这首歌，而不是整个目录。 */
+  let coverTarget = null;
 
   function currentTask() {
     const r = document.querySelector('input[name="task"]:checked');
@@ -35,6 +37,7 @@ const TaskRunner = (() => {
     const name = document.getElementById('preset-select').value;
     if (!name || !taskPresets.presets[name]) return;
     const p = taskPresets.presets[name];
+    coverTarget = null;
     document.querySelectorAll('input[name="task"]').forEach(r => { r.checked = (r.value === p.task); });
     syncUI();
     if (p.task === 'convert') {
@@ -51,7 +54,7 @@ const TaskRunner = (() => {
   }
   function collectConfig() {
     const task = currentTask();
-    const cfg = {task, path: App.path};
+    const cfg = {task, path: (task === 'cover' && coverTarget) ? coverTarget.dir : App.path};
     if (task === 'convert') {
       cfg.format = document.getElementById('fmt-select').value;
       cfg.output_dir = document.getElementById('output-dir').value.trim();
@@ -65,6 +68,10 @@ const TaskRunner = (() => {
       // 目标格式已移除：所有音频格式都会替换封面；可单独指定封面图片
       const cp = document.getElementById('cover-path');
       cfg.cover_path = cp ? cp.value.trim() : '';
+    }
+    if (task === 'cover' && coverTarget) {
+      cfg.only_files = [coverTarget.path];
+      return cfg;
     }
     const sel = App.selection();
     if (sel.length) cfg.only_files = sel;
@@ -97,8 +104,8 @@ const TaskRunner = (() => {
   }
 
   async function start() {
-    if (!App.path) { alert('请先选择目录'); return; }
     const cfg = collectConfig();
+    if (!cfg.path) { alert('请先选择目录'); return; }
     if (typeof Logs !== 'undefined') Logs.clear('process');
     const bar = document.getElementById('progress-bar');
     bar.style.width = '0%';
@@ -266,6 +273,27 @@ const TaskRunner = (() => {
     }
   }
 
+  /** 由元数据“编辑封面”调用：切到替换封面，并把目标限定为当前文件。 */
+  function openCoverEditor(path) {
+    const raw = String(path || '').trim();
+    if (raw.indexOf('dav:') === 0) {
+      Utils.toast('WebDAV 文件不支持替换封面，请切回本机数据源', 'warn');
+      return;
+    }
+    coverTarget = null;
+    if (raw) {
+      const local = raw.replace(/^local:/, '');
+      coverTarget = {path: raw, dir: Utils.dirname(local), name: Utils.basename(local)};
+    }
+    document.querySelectorAll('input[name="task"]').forEach(r => { r.checked = (r.value === 'cover'); });
+    syncUI();
+    if (typeof App !== 'undefined' && App.openModule) App.openModule('task');
+    setTimeout(() => {
+      const btn = document.getElementById('btn-pick-cover');
+      if (btn) btn.focus();
+    }, 60);
+  }
+
   function init() {
     // 之前这里只绑了取消，开始按钮完全没有 click 监听：
     // 选中目录后点“开始执行”不会有任何请求，看起来就是没反应。
@@ -282,8 +310,31 @@ const TaskRunner = (() => {
     // 任务类型切换必须刷新各自的配置面板；之前只在模块打开时 syncUI，
     // 导致“重命名 / 替换封面”的界面切过去看不到。
     document.querySelectorAll('input[name="task"]').forEach(r => {
-      r.addEventListener('change', syncUI);
+      r.addEventListener('change', () => {
+        if (r.checked && r.value !== 'cover') coverTarget = null;
+        syncUI();
+      });
     });
+    const pickCover = document.getElementById('btn-pick-cover');
+    if (pickCover) pickCover.addEventListener('click', async () => {
+      const inp = document.getElementById('cover-path');
+      if (pickCover.disabled) return;
+      pickCover.disabled = true;
+      try {
+        const p = await FilePicker.pickCover(App.path);
+        if (p) {
+          if (inp) inp.value = p;
+          Utils.toast('已选择封面图片');
+          lg('info', '封面图片: ' + p);
+        }
+      } catch (e) {
+        Utils.toast('选择封面失败: ' + (e && e.message || e), 'err');
+      } finally {
+        pickCover.disabled = false;
+      }
+    });
+    const previewName = document.getElementById('btn-preview-name');
+    if (previewName) previewName.addEventListener('click', previewNames);
     const useCur = document.getElementById('btn-use-cur-dir');
     if (useCur) useCur.addEventListener('click', () => {
       const inp = document.getElementById('output-dir');
@@ -296,5 +347,5 @@ const TaskRunner = (() => {
   }
 
   return {init, syncUI, loadTaskPresets, applyPreset, saveAsPreset, deletePreset, start, previewNames,
-          currentTask, collectConfig, checkUnfinished};
+          openCoverEditor, currentTask, collectConfig, checkUnfinished};
 })();

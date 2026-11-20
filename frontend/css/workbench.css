@@ -87,7 +87,9 @@
   .pf-body{flex:1 1 auto;display:flex;flex-direction:column;gap:8px;padding:8px 10px;overflow:hidden}
   .pf-now{display:flex;gap:10px;align-items:center;min-height:56px}
   .pf-cover{width:56px;height:56px;border-radius:8px;flex:0 0 auto;overflow:hidden;
-    background:linear-gradient(135deg,#1e2833,#2a3644);display:flex;align-items:center;justify-content:center}
+    background:linear-gradient(135deg,#1e2833,#2a3644);display:flex;align-items:center;justify-content:center;
+    cursor:pointer;border:1px solid transparent;transition:border-color .15s}
+  .pf-cover:hover,.pf-cover:focus-visible{border-color:var(--accent);outline:none}
   .pf-cover img{width:100%;height:100%;object-fit:cover;display:none}
   .pf-cover.on img{display:block}
   .pf-info{min-width:0;flex:1 1 auto}

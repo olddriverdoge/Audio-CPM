@@ -37,6 +37,8 @@ import androidx.media3.session.MediaStyleNotificationHelper;
 public class PlaybackService extends MediaSessionService {
     private static final String TAG = "Audio-CPM";
     private static final String CHANNEL_ID = "audio_cpm_playback";
+    private static final String PREFS_AUDIO = "ac2_audio_state";
+    private static final String KEY_PREFERRED_DEVICE = "preferred_device";
     private static final int NOTIF_ID = 1001;
     private static volatile ExoPlayer player;
     private static volatile MediaSession session;
@@ -77,6 +79,12 @@ public class PlaybackService extends MediaSessionService {
     /** DAC / USB / 有线输出路由：只改 ExoPlayer 的 preferred device，不改变解码和 EQ 链路。 */
     public static boolean setPreferredDevice(int id) {
         preferredDeviceId = Math.max(0, id);
+        // 进程重启后也要恢复用户选过的 DAC/耳机，不能只活在前端 localStorage 里。
+        try {
+            Context c = AudioCpmApp.get();
+            if (c != null) c.getSharedPreferences(PREFS_AUDIO, Context.MODE_PRIVATE)
+                    .edit().putInt(KEY_PREFERRED_DEVICE, preferredDeviceId).apply();
+        } catch (Throwable ignored) {}
         // 服务/播放器还没起来时先记住选择，PlaybackService.onCreate 会再应用一次。
         if (player == null) return true;
         return applyPreferredDevice();
@@ -110,6 +118,12 @@ public class PlaybackService extends MediaSessionService {
         super.onCreate();
         instance = this;
         Log.i(TAG, "PlaybackService.onCreate");
+        try {
+            preferredDeviceId = getSharedPreferences(PREFS_AUDIO, Context.MODE_PRIVATE)
+                    .getInt(KEY_PREFERRED_DEVICE, 0);
+        } catch (Throwable ignored) {}
+        // 进程可能被系统回收后重建；高低音/EQ 参数从原生偏好恢复，不依赖前端面板是否打开。
+        try { SoftwareEqProcessor.restore(this); } catch (Throwable ignored) {}
         ensureChannel();
         // 每次新进程启动都清掉上次的诊断残留，避免旧 errorLog 被误当成
         // 当前播放错误（旧文件只在 onPlayerError 时覆盖，不会自动清空）。

@@ -9,6 +9,11 @@ const Spectrum = (() => {
   const minBtn = document.getElementById('sf-min');
   let delayEl = null;
   let delayVal = null;
+  let delayLab = null;
+  /* 延迟按输出设备隔离：key 由音频输出面板上报（type|name），系统默认用 default。 */
+  let delayKey = 'default';
+  let delayShort = '系统默认';
+  let delayFull = '系统默认';
   const subEl = document.getElementById('sf-sub');
   let xScale = 'log';                  // log | lin（频谱 X 轴与柱数据同时切换）
   let hideTimer = 0;
@@ -975,6 +980,38 @@ const Spectrum = (() => {
     paintBarsChip();
   }
 
+  function applyOutputDevice(detail) {
+    detail = detail || {};
+    const key = String(detail.key || 'default') || 'default';
+    const short = String(detail.short || detail.label || '系统默认');
+    const full = String(detail.label || short);
+    if (key === delayKey && short === delayShort) return;
+    delayKey = key;
+    delayShort = short;
+    delayFull = full;
+    if (delayLab) {
+      delayLab.textContent = (typeof I18n !== 'undefined')
+        ? I18n.tr('延迟（{dev}）', {dev: delayShort}) : ('延迟（' + delayShort + '）');
+      delayLab.title = '当前输出：' + delayFull;
+    }
+    loadDelayForCurrent();
+  }
+
+  function loadDelayForCurrent() {
+    let map = null;
+    try { map = Store.get(K.spectrumDelayMap, null); } catch (_) {}
+    if (!map || typeof map !== 'object') map = {};
+    let ms = null;
+    if (Object.prototype.hasOwnProperty.call(map, delayKey)) {
+      ms = Number(map[delayKey]);
+    } else {
+      ms = Number(Store.get(K.spectrumDelay, 0) || 0);
+    }
+    if (!isFinite(ms)) ms = 0;
+    setDelay(ms, false);
+    if (delayVal) delayVal.title = '当前输出：' + delayFull;
+  }
+
   function buildSub() {
     if (!subEl) return;
     subEl.innerHTML = '';
@@ -982,7 +1019,10 @@ const Spectrum = (() => {
     const row = document.createElement('div');
     row.className = 'sf-line';
     const lab = document.createElement('label');
-    lab.textContent = '延迟（蓝牙对齐）'; lab.htmlFor = 'sf-delay';
+    lab.textContent = (typeof I18n !== 'undefined')
+      ? I18n.tr('延迟（{dev}）', {dev: delayShort}) : ('延迟（' + delayShort + '）');
+    lab.title = '当前输出：' + delayFull;
+    lab.htmlFor = 'sf-delay';
     const inp = document.createElement('input');
     inp.type = 'range'; inp.id = 'sf-delay'; inp.min = '0'; inp.max = '1000'; inp.step = '20';
     const val = document.createElement('span'); val.id = 'sf-delay-val';
@@ -999,8 +1039,8 @@ const Spectrum = (() => {
     gw.className = 'sf-grp'; gw.dataset.scene = 'waterfall';
     WF_CHIPS.forEach(it => gw.append(makeChip(it)));
     subEl.append(row, gBoth, gs, gw);
-    delayEl = inp; delayVal = val;
-    setDelay(Store.get(K.spectrumDelay, 0) || 0, false);
+    delayEl = inp; delayVal = val; delayLab = lab;
+    loadDelayForCurrent();
     inp.addEventListener('input', () => { setDelay(Number(inp.value), false); armHide(); });
     inp.addEventListener('change', () => { setDelay(Number(inp.value), true); armHide(); });
     paintScene();
@@ -1027,7 +1067,16 @@ const Spectrum = (() => {
     delayMs = Math.max(0, Math.min(1000, Math.round(ms) || 0));
     if (delayEl) delayEl.value = String(delayMs);
     if (delayVal) delayVal.textContent = delayMs + 'ms';
-    if (save) Store.set(K.spectrumDelay, delayMs);
+    if (save) {
+      let map = null;
+      try { map = Store.get(K.spectrumDelayMap, null); } catch (_) {}
+      if (!map || typeof map !== 'object') map = {};
+      map[delayKey] = delayMs;
+      Store.set(K.spectrumDelayMap, map);
+      // 旧键保留为“未识别设备”的默认值，升级后不丢用户原来的全局延迟。
+      Store.set(K.spectrumDelay, delayMs);
+      if (delayVal) delayVal.title = '当前输出：' + delayFull;
+    }
   }
 
   if (subEl) {
@@ -1153,6 +1202,8 @@ const Spectrum = (() => {
     apply();
     paintTrack();
     if (Player.onMeta) Player.onMeta(() => paintTrack());
+    window.addEventListener('ac2-output-device', e => applyOutputDevice(e.detail || {}));
+    if (window.__AUDIO_CPM_OUTPUT) applyOutputDevice(window.__AUDIO_CPM_OUTPUT);
     const audio = Player.audio;
     audio.addEventListener('play', () => { if (open) start(); });
     audio.addEventListener('pause', () => { if (open) setState('暂停'); });

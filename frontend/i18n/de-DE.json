@@ -460,5 +460,21 @@
   "缩放（双指在模块上缩放该模块，空白处缩放整体）": "Zoom (Modul mit zwei Fingern zoomen; leere Fläche zoomt alles)",
   "工作台已锁定：单指平移；双指在模块上缩放该模块，空白处缩放整体": "Arbeitsbereich gesperrt: Mit einem Finger verschieben; Modul mit zwei Fingern zoomen, leere Fläche zoomt alles",
   "展开一层": "Eine Ebene öffnen",
-  "已展开一层": "Eine Ebene geöffnet"
+  "已展开一层": "Eine Ebene geöffnet",
+  "编辑封面": "Cover bearbeiten",
+  "点击放大": "Zum Vergrößern tippen",
+  "点击查看元数据": "Tippen für Metadaten",
+  "延迟（{dev}）": "Verzögerung ({dev})",
+  "系统默认（当前：{dev}）": "Systemstandard (aktuell: {dev})",
+  "系统默认 · 当前输出：{out}": "Systemstandard · Aktuelle Ausgabe: {out}",
+  "已选：{dev} · 当前输出：{out}": "Ausgewählt: {dev} · Aktuelle Ausgabe: {out}",
+  "上次选择的设备未连接 · 当前输出：{out}": "Zuletzt gewähltes Gerät getrennt · Aktuelle Ausgabe: {out}",
+  "当前输出：{out}": "Aktuelle Ausgabe: {out}",
+  "已选择封面图片": "Cover-Bild ausgewählt",
+  "选择封面失败: {msg}": "Cover-Auswahl fehlgeschlagen: {msg}",
+  "系统选择器失败: {msg}": "Systemauswahl fehlgeschlagen: {msg}",
+  "系统选择器不可用: {msg}": "Systemauswahl nicht verfügbar: {msg}",
+  "系统选择器返回异常": "Systemauswahl lieferte ein ungültiges Ergebnis",
+  "WebDAV 文件不支持替换封面，请切回本机数据源": "WebDAV-Dateien unterstützen keinen Cover-Ersatz; zur Gerätequelle wechseln",
+  "WebDAV 文件暂不支持元数据详情": "Metadatendetails für WebDAV-Dateien nicht verfügbar"
 }

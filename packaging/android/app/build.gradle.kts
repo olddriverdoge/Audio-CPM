@@ -35,8 +35,8 @@ android {
         applicationId = "com.github.olddriverdoge.audiocpm$packageSuffix"
         minSdk = 24
         targetSdk = 35
-        versionCode = 80
-        versionName = "0.4.33"
+        versionCode = 81
+        versionName = "0.5.1"
         ndk { abiFilters += listOf("arm64-v8a") }
         externalNativeBuild {
             cmake {

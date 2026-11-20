@@ -1,5 +1,8 @@
 package com.github.olddriverdoge.audiocpm;
 
+import android.content.Context;
+import android.content.SharedPreferences;
+
 import androidx.media3.common.C;
 import androidx.media3.common.audio.AudioProcessor.AudioFormat;
 import androidx.media3.common.audio.BaseAudioProcessor;
@@ -36,6 +39,7 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
     private static volatile int trebleAmount = 0;             // 0..1000（软件高音增强）
     private static volatile int virtAmount = 0;               // 0..1000（软件立体声扩展）
     private static final int MAX_BAND_MB = 1000;              // 单个频段最多 ±10.0 dB，防止破音
+    private static final String PREFS = "ac2_audio_eq";
     private static volatile long rev = 0;
 
     private int channels = 2, sampleRate = 48000, encoding = C.ENCODING_PCM_16BIT;
@@ -46,33 +50,38 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
     private boolean bypass = false;
 
     /* ---------------- 外部调参 ---------------- */
-    public static void setEnabled(boolean on) { enabled = on; rev++; }
+    public static void setEnabled(boolean on) { enabled = on; rev++; persist(); }
     public static boolean isEnabled() { return enabled; }
 
     public static void setBand(int band, int mb) {
         if (band < 0 || band >= BANDS) return;
         gainsMb[band] = Math.max(-MAX_BAND_MB, Math.min(MAX_BAND_MB, mb));
         rev++;
+        persist();
     }
 
     public static void setBass(int amount) {
         bassAmount = Math.max(0, Math.min(1000, amount));
         rev++;
+        persist();
     }
 
     public static void setTreble(int amount) {
         trebleAmount = Math.max(0, Math.min(1000, amount));
         rev++;
+        persist();
     }
 
     public static void setVirt(int amount) {
         virtAmount = Math.max(0, Math.min(1000, amount));
         rev++;
+        persist();
     }
 
     public static void setPreamp(int mb) {
         preampMb = Math.max(-1000, Math.min(1000, mb));
         rev++;
+        persist();
     }
 
     public static int getPreamp() { return preampMb; }
@@ -82,6 +91,7 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
         if (preset < 0 || preset >= PRESETS.length || PRESETS[preset] == null) return;
         for (int i = 0; i < BANDS; i++) gainsMb[i] = (int) Math.round(PRESETS[preset][i] * 100);
         rev++;
+        persist();
     }
 
     public static void resetAll() {
@@ -92,6 +102,42 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
         virtAmount = 0;
         for (int i = 0; i < BANDS; i++) gainsMb[i] = 0;
         rev++;
+        persist();
+    }
+
+    /**
+     * 原生侧持久化：播放服务被系统回收重启后，前端还没打开面板也要保持低音/高音/EQ。
+     * 之前这些状态只存在静态字段里，进程一重建就丢，表现为“切几首歌/后台一会音效没了”。
+     */
+    private static synchronized void persist() {
+        try {
+            Context c = AudioCpmApp.get();
+            if (c == null) return;
+            SharedPreferences.Editor e = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit();
+            e.putBoolean("enabled", enabled);
+            e.putInt("preamp", preampMb);
+            e.putInt("bass", bassAmount);
+            e.putInt("treble", trebleAmount);
+            e.putInt("virt", virtAmount);
+            for (int i = 0; i < BANDS; i++) e.putInt("band" + i, gainsMb[i]);
+            e.apply();
+        } catch (Throwable ignored) {}
+    }
+
+    public static synchronized void restore(Context context) {
+        if (context == null) return;
+        try {
+            SharedPreferences p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            enabled = p.getBoolean("enabled", false);
+            preampMb = Math.max(-1000, Math.min(1000, p.getInt("preamp", 0)));
+            bassAmount = Math.max(0, Math.min(1000, p.getInt("bass", 0)));
+            trebleAmount = Math.max(0, Math.min(1000, p.getInt("treble", 0)));
+            virtAmount = Math.max(0, Math.min(1000, p.getInt("virt", 0)));
+            for (int i = 0; i < BANDS; i++) {
+                gainsMb[i] = Math.max(-MAX_BAND_MB, Math.min(MAX_BAND_MB, p.getInt("band" + i, 0)));
+            }
+            rev++;
+        } catch (Throwable ignored) {}
     }
 
     public static String infoJson() {
@@ -158,10 +204,12 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
         preampLin = (float) Math.pow(10.0, preampDb / 20.0);
         double fc = Math.min(160.0, fs * 0.2);
         bassAlpha = (float) (1.0 - Math.exp(-2.0 * Math.PI * fc / fs));
-        bassGain = (bassAmount / 1000f) * 0.65f;       // 最大约 +4.3 dB 的低频增益，避免直接削波
+        // 旧的 0.65 在 50% 时只有 +2.5 dB，手机/蓝牙耳机上几乎听不出来。
+        // 提到 1.25/1.15：50% 时低音约 +4.2 dB、高音约 +3.4 dB，最大约 +7/+5 dB；输出仍硬限幅防破音。
+        bassGain = (bassAmount / 1000f) * 1.25f;
         double fcT = Math.min(4000.0, fs * 0.2);
         trebleAlpha = (float) (1.0 - Math.exp(-2.0 * Math.PI * fcT / fs));
-        trebleGain = (trebleAmount / 1000f) * 0.65f;   // 最大约 +4.3 dB 的高频增益
+        trebleGain = (trebleAmount / 1000f) * 1.15f;
         virtWidth = (virtAmount / 1000f) * 1.1f;       // 最大 2.1 倍侧向扩展
         if (z1 == null) { z1 = new float[channels][BANDS]; z2 = new float[channels][BANDS]; }
         if (bassZ == null) bassZ = new float[channels];

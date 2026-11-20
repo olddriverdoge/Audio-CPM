@@ -74,12 +74,18 @@ const Utils = (() => {
     el.scrollTop = el.scrollHeight;
     while (el.children.length > 500) el.removeChild(el.firstChild);
   }
-  function openModal(src) {
+  /* 置顶图片预览：可指定宽度（元数据封面用浮窗外框宽度），层级高于所有浮窗/设置弹层。 */
+  function openModal(src, opts) {
     if (!src) return;
+    opts = opts || {};
+    document.querySelectorAll('.modal').forEach(el => el.remove());
     const m = document.createElement('div');
     m.className = 'modal';
     const img = document.createElement('img');
     img.src = src;
+    if (opts.alt) img.alt = String(opts.alt);
+    const w = Number(opts.width);
+    if (w > 0) img.style.width = Math.round(w) + 'px';
     m.appendChild(img);
     m.addEventListener('click', () => m.remove());
     document.body.appendChild(m);

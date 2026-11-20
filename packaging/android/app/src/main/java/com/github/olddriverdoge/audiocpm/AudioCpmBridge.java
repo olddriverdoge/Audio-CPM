@@ -1,6 +1,7 @@
 package com.github.olddriverdoge.audiocpm;
 
 import android.content.ComponentName;
+import android.media.AudioAttributes;
 import android.media.AudioDeviceInfo;
 import android.media.AudioManager;
 import android.media.AudioTrack;
@@ -113,27 +114,89 @@ public class AudioCpmBridge {
         }
     }
 
+    /** 设备稳定 key：同型号重连后 id 可能变化，type + 产品名更适合记住“这台设备”的延迟。 */
+    private static String deviceKey(AudioDeviceInfo d) {
+        String name = d.getProductName() == null ? "" : d.getProductName().toString().trim();
+        return deviceTypeName(d.getType()) + "|" + name;
+    }
+
+    /**
+     * 当前实际输出设备。优先用 Android 13+ 的预期路由 API；旧系统按系统路由优先级
+     * 从已连接 sink 里推断（USB/有线 > 蓝牙 > 扬声器），至少蓝牙不会再被显示成“系统默认”。
+     */
+    private static int activeOutputDeviceId(AudioManager am, AudioDeviceInfo[] devices) {
+        int selected = PlaybackService.getPreferredDeviceId();
+        if (selected > 0) {
+            for (AudioDeviceInfo d : devices) {
+                if (d.getId() == selected && d.isSink()) return selected;
+            }
+        }
+        if (Build.VERSION.SDK_INT >= 33) {
+            try {
+                AudioAttributes attrs = new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build();
+                List<AudioDeviceInfo> routed = am.getAudioDevicesForAttributes(attrs);
+                for (AudioDeviceInfo d : routed) {
+                    if (d != null && d.isSink()) return d.getId();
+                }
+            } catch (Throwable ignored) {}
+        }
+        int bestId = 0, bestScore = -1;
+        for (AudioDeviceInfo d : devices) {
+            if (!d.isSink()) continue;
+            int score = outputPriority(d.getType());
+            if (score > bestScore) { bestScore = score; bestId = d.getId(); }
+        }
+        return bestId;
+    }
+
+    private static int outputPriority(int type) {
+        switch (type) {
+            case AudioDeviceInfo.TYPE_USB_HEADSET:
+            case AudioDeviceInfo.TYPE_USB_DEVICE: return 90;
+            case AudioDeviceInfo.TYPE_WIRED_HEADSET:
+            case AudioDeviceInfo.TYPE_WIRED_HEADPHONES: return 80;
+            case AudioDeviceInfo.TYPE_BLUETOOTH_A2DP:
+            case AudioDeviceInfo.TYPE_BLE_HEADSET:
+            case AudioDeviceInfo.TYPE_BLE_SPEAKER: return 70;
+            case AudioDeviceInfo.TYPE_BLUETOOTH_SCO: return 60;
+            case AudioDeviceInfo.TYPE_HDMI_EARC:
+            case AudioDeviceInfo.TYPE_HDMI_ARC:
+            case AudioDeviceInfo.TYPE_HDMI: return 50;
+            case AudioDeviceInfo.TYPE_BUILTIN_SPEAKER: return 10;
+            case AudioDeviceInfo.TYPE_BUILTIN_EARPIECE: return 5;
+            default: return 0;
+        }
+    }
+
     /** 可用输出设备：USB DAC / 有线 / 蓝牙 / 扬声器。只返回 sink 设备。 */
     public static String audioDevices() {
         try {
             AudioManager am = (AudioManager) AudioCpmApp.get().getSystemService(Context.AUDIO_SERVICE);
             if (am == null) return "[]";
+            AudioDeviceInfo[] devices = am.getDevices(AudioManager.GET_DEVICES_OUTPUTS);
+            int activeId = activeOutputDeviceId(am, devices);
             StringBuilder sb = new StringBuilder("[");
             boolean first = true;
-            for (AudioDeviceInfo d : am.getDevices(AudioManager.GET_DEVICES_OUTPUTS)) {
+            for (AudioDeviceInfo d : devices) {
                 if (!d.isSink()) continue;
                 if (!first) sb.append(',');
                 first = false;
+                String key = deviceKey(d);
                 sb.append("{\"id\":").append(d.getId())
                         .append(",\"type\":\"").append(deviceTypeName(d.getType()))
                         .append("\",\"name\":\"").append(esc(d.getProductName() == null ? "" : d.getProductName().toString()))
+                        .append("\",\"key\":\"").append(esc(key))
                         .append("\",\"sampleRates\":[");
                 int[] rates = d.getSampleRates();
                 for (int i = 0; i < rates.length; i++) { if (i > 0) sb.append(','); sb.append(rates[i]); }
                 sb.append("],\"channels\":[");
                 int[] ch = d.getChannelCounts();
                 for (int i = 0; i < ch.length; i++) { if (i > 0) sb.append(','); sb.append(ch[i]); }
-                sb.append("],\"preferred\":").append(d.getId() == PlaybackService.getPreferredDeviceId()).append('}');
+                sb.append("],\"preferred\":").append(d.getId() == PlaybackService.getPreferredDeviceId())
+                        .append(",\"active\":").append(d.getId() == activeId).append('}');
             }
             sb.append(']');
             return sb.toString();

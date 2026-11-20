@@ -56,12 +56,12 @@ function createMetaView(container, opts) {
     html += '<h3>封面</h3>';
     if (d.has_cover) {
       html += '<div class="cover-box"><img src="' + esc(Api.coverUrl(d.path)) +
-        '" data-act="modal" loading="lazy" onerror="this.style.display=\'none\'"></div>';
+        '" data-act="modal" loading="lazy" title="点击放大" onerror="this.style.display=\'none\'"></div>';
     } else {
       html += '<div class="detail-empty">无内嵌封面</div>';
     }
-    html += '<div class="kv"><span class="k">内嵌封面</span><span class="v">' +
-      (d.has_cover ? tr('✓ 有') : tr('✗ 无')) + '</span></div>';
+    html += '<div class="cover-actions"><button type="button" class="small" data-act="cover-edit">✎ ' +
+      tr('编辑封面') + '</button></div>';
 
     // 2) 元数据：默认只读展示，点「编辑」才切换成可编辑表格
     if (canEdit && editing) {
@@ -197,7 +197,13 @@ function createMetaView(container, opts) {
       const tr = t.closest('tr');
       if (tr) tr.remove();
     } else if (act === 'modal') {
-      Utils.openModal(t.tagName === 'IMG' ? t.src : Api.coverUrl(curPath));
+      const src = t.tagName === 'IMG' ? t.src : Api.coverUrl(curPath);
+      const floatBox = container.closest('.meta-float');
+      const width = floatBox ? floatBox.getBoundingClientRect().width : 0;
+      Utils.openModal(src, {width: width, alt: curPath ? Utils.basename(curPath) : ''});
+    } else if (act === 'cover-edit') {
+      if (typeof App !== 'undefined' && App.openCoverEditor) App.openCoverEditor(curPath);
+      else if (typeof TaskRunner !== 'undefined') TaskRunner.openCoverEditor(curPath);
     }
   });
 

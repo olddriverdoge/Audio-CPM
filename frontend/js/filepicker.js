@@ -62,6 +62,46 @@ const FilePicker = (() => {
     }
   }
 
+  /* 系统文件选择器：Android 原生 ACTION_OPEN_DOCUMENT，结果由 AudioCpmNative 异步回调。
+     返回 null 表示当前环境没有原生选择器（网页版），由 pickCover 回退到应用内选择器。 */
+  function pickSystemImage() {
+    if (!window.AudioCpmNative || typeof window.AudioCpmNative.pickImage !== 'function') return null;
+    return new Promise(resolve => {
+      let settled = false;
+      const done = val => {
+        if (settled) return;
+        settled = true;
+        try { window.AudioCpmPickResult = null; } catch (_) {}
+        resolve(val);
+      };
+      window.AudioCpmPickResult = raw => {
+        let d = null;
+        try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch (_) {}
+        if (!d) { Utils.toast('系统选择器返回异常', 'err'); done(null); return; }
+        if (d.ok && d.path) { done(String(d.path)); return; }
+        if (!d.canceled && d.error) Utils.toast('系统选择器失败: ' + d.error, 'err');
+        done(null);
+      };
+      let started = null;
+      try { started = JSON.parse(window.AudioCpmNative.pickImage() || '{}'); }
+      catch (e) { started = null; }
+      if (!started || !started.ok) {
+        if (started && started.error && started.error !== 'busy') {
+          Utils.toast('系统选择器不可用: ' + started.error, 'warn');
+        }
+        // undefined 表示原生选择器没起来，pickCover 会回退应用内选择；null 才是用户取消。
+        done(undefined);
+      }
+    });
+  }
+
+  /* 替换封面优先系统选择器；只有网页版/无原生桥时才用应用内选择。 */
+  function pickCover(startPath) {
+    const sys = pickSystemImage();
+    if (!sys) return pickImage(startPath);
+    return sys.then(v => (v === undefined) ? pickImage(startPath) : v);
+  }
+
   /* 返回 Promise<string|null> */
   function pickImage(startPath) {
     ensure();
@@ -73,5 +113,5 @@ const FilePicker = (() => {
     });
   }
 
-  return {pickImage};
+  return {pickImage, pickCover, pickSystemImage};
 })();

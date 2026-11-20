@@ -16,4 +16,5 @@
     <string name="action_pause">暂停</string>
     <string name="action_play">播放</string>
     <string name="action_next">下一首</string>
+    <string name="cover_picker_title">选择封面图片</string>
 </resources>

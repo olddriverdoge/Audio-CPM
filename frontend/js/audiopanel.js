@@ -84,6 +84,26 @@ function createAudioPanel() {
     const maxRate = rates.length ? Math.max.apply(null, rates) : 0;
     return type + (name ? ' · ' + name : '') + (maxRate ? ' · ' + (maxRate / 1000).toFixed(1) + 'kHz' : '');
   }
+  function deviceShort(d) {
+    return d ? (DEVICE_TYPES[d.type] || d.type || '设备') : '系统默认';
+  }
+  function deviceKey(d) {
+    return d ? String(d.key || ((d.type || 'other') + '|' + String(d.name || ''))) : 'default';
+  }
+  /* 把当前实际输出广播给频谱模块：延迟按这个 key 分别保存。 */
+  function publishActive(devices) {
+    const active = (devices || []).find(d => !!d.active) || null;
+    const detail = {
+      key: active ? deviceKey(active) : 'default',
+      id: active ? Number(active.id) || 0 : 0,
+      label: active ? deviceLabel(active) : '系统默认',
+      short: active ? deviceShort(active) : '系统默认',
+      active: !!active
+    };
+    window.__AUDIO_CPM_OUTPUT = detail;
+    try { window.dispatchEvent(new CustomEvent('ac2-output-device', {detail})); } catch (_) {}
+    return detail;
+  }
 
   function bindRoute() {
     const sel = document.getElementById('af-device');
@@ -95,16 +115,28 @@ function createAudioPanel() {
         const r = await Api.audioDevices();
         if (!Array.isArray(r)) { hint('设备列表读取失败'); return; }
         const saved = Number(Store.get(K.audioDevice, 0)) || 0;
-        const opts = ['<option value="0">系统默认</option>'].concat(r.map(d =>
-          '<option value="' + Number(d.id) + '">' + Utils.escapeHtml(deviceLabel(d)) + '</option>'));
-        sel.innerHTML = opts.join('');
-        sel.value = (r.some(d => Number(d.id) === saved) || saved === 0) ? String(saved) : '0';
-        const cur = r.find(d => !!d.preferred) || null;
-        hint(cur ? ('当前：' + deviceLabel(cur)) : '当前：系统默认');
-        if (saved && !r.some(d => Number(d.id) === saved)) {
-          // 设备拔掉了：UI 回到默认，但不清用户的选择，插回后仍可恢复。
-          hint('上次选择的设备未连接，当前使用系统默认');
+        const active = r.find(d => !!d.active) || null;
+        const detail = publishActive(r);
+        const savedDev = r.find(d => Number(d.id) === saved) || null;
+        // 只在用户没有正在操作下拉框时重建，避免 3 秒轮询把点选打断。
+        if (document.activeElement !== sel) {
+          const defText = active ? ('系统默认（当前：' + deviceShort(active) + '）') : '系统默认';
+          const opts = ['<option value="0">' + Utils.escapeHtml(defText) + '</option>'].concat(r.map(d =>
+            '<option value="' + Number(d.id) + '">' + Utils.escapeHtml(deviceLabel(d)) + '</option>'));
+          sel.innerHTML = opts.join('');
+          sel.value = (saved === 0 || savedDev) ? String(saved) : '0';
         }
+        if (savedDev && saved !== 0) {
+          hint('已选：' + deviceLabel(savedDev) + ' · 当前输出：' +
+            (active ? deviceLabel(active) : '系统默认'));
+        } else if (saved && !savedDev) {
+          // 设备拔掉了：UI 回到默认，但不清用户的选择，插回后仍可恢复。
+          hint('上次选择的设备未连接 · 当前输出：' + (active ? deviceLabel(active) : '系统默认'));
+        } else {
+          hint('系统默认 · 当前输出：' + (active ? deviceLabel(active) : '系统默认'));
+        }
+        // 给频谱模块一个简短的设备标签，不改它自己的配置。
+        try { if (window.__ac2OutputDetail !== detail) window.__ac2OutputDetail = detail; } catch (_) {}
       } catch (e) {
         hint('设备列表读取失败: ' + ((e && e.message) || e));
       }
@@ -135,7 +167,8 @@ function createAudioPanel() {
     // EQ 关闭时不要再单独发送频段/前级；它们属于同一条 EQ 链路，
     // 否则界面显示“关闭”，拖动推子却仍会改变声音。
     if (cfg.eqOn) {
-      if (Array.isArray(cfg.bands) && info && info.fx && info.fx.ok) {
+      // 不再依赖面板 info：切歌/进程重建后也要把保存的 10 段参数重新下发。
+      if (Array.isArray(cfg.bands)) {
         cfg.bands.forEach((lv, i) => fx('band', lv, i));
       }
       fx('preamp', Math.round((cfg.preamp || 0) * 100));
@@ -145,6 +178,12 @@ function createAudioPanel() {
     fx('virt', cfg.virt || 0);
     if (cfg.speed && cfg.speed !== 1) fx('speed', Math.round(cfg.speed * 100));
   }
+
+  /* 切歌时 App.onPlayed 会调用；合并短时间内的多次调用，避免连播时重复下发 20 次。 */
+  window.__ac2ReapplyAudioFx = () => {
+    if (reapplyTimer) clearTimeout(reapplyTimer);
+    reapplyTimer = setTimeout(() => { reapplyTimer = 0; applyAll(); }, 80);
+  };
 
   function paintEqSwitch() {
     const sw = document.getElementById('af-eq-on');
@@ -273,7 +312,7 @@ function createAudioPanel() {
       cfg.eqOn = !!eqOn.checked; save();
       fx('eq', cfg.eqOn ? 1 : 0);
       if (cfg.eqOn) {
-        if (Array.isArray(cfg.bands) && info && info.fx && info.fx.ok) {
+        if (Array.isArray(cfg.bands)) {
           cfg.bands.forEach((lv, i) => fx('band', lv, i));
         }
         fx('preamp', Math.round((cfg.preamp || 0) * 100));
@@ -484,7 +523,7 @@ function createAudioPanel() {
     } catch (_) {}
   }
 
-  let refreshTimer = 0, lastInfoKey = '';
+  let refreshTimer = 0, devTimer = 0, reapplyTimer = 0, lastInfoKey = '';
 
   function paintTrack() {
     if (!trackEl || !info) return;
@@ -576,9 +615,14 @@ function createAudioPanel() {
       if (reloadDevices) reloadDevices();
       clearInterval(refreshTimer);
       refreshTimer = setInterval(refresh, 1500);
+      clearInterval(devTimer);
+      // 连接/摘下蓝牙、插拔 USB 时，面板不能一直停在打开时的旧设备。
+      devTimer = setInterval(() => { if (reloadDevices) reloadDevices(); }, 3000);
     } else {
       clearInterval(refreshTimer);
       refreshTimer = 0;
+      clearInterval(devTimer);
+      devTimer = 0;
     }
   });
   return fw;

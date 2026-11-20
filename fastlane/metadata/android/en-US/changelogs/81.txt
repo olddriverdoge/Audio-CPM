@@ -1,0 +1,8 @@
+0.5.1
+- Tap the cover in Playback Manager to open the metadata window
+- Metadata cover now fills the window; tap for a top-layer preview at window width
+- Replace the embedded-cover check with an Edit cover button that opens batch Replace cover for the current file
+- Cover replacement now uses the system file picker and copies the picked image into app-private storage
+- Spectrum/spectrogram delay is stored per output device and restored when the route changes
+- Audio output now shows the actual active device (Bluetooth, wired, USB)
+- Stronger bass/treble boost; effect settings persist natively across track changes and process restarts

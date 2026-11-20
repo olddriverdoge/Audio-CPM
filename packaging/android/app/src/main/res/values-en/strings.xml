@@ -16,4 +16,5 @@
     <string name="action_pause">Pause</string>
     <string name="action_play">Play</string>
     <string name="action_next">Next</string>
+    <string name="cover_picker_title">Choose a cover image</string>
 </resources>

@@ -47,9 +47,9 @@
   .ctx-item{padding:7px 12px;border-radius:5px;font-size:13px;cursor:pointer}
   .ctx-item:hover{background:#2f3a48}
   .ctx-item.danger{color:var(--err)}
-  .modal{position:fixed;inset:0;background:rgba(0,0,0,.88);display:flex;align-items:center;
-    justify-content:center;z-index:400;cursor:zoom-out}
-  .modal img{max-width:92vw;max-height:92vh}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.92);display:flex;align-items:center;
+    justify-content:center;z-index:2147483647;cursor:zoom-out;padding:4px;overscroll-behavior:contain}
+  .modal img{max-width:96vw;max-height:92vh;object-fit:contain;border-radius:4px;box-shadow:0 16px 60px rgba(0,0,0,.8)}
   .sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;
     align-items:center;justify-content:center;z-index:350}
   .sheet{background:var(--panel);border:1px solid var(--border);border-radius:10px;
@@ -86,7 +86,7 @@
     .m2-left{min-width:110px;padding-right:4px}
     .m2-right{padding-left:4px}
     .detail-panel .k{min-width:64px}
-    .cover-box img{max-width:100%;max-height:110px}
+    .cover-box img{max-width:100%;max-height:46vh}
     #view1{height:34vh}
     .pb-vol{display:none}
     .pb-time{min-width:32px}
