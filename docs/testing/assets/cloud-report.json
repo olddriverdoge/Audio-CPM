@@ -1,0 +1,342 @@
+{
+  "api": {
+    "results": [
+      {
+        "name": "static frontend is served",
+        "ok": true,
+        "detail": "23469 bytes"
+      },
+      {
+        "name": "capabilities + ffmpeg formats",
+        "ok": true,
+        "detail": "{\"formats\": [\"flac\", \"m4a\", \"wav\", \"aif\"], \"mode\": \"system\"}"
+      },
+      {
+        "name": "local root and capability metadata",
+        "ok": true,
+        "detail": "1 root(s)"
+      },
+      {
+        "name": "storage sources list",
+        "ok": true,
+        "detail": "1 source(s)"
+      },
+      {
+        "name": "browse root directory listing",
+        "ok": true,
+        "detail": "['api', 'ui']"
+      },
+      {
+        "name": "browse audio/image metadata",
+        "ok": true,
+        "detail": "['Track One.flac', 'Track Two.wav', 'cover.jpg']"
+      },
+      {
+        "name": "browse missing path falls back to root",
+        "ok": true,
+        "detail": "local:/tmp/ac2_cloud_suite_2ggwbus2/root"
+      },
+      {
+        "name": "tree root and child paths",
+        "ok": true,
+        "detail": "['api', 'ui']"
+      },
+      {
+        "name": "tree missing directory gives 400",
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "probe FLAC tags and duration",
+        "ok": true,
+        "detail": "flac"
+      },
+      {
+        "name": "probe embedded cover",
+        "ok": true,
+        "detail": "True"
+      },
+      {
+        "name": "probe missing file gives 404",
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "edit tags writes and reads back",
+        "ok": true,
+        "detail": "title/genre written"
+      },
+      {
+        "name": "serve local image",
+        "ok": true,
+        "detail": "image/jpeg"
+      },
+      {
+        "name": "image rejects non-image",
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "embedded cover thumbnail",
+        "ok": true,
+        "detail": "279 bytes"
+      },
+      {
+        "name": "cover endpoint 404 without cover",
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "waveform peaks and duration",
+        "ok": true,
+        "detail": "32 peaks, 71 ms"
+      },
+      {
+        "name": "stream full audio",
+        "ok": true,
+        "detail": "32604 bytes, audio/flac"
+      },
+      {
+        "name": "stream HTTP Range",
+        "ok": true,
+        "detail": "bytes 0-99/32604"
+      },
+      {
+        "name": "external play missing file is handled",
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "external play blocks non-public path",
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "mkdir validation and duplicate",
+        "ok": true,
+        "detail": "created + duplicate rejected"
+      },
+      {
+        "name": "rmdir empty directory",
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "rename directory",
+        "ok": true,
+        "detail": "local:/tmp/ac2_cloud_suite_2ggwbus2/root/api/work/renamed"
+      },
+      {
+        "name": "copy conflict policies",
+        "ok": true,
+        "detail": "copy + skip + rename"
+      },
+      {
+        "name": "move file",
+        "ok": true,
+        "detail": "source removed, target exists"
+      },
+      {
+        "name": "move directory into itself is rejected",
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "delete existing + missing",
+        "ok": true,
+        "detail": "{\"results\": [{\"path\": \"local:/tmp/ac2_cloud_suite_2ggwbus2/root/api/ops/Delete Me.flac\", \"status\": \"ok\"}, {\"path\": \"local:/tmp/ac2_cloud_suite_2ggwbus2/root/api/work/not-here.flac\", \"status\": \"error\", \"reason\": \"not_found\"}], \"deleted\": 1, \"failed\": 1}"
+      },
+      {
+        "name": "rmdir non-empty directory rejected",
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "save local source and validate id",
+        "ok": true,
+        "detail": "testlocal added"
+      },
+      {
+        "name": "WebDAV connection failure is reported",
+        "ok": true,
+        "detail": "[Errno 111] Connection refused"
+      },
+      {
+        "name": "delete source and protect local",
+        "ok": true,
+        "detail": "custom deleted; local protected"
+      },
+      {
+        "name": "rename preview",
+        "ok": true,
+        "detail": "[{'file': 'Track Two.flac', 'new': 'Test Composer - Track Two.flac'}, {'file': 'Track With Cover.flac', 'new': 'Test Composer - Track One.flac'}, {'file': 'Track One.flac', 'new': 'Test Composer - Track One_1.flac'}]"
+      },
+      {
+        "name": "convert task completes",
+        "ok": true,
+        "detail": "fab6d4495f3e: Track One.flac"
+      },
+      {
+        "name": "tags/rename task with composer",
+        "ok": true,
+        "detail": "Test Composer - Track Two.flac"
+      },
+      {
+        "name": "tags/rename tolerates missing composer",
+        "ok": true,
+        "detail": "Test Artist - Track One.flac"
+      },
+      {
+        "name": "check tags task",
+        "ok": true,
+        "detail": "1 file checked"
+      },
+      {
+        "name": "replace cover task",
+        "ok": true,
+        "detail": "cover embedded and served"
+      },
+      {
+        "name": "task presets persist",
+        "ok": true,
+        "detail": "save + reload"
+      },
+      {
+        "name": "start task validation",
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "name": "task list and missing status",
+        "ok": true,
+        "detail": "5 tasks persisted/listed"
+      },
+      {
+        "name": "task SSE stream",
+        "ok": true,
+        "detail": "1980 bytes"
+      },
+      {
+        "name": "native audio falls back cleanly on cloud",
+        "ok": true,
+        "detail": "not_supported/[]"
+      },
+      {
+        "name": "native audio FX/device fall back cleanly",
+        "ok": true,
+        "detail": "fx + device"
+      },
+      {
+        "name": "all native playback routes have cloud fallbacks",
+        "ok": true,
+        "detail": "10 control routes + spectrum/diag"
+      }
+    ],
+    "passed": 46,
+    "failed": 0
+  },
+  "ui": {
+    "results": [
+      {
+        "name": "home renders built-in scenes",
+        "ok": true,
+        "detail": "3 scene cards"
+      },
+      {
+        "name": "settings language hint is English",
+        "ok": true,
+        "detail": "Can't find your language? No problem — open http://127.0.0.1:8765/ in a browser and turn on auto-translate."
+      },
+      {
+        "name": "hint stays English after language switch",
+        "ok": true,
+        "detail": "設定 -> hint unchanged"
+      },
+      {
+        "name": "convert scene opens expected modules",
+        "ok": true,
+        "detail": "browse + task + log visible"
+      },
+      {
+        "name": "task type switches panels",
+        "ok": true,
+        "detail": "convert/tags/cover panels toggle"
+      },
+      {
+        "name": "column settings sheet opens",
+        "ok": true,
+        "detail": "open/close"
+      },
+      {
+        "name": "browse nested directories",
+        "ok": true,
+        "detail": "ui/Album A visible"
+      },
+      {
+        "name": "click audio row starts playback",
+        "ok": true,
+        "detail": "Track One"
+      },
+      {
+        "name": "grid view reveals player bar",
+        "ok": true,
+        "detail": "grid + bottom player bar"
+      },
+      {
+        "name": "metadata float opens for played track",
+        "ok": true,
+        "detail": "metadata visible"
+      },
+      {
+        "name": "spectrum float opens",
+        "ok": true,
+        "detail": "2 tabs + canvas"
+      },
+      {
+        "name": "checkbox selects file and reveals tools",
+        "ok": true,
+        "detail": "已选 1 个文件"
+      },
+      {
+        "name": "delete selected file with confirmation",
+        "ok": true,
+        "detail": "disk and DOM removed"
+      },
+      {
+        "name": "convert task setup",
+        "ok": true,
+        "detail": "FLAC-16-44"
+      },
+      {
+        "name": "convert task via UI completes",
+        "ok": true,
+        "detail": "Track To Convert.flac"
+      },
+      {
+        "name": "audio panel opens on cloud",
+        "ok": true,
+        "detail": "panel shows web/native limitation"
+      },
+      {
+        "name": "save current layout as scene",
+        "ok": true,
+        "detail": "scene persisted in localStorage"
+      },
+      {
+        "name": "mobile viewport settings fits",
+        "ok": true,
+        "detail": "sheet width 359px"
+      }
+    ],
+    "passed": 18,
+    "failed": 0,
+    "console_errors": [],
+    "page_errors": []
+  },
+  "base": "http://127.0.0.1:54341",
+  "fixture": "/tmp/ac2_cloud_suite_2ggwbus2",
+  "screenshots": "/tmp/ac2_cloud_suite_2ggwbus2/screenshots",
+  "duration_sec": 35.83,
+  "generated_at": "2026-11-20T22:26:58+0800",
+  "pass": true
+}
