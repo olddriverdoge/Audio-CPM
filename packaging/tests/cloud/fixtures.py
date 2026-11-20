@@ -64,6 +64,7 @@ def build_fixture(root: Path, ffmpeg: str = "ffmpeg") -> Dict[str, str]:
     for p in (
         api / "in" / "Album A",
         api / "in" / "Album B",
+        api / "in" / "Cover Only",
         api / "ops",
         api / "out",
         api / "work",
@@ -91,6 +92,8 @@ def build_fixture(root: Path, ffmpeg: str = "ffmpeg") -> Dict[str, str]:
     })
     covered = api / "in" / "Album B" / "Track With Cover.flac"
     _embed_cover(ffmpeg, track1, cover, covered)
+    # 目录封面回落用：目录里只有带内嵌封面的音频，没有独立图片文件。
+    shutil.copy2(covered, api / "in" / "Cover Only" / "Only Audio.flac")
     (api / "in" / "Album B" / "readme.txt").write_text("not audio", encoding="utf-8")
     (api / "in" / "Album A" / "cover.jpg").write_bytes(cover.read_bytes())
     # Copy the source image too; the task tests can use either path.
@@ -134,6 +137,7 @@ def build_fixture(root: Path, ffmpeg: str = "ffmpeg") -> Dict[str, str]:
         "api_in": f"local:{api / 'in'}",
         "album_a": f"local:{api / 'in' / 'Album A'}",
         "album_b": f"local:{api / 'in' / 'Album B'}",
+        "cover_only": f"local:{api / 'in' / 'Cover Only'}",
         "track1": f"local:{track1}",
         "track2": f"local:{track2}",
         "covered": f"local:{covered}",

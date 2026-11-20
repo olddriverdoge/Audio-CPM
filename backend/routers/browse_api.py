@@ -6,7 +6,7 @@ import os
 
 from starlette.exceptions import HTTPException
 from starlette.requests import Request
-from starlette.responses import FileResponse, StreamingResponse
+from starlette.responses import FileResponse, RedirectResponse, StreamingResponse
 from starlette.routing import Route
 
 from ..config import DEFAULT_ROOT, MEDIA_EXTS, IMAGE_EXTS
@@ -82,6 +82,52 @@ def api_browse(request: Request):
               "dirs": dirs, "files": files, "cover": dir_cover})
 
 
+def api_folder_cover(request: Request):
+    """文件夹封面：优先目录内第一张图片；没有图片则用第一个音频的内嵌封面。"""
+    path = qs(request, 'path')
+    ref = parse_ref(path)
+    if ref.kind == 'dav':
+        try:
+            d = get_dav_client(ref.source).list(ref.path)
+        except Exception as e:
+            raise HTTPException(400, f"WebDAV 读取失败: {e}")
+        prefix = 'dav:' + ref.source
+        first_image = next((x for x in d.get('files', []) if x.get('type') == 'image'), None)
+        first_media = next((x for x in d.get('files', []) if x.get('type') == 'media'), None)
+        if first_image:
+            return RedirectResponse('/api/image?path=' + _quote(prefix + first_image['path']), status_code=302)
+        if first_media:
+            return RedirectResponse('/api/thumb?path=' + _quote(prefix + first_media['path']) + '&size=96', status_code=302)
+        raise HTTPException(404, "no folder cover")
+
+    p = ref.path
+    if not os.path.isdir(p):
+        raise HTTPException(404, "folder not found")
+    try:
+        names = sorted(os.listdir(p))
+    except Exception as e:
+        raise HTTPException(400, f"无法读取目录: {e}")
+    first_image = first_media = None
+    for name in names:
+        full = os.path.join(p, name)
+        if not os.path.isfile(full):
+            continue
+        ext = os.path.splitext(name)[1].lower()
+        if ext in IMAGE_EXTS and first_image is None:
+            first_image = full
+        elif ext in MEDIA_EXTS and first_media is None:
+            first_media = full
+        if first_image or first_media:
+            # 图片优先；若先遇到音频，还要继续找一个图片
+            if first_image:
+                break
+    if first_image:
+        return RedirectResponse('/api/image?path=' + _quote(local_uri(first_image)), status_code=302)
+    if first_media:
+        return RedirectResponse('/api/thumb?path=' + _quote(local_uri(first_media)) + '&size=96', status_code=302)
+    raise HTTPException(404, "no folder cover")
+
+
 def api_image(request: Request):
     path = qs(request, 'path')
     ref = parse_ref(path)
@@ -136,5 +182,6 @@ def api_probe_file(request: Request):
 
 
 routes.append(Route('/api/browse', api_browse))
+routes.append(Route('/api/folder_cover', api_folder_cover))
 routes.append(Route('/api/image', api_image))
 routes.append(Route('/api/probe_file', api_probe_file))

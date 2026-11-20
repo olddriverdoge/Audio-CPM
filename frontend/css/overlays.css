@@ -152,7 +152,7 @@
   body.has-player .move-float{bottom:212px}
   .move-float.hidden{display:none}
 
-  .spectrum-float{position:fixed;right:10px;bottom:96px;z-index:331;width:320px;height:170px;
+  .spectrum-float{position:fixed;right:10px;bottom:96px;z-index:331;width:min(320px,calc(100vw - 20px));height:min(170px,calc(100vh - 120px));
     min-width:180px;min-height:110px;max-width:92vw;max-height:70vh;
     display:flex;flex-direction:column;background:rgba(13,18,24,.97);
     border:1px solid var(--border);border-radius:8px;
@@ -177,7 +177,7 @@
   /* 元数据浮窗：与频谱浮窗同交互，独立入口 */
   .sf-fab.meta-fab{bottom:132px}
   body.has-player .sf-fab.meta-fab{bottom:176px}
-  .meta-float{position:fixed;right:10px;bottom:132px;z-index:331;width:320px;height:400px;
+  .meta-float{position:fixed;right:10px;bottom:132px;z-index:331;width:min(320px,calc(100vw - 20px));height:min(400px,calc(100vh - 140px));
     min-width:230px;min-height:160px;max-width:94vw;max-height:80vh;
     display:flex;flex-direction:column;background:rgba(13,18,24,.97);
     border:1px solid var(--border);border-radius:8px;
@@ -233,7 +233,7 @@ body.app-mode #menu-overlay { padding-top: var(--sat, 0px); }
 /* ---------- 全局日志浮窗（按钮入口 + 按页面隔离） ---------- */
 .sf-fab.log-fab{bottom:204px}
 body.has-player .sf-fab.log-fab{bottom:248px}
-.log-float{position:fixed;right:10px;bottom:204px;z-index:331;width:360px;height:260px;
+.log-float{position:fixed;right:10px;bottom:204px;z-index:331;width:min(360px,calc(100vw - 20px));height:min(260px,calc(100vh - 160px));
   min-width:220px;min-height:140px;max-width:94vw;max-height:74vh;
   display:flex;flex-direction:column;background:rgba(13,18,24,.97);
   border:1px solid var(--border);border-radius:8px;

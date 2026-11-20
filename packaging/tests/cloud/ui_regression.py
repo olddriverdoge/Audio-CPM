@@ -78,7 +78,7 @@ class UiRegression:
         self.page.set_default_timeout(9000)
         self.page.on("console", self._on_console)
         self.page.on("pageerror", self._on_pageerror)
-        self.page.goto(self.base + "/", wait_until="load", timeout=20000)
+        self.page.goto(self.base + "/?defaults=0", wait_until="load", timeout=20000)
         self.page.evaluate("localStorage.clear()")
         self.page.reload(wait_until="load", timeout=20000)
         self.page.wait_for_function(
@@ -298,6 +298,13 @@ class UiRegression:
 
         def navigate():
             self.open_dir(self.fx["ui_root"])
+            # 文件夹图标优先显示目录内第一张图，而不是固定的 📁。
+            icon = self.page.locator(
+                f'#view1 .item.dir[data-dir-path="{self.fx["ui_album_a"]}"] .dir-icon img'
+            )
+            icon.wait_for(state="attached", timeout=3000)
+            src = icon.evaluate("e => e.currentSrc || e.src || e.getAttribute('data-thumb')")
+            self.require("/api/folder_cover" in (src or ""), f"folder cover src: {src!r}")
             self.open_dir(self.fx["ui_album_a"])
             self.wait_file(self.fx["ui_track1"])
             return "ui/Album A visible"
@@ -306,7 +313,7 @@ class UiRegression:
         def play():
             # Click near the left edge so this is "start from 0", not seek to
             # the middle of the row (which can finish a short fixture quickly).
-            self.wait_file(self.fx["ui_track1"]).click(position={"x": 4, "y": 15})
+            self.wait_file(self.fx["ui_track1"]).locator('.name').click()
             self.page.wait_for_timeout(350)
             cur = self.page.evaluate("typeof Player !== 'undefined' ? Player.current : null")
             self.require(cur == self.fx["ui_track1"], f"Player.current: {cur}")
@@ -331,7 +338,28 @@ class UiRegression:
             return "grid + bottom player bar"
         self.check("grid view reveals player bar", grid_bar)
 
+        def folder_grid():
+            # 网格模式的目录封面也走 /api/folder_cover；没有图片时回落到音频封面。
+            self.page.evaluate("(p) => App.browse(p)", self.fx["ui_root"])
+            self.page.wait_for_timeout(500)
+            self.page.locator("#s1-view-btn").click()
+            self.page.wait_for_timeout(450)
+            imgs = self.page.locator(
+                f'.tile[data-dir-path="{self.fx["ui_album_a"]}"] .tile-cover.dir img'
+            )
+            self.require(imgs.count() == 1, "grid folder cover image missing")
+            src = imgs.first.evaluate("e => e.currentSrc || e.src || e.getAttribute('data-thumb')")
+            self.require("/api/folder_cover" in (src or ""), f"grid folder cover src: {src!r}")
+            self.page.locator("#s1-view-btn").click()
+            self.page.wait_for_timeout(300)
+            return "grid folder cover"
+        self.check("grid directory uses folder cover", folder_grid)
+
         def meta():
+            # 前面的播放/网格操作可能让 2 秒的测试音频自动切到下一首；
+            # 打开元数据前重新播放 Track One，断言针对确定的文件。
+            self.page.evaluate("(p) => PlayMgr.play(p)", self.fx["ui_track1"])
+            self.page.wait_for_timeout(350)
             self.page.locator("#module-fab").click()
             self.page.locator("#module-menu").wait_for(state="visible", timeout=3000)
             self.page.locator('#module-menu [data-mod="meta"]').click()
@@ -358,7 +386,7 @@ class UiRegression:
             # 切到 Album B 的带内嵌封面文件，确保背景图不是依赖目录 cover.jpg。
             self.page.evaluate("(p) => App.browse(p)", self.fx["ui_album_b"])
             self.raise_browse()
-            self.wait_file(self.fx["ui_covered"]).click(position={"x": 4, "y": 15})
+            self.wait_file(self.fx["ui_covered"]).locator('.name').click()
             self.page.wait_for_timeout(400)
             self.page.evaluate("() => App.openModule('play')")
             self.page.locator("#play-float").wait_for(state="visible", timeout=5000)
@@ -371,6 +399,12 @@ class UiRegression:
                 "() => getComputedStyle(document.querySelector('#pf-bg')).backgroundImage"
             )
             self.require("api/cover" in bg, f"cover backdrop: {bg[:160]}")
+            pf = self.page.evaluate(
+                "() => { const s = getComputedStyle(document.querySelector('#pf-bg'));"
+                " return {opacity: s.opacity, filter: s.filter, inset: s.inset}; }"
+            )
+            self.require(float(pf["opacity"]) >= 0.95, f"cover backdrop too transparent: {pf}")
+            self.require("blur(24px)" not in (pf["filter"] or ""), f"cover backdrop still heavily blurred: {pf}")
             toggle = self.page.locator("#pf-q-toggle")
             self.require(toggle.get_attribute("aria-expanded") == "true", "queue should start expanded")
             toggle.click()
@@ -394,7 +428,10 @@ class UiRegression:
         self.page.locator("#fw-browse").wait_for(state="visible", timeout=5000)
 
         def select_row():
-            self.open_dir(self.fx["ui_root"])
+            # 前一个用例可能在 Album B；直接回到 ui 根目录，再让真实点击
+            # 目录行进入 Trash。避免把测试的随机当前路径当成产品回归。
+            self.page.evaluate("(p) => App.browse(p)", self.fx["ui_root"])
+            self.page.wait_for_timeout(500)
             self.open_dir(self.fx["ui_trash"])
             target = self.page.locator(f'#view1 .item.file[data-path="{self.fx["ui_delete_me"]}"]')
             target.wait_for(state="visible", timeout=5000)
@@ -515,7 +552,7 @@ class UiRegression:
                     status: 200, headers: {'Content-Type': 'application/json'}
                   }))
                 : realFetch(url, opts);
-              try { return await Defaults.apply(); } finally { window.fetch = realFetch; }
+try { return await Defaults.apply(true); } finally { window.fetch = realFetch; }
             }""", bundle)
             self.require(changed >= 2, f"defaults changed {changed}")
             ov = self.page.evaluate("() => JSON.parse(localStorage.getItem('ac3_scene_overrides') || '{}')")
@@ -530,11 +567,100 @@ class UiRegression:
                     status: 200, headers: {'Content-Type': 'application/json'}
                   }))
                 : realFetch(url, opts);
-              try { return await Defaults.apply(); } finally { window.fetch = realFetch; }
+try { return await Defaults.apply(true); } finally { window.fetch = realFetch; }
             }""", bundle)
             self.require(again == 0, f"defaults applied twice: {again}")
             return "scene geo + pref injected once"
         self.check("UI defaults import is one-shot and non-destructive", run)
+
+    def test_real_defaults_and_orientation(self):
+        """真实仓库 defaults.json + 390x844 竖屏 -> 844x390 横屏。
+
+        不截屏：只用 DOM 矩形判断模块是否都在视口内、是否互相重叠，
+        以及默认网格/列宽/场景覆盖是否真的来自 defaults.json。
+        """
+        ctx = self.browser.new_context(
+            locale="zh-CN", viewport={"width": 390, "height": 844}, device_scale_factor=1
+        )
+        self.context = ctx
+        self.page = ctx.new_page()
+        self.page.set_default_timeout(9000)
+        page = self.page
+
+        def boot():
+            page.goto(self.base + "/", wait_until="load", timeout=20000)
+            page.evaluate("localStorage.clear()")
+            page.reload(wait_until="load", timeout=20000)
+            page.wait_for_function(
+                "typeof App !== 'undefined' && document.querySelectorAll('#scene-tabs .scene-chip').length > 0",
+                timeout=15000,
+            )
+            page.wait_for_timeout(900)
+            return "loaded real defaults"
+        self.check("real defaults bundle loads", boot)
+
+        def defaults():
+            marker = page.evaluate("() => localStorage.getItem('ac3_defaults_applied')")
+            self.require(bool(marker), "defaults marker missing")
+            ov = page.evaluate("() => JSON.parse(localStorage.getItem('ac3_scene_overrides') || '{}')")
+            self.require(len([k for k in ov if k.startswith('builtin-')]) == 3,
+                         f"builtin overrides: {list(ov)}")
+            self.require(any(k.get('viewport') for k in ov.values()), "scene viewport not recorded")
+            self.require(page.evaluate("() => JSON.parse(localStorage.getItem('ac2_view_mode') || 'null')") == "grid",
+                         "default view mode not grid")
+            cols = page.evaluate("() => JSON.parse(localStorage.getItem('ac2_columns') || '{}')")
+            self.require(cols.get("widths", {}).get("name") == 167, f"column widths: {cols}")
+            return "3 scenes + grid + name=167"
+        self.check("real defaults populate scenes and prefs", defaults)
+
+        def geometry_ok(tag):
+            data = page.evaluate("""() => {
+              const ids = ['fw-browse','fw-task','log-float','play-float','spectrum-float','tree-float'];
+              const mods = App.openModules ? App.openModules() : [];
+              const wins = mods.map(m => document.querySelector('#fw-' + m + ', #' + m + '-float')).filter(Boolean);
+              const vw = innerWidth, vh = innerHeight;
+              const pb = document.querySelector('#player-bar');
+              const pbTop = pb && !pb.classList.contains('hidden') ? pb.getBoundingClientRect().top : vh;
+              const rs = wins.map(w => {
+                const r = w.getBoundingClientRect();
+                return {id: w.id, x:r.x, y:r.y, w:r.width, h:r.height};
+              });
+              let overlaps = [];
+              for (let i=0;i<rs.length;i++) for (let j=i+1;j<rs.length;j++) {
+                const a=rs[i], b=rs[j];
+                const iw=Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x);
+                const ih=Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y);
+                if (iw>12 && ih>12) overlaps.push([a.id,b.id,Math.round(iw),Math.round(ih)]);
+              }
+              const outside = rs.filter(r => r.x < -2 || r.y < -2 || r.x+r.w > vw+2 || r.y+r.h > pbTop+2);
+              return {vw, vh, pbTop, rs, overlaps, outside};
+            }""")
+            self.require(len(data["rs"]) >= 2, f"{tag}: no windows {data}")
+            self.require(not data["overlaps"], f"{tag}: overlaps {data['overlaps']} rects={data['rs']}")
+            self.require(not data["outside"], f"{tag}: outside viewport {data['outside']} vw={data['vw']} pbTop={data['pbTop']}")
+            return f"{tag}: {len(data['rs'])} windows clear"
+        def portrait():
+            page.locator('#scene-tabs .scene-chip, .sh-card[data-id="builtin-convert"]').first.click()
+            page.wait_for_timeout(700)
+            return geometry_ok("portrait")
+        self.check("portrait scene windows fit without overlap", portrait)
+
+        def landscape():
+            page.set_viewport_size({"width": 844, "height": 390})
+            page.wait_for_timeout(1100)
+            return geometry_ok("landscape")
+        self.check("landscape reflow keeps all windows visible and non-overlapping", landscape)
+
+        def no_play_or_overwrite():
+            self.require(page.locator("#view1 .play-btn").count() == 0, "list play button still present")
+            page.locator("#scene-add").click()
+            page.locator("#scene-save-overlay").wait_for(state="visible", timeout=4000)
+            self.require(page.locator(".ss-overwrite").count() == 0, "overwrite button still present")
+            text = page.locator("#scene-save-overlay").inner_text()
+            self.require("覆盖" not in text, f"overwrite wording still present: {text[:120]}")
+            page.locator("#ss-cancel").click()
+            return "play button + overwrite button removed"
+        self.check("file list play button and save-scene overwrite removed", no_play_or_overwrite)
 
     def test_mobile_layout(self):
         def run():
@@ -547,7 +673,7 @@ class UiRegression:
             self.page.set_default_timeout(9000)
             self.page.on("console", self._on_console)
             self.page.on("pageerror", self._on_pageerror)
-            self.page.goto(self.base + "/", wait_until="load", timeout=20000)
+            self.page.goto(self.base + "/?defaults=0", wait_until="load", timeout=20000)
             self.page.wait_for_function("typeof App !== 'undefined'", timeout=15000)
             self.page.wait_for_timeout(800)
             self.page.locator("#btn-player-cfg").click()
@@ -588,6 +714,8 @@ class UiRegression:
                 self.test_scene_save()
                 self.fresh_page()
                 self.test_defaults_import()
+                self.fresh_page()
+                self.test_real_defaults_and_orientation()
                 self.fresh_page()
                 self.test_mobile_layout()
             finally:

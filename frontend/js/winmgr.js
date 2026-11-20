@@ -154,6 +154,17 @@ const WinMgr = (() => {
     }
 
     /* 转屏：按当前真实尺寸重新压缩进可视区（不依赖上一方向存下来的几何） */
+    /* 自适应布局直接落一个视觉矩形（不经过拖拽手势），并持久化。
+       loose=true 时允许小于模块常规最小尺寸：横屏高度有限时，若仍按
+       minH 夹取，右列两个窗会互相压住，反而不如让内容自己滚动。 */
+    function place(r, loose) {
+      if (!r) return;
+      const base = {x: r.x, y: r.y, w: Math.max(40, r.w), h: Math.max(40, r.h)};
+      rect = loose ? base : clampRect(base, minW, minH);
+      setRect(win, rect);
+      persist();
+    }
+
     function fit() {
       if (win.classList.contains('hidden')) return;
       const b = bounds();
@@ -375,6 +386,7 @@ const WinMgr = (() => {
       refresh,
       sync,
       fit,
+      place,
       zoomAt,
       persist: () => persist(),
       raise: () => raise(win),
@@ -407,9 +419,13 @@ const WinMgr = (() => {
   function syncRects() { regs.forEach(r => { try { r.sync(); } catch (_) {} }); }
   function cancelGestures() { regs.forEach(r => { try { r.cancelGestures(); } catch (_) {} }); }
   function find(win) { return regs.find(r => r.win === win) || null; }
+  function place(win, r, loose) {
+    const c = typeof win === 'string' ? regs.find(x => x.win.id === win) : find(win);
+    if (c && c.place) c.place(r, loose);
+  }
   function zoomWindow(win, base, factor, sx, sy, baseScale) {
     const c = find(win);
     if (c) c.zoomAt(base, factor, sx, sy, baseScale);
   }
-  return {register, raise, reclampAll, reapplyAll, persistAll, syncRects, cancelGestures, bounds, find, zoomWindow};
+  return {register, raise, reclampAll, reapplyAll, persistAll, syncRects, cancelGestures, bounds, find, place, zoomWindow};
 })();

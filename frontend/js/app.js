@@ -994,8 +994,6 @@ const App = (() => {
     if (s1v) s1v.addEventListener('click', cycleViewMode);
     const s1sz = document.getElementById('s1-size-btn');
     if (s1sz) s1sz.addEventListener('click', cycleGridSize);
-    const s1tg = document.getElementById('s1-target-btn');
-    if (s1tg) s1tg.addEventListener('click', () => { addTargetCurrent().catch(e => Utils.toast('设置目标目录失败: ' + (e && e.message || e), 'err')); });
 
     /* 全屏（仅网页版；app 内已被剔除） */
     const fsBtn = document.getElementById('btn-fullscreen');

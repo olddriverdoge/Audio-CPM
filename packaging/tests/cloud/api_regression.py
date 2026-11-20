@@ -150,6 +150,23 @@ class ApiRegression:
             return list(names)
         self.check("browse audio/image metadata", browse_album)
 
+        def folder_cover():
+            # 有图片：用目录内第一张图片；没有图片：回落第一个音频的内嵌封面。
+            r = self.get("/api/folder_cover", params={"path": self.fx["album_a"]})
+            self.require(r.status_code in (302, 307), f"image folder cover status: {r.status_code}")
+            loc = r.headers.get("location", "")
+            self.require(loc.startswith("/api/image?path="), f"image folder cover: {loc}")
+            r = self.get("/api/folder_cover", params={"path": self.fx["cover_only"]})
+            self.require(r.status_code in (302, 307), f"audio folder cover status: {r.status_code}")
+            loc = r.headers.get("location", "")
+            self.require(loc.startswith("/api/thumb?path="), f"audio folder cover: {loc}")
+            r2 = self.get(loc)
+            self.require(r2.status_code == 200, f"audio folder thumb: {r2.status_code}")
+            empty = self.get("/api/folder_cover", params={"path": self.fx["out"]})
+            self.require(empty.status_code == 404, f"empty folder cover: {empty.status_code}")
+            return "/api/image + /api/thumb fallback"
+        self.check("folder cover prefers image then audio embedded cover", folder_cover)
+
         def browse_missing_falls_back():
             # The backend deliberately falls back to DEFAULT_ROOT for a missing
             # directory; it must not return a half-empty response.

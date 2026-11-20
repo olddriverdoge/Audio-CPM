@@ -25,6 +25,10 @@
   .item.dir{cursor:pointer}
   .item.file.sel{background:var(--hl)}
   .item .icon{flex:none;width:16px;text-align:center}
+  .item .dir-icon{width:28px;height:28px;position:relative;display:flex;align-items:center;justify-content:center;
+    background:#0a0f16;border-radius:4px;overflow:hidden}
+  .item .dir-icon .ph{font-size:15px;color:#5c6a7a}
+  .item .dir-icon img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
   .item .name{flex:1 1 auto;min-width:0;overflow:hidden;
     white-space:nowrap;color:var(--text)}
   .item.file .name{cursor:pointer}
@@ -131,10 +135,10 @@
   .save-msg.ok{color:var(--ok)} .save-msg.err{color:var(--err)}
 
   /* 自定义表头列 */
-  .item .col{flex:0 0 auto;width:92px;min-width:56px;max-width:150px;overflow:hidden;
+  .item .col{flex:0 0 auto;width:92px;min-width:32px;max-width:150px;overflow:hidden;
     white-space:nowrap;font-size:11px;color:var(--muted)}
   .item.head .col{color:var(--muted)}
-  .pb-lead{flex:none;width:26px}
+  .pb-lead{flex:none;width:0}
   .pb-ghost{flex:none;width:30px}
   .col-opts{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:6px}
   .col-opt{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;color:var(--text);cursor:pointer}

@@ -81,14 +81,12 @@ function createBrowseView(cfg) {
       const shown = files.filter(f => st.sel.has(f.path)).length;
       const allSel = files.length > 0 && shown === files.length;
       html += '<div class="item head">' +
-        '<span class="pb-lead"></span>' +
         '<input type="checkbox" class="chk" data-act="selall"' + (allSel ? ' checked' : '') + '>' +
         (cols ? cols.headerHtml(st.sorts) : '<span class="name">文件名</span>') +
         '</div>';
     } else if (st.parent && st.parent !== st.path) {
       // 源文件选择：提供“返回上级”，避免只能靠地址栏
       html += '<div class="item dir" data-dir-path="' + esc(st.parent) + '">' +
-        '<span class="pb-lead"></span>' +
         '<span class="chk" style="visibility:hidden"></span>' +
         '<span class="icon">⬆</span>' +
         '<span class="name">.. 上级目录</span></div>';
@@ -98,12 +96,13 @@ function createBrowseView(cfg) {
         const d = it.dir;
         const dsel = st.sel.has(d.path);
         html += '<div class="item dir' + (dsel ? ' sel' : '') + '" data-dir-path="' + esc(d.path) + '">' +
-          '<span class="pb-lead"></span>' +
-          (cfg.selectDirs
+            (cfg.selectDirs
             ? '<input type="checkbox" class="chk dir-chk" data-dir-path="' + esc(d.path) + '"' +
               (dsel ? ' checked' : '') + '>'
             : '<span class="chk" style="visibility:hidden"></span>') +
-          '<span class="icon">📁</span>' +
+          '<span class="icon dir-icon"><span class="ph">📁</span>' +
+            (isDavPath(d.path) ? '' : '<img data-thumb="' + esc(Api.folderCoverUrl(d.path)) + '" alt="" onerror="ThumbMgr.onError(this)">') +
+          '</span>' +
           '<span class="name">' + esc(d.name) + '</span>' +
           '<span class="mtime">' + Utils.fmtTime(d.mtime) + '</span>' +
           '</div>';
@@ -118,7 +117,6 @@ function createBrowseView(cfg) {
         ? '<img class="row-thumb" data-thumb="' + esc(thumb) + '" alt="" onerror="ThumbMgr.onError(this)">'
         : (f.type === 'image' ? '🖼' : '♪');
       html += '<div class="item file' + (sel ? ' sel' : '') + '" data-path="' + esc(f.path) + '">' +
-        '<button type="button" class="play-btn" data-act="play" title="播放">▶</button>' +
         '<input type="checkbox" class="chk file-chk" data-path="' + esc(f.path) + '"' +
         (sel ? ' checked' : '') + '>' +
         '<span class="icon">' + icon + '</span>' +
@@ -145,6 +143,7 @@ function createBrowseView(cfg) {
       const dsel = st.sel.has(d.path);
       return '<div class="tile' + (dsel ? ' sel' : '') + '" data-dir-path="' + esc(d.path) + '" style="width:' + w + 'px">' +
         '<div class="tile-cover dir"><span class="ph">📁</span>' +
+        (isDavPath(d.path) ? '' : '<img data-thumb="' + esc(Api.folderCoverUrl(d.path)) + '" alt="" onerror="ThumbMgr.onError(this)">') +
         (cfg.selectDirs
           ? '<input type="checkbox" class="chk tile-chk dir-chk" data-dir-path="' + esc(d.path) + '"' +
             (dsel ? ' checked' : '') + '>'

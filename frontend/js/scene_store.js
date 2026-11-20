@@ -65,6 +65,7 @@ const SceneStore = (() => {
         geo: o.geo || {},
         uiScale: o.uiScale,
         canvas: o.canvas,
+        viewport: o.viewport,
         custom: true
       });
     });
@@ -122,7 +123,7 @@ const SceneStore = (() => {
 
   /* 把仓库默认配置里的内置场景灌入用户覆盖表。只补缺失的 id，
      绝不覆盖本机已经调好的场景。 */
-  function applyDefaults(scenes) {
+  function applyDefaults(scenes, viewport) {
     if (!Array.isArray(scenes) || !scenes.length) return 0;
     const ov = overrides();
     let n = 0;
@@ -135,7 +136,10 @@ const SceneStore = (() => {
       ov[s.id] = {
         id: s.id, name: s.name, desc: s.desc,
         modules: modules, geo: s.geo || {},
-        uiScale: s.uiScale, canvas: s.canvas, updatedAt: 0
+        uiScale: s.uiScale, canvas: s.canvas,
+        // 记住这份几何是在哪个视口下导出的；换手机/转屏时由 Adaptive 等比适配。
+        viewport: viewport || (typeof Adaptive !== 'undefined' ? Adaptive.inferViewport(s.geo || {}) : null),
+        updatedAt: 0
       };
       n++;
     });
@@ -153,7 +157,11 @@ const SceneStore = (() => {
       modules: modules,
       geo: snapshotGeo(modules),
       uiScale: (App.currentUiScale ? App.currentUiScale() : 1),
-      canvas: (App.canvasPan ? App.canvasPan() : null)
+      canvas: (App.canvasPan ? App.canvasPan() : null),
+      viewport: (typeof Adaptive !== 'undefined' ? (() => {
+        const v = Adaptive.currentViewport();
+        return {w: v.w, h: v.h};
+      })() : null)
     };
   }
 
@@ -193,14 +201,19 @@ const SceneStore = (() => {
     if (App.closeAllModules) App.closeAllModules();
     // 内置场景只有在用户覆盖过（custom=true）时才恢复几何；默认定义永远不能
     // 覆盖用户历史保存的窗口位置/大小/scale。
+    const fitted = (typeof Adaptive !== 'undefined' && s.viewport)
+      ? Adaptive.fitScene(s, s.viewport, {force: false}) : s;
     const userGeometry = !isBuiltin(s) || !!s.custom;
     if (userGeometry) {
-      if (s.uiScale && App.commitUiScale) { try { App.commitUiScale(s.uiScale); } catch (_) {} }
-      if (s.canvas && App.setCanvasPan) { try { App.setCanvasPan(s.canvas.x, s.canvas.y, true); } catch (_) {} }
-      Object.keys(s.geo || {}).forEach(id => Store.set('ac3_geo_' + id, s.geo[id]));
+      if (fitted.uiScale && App.commitUiScale) { try { App.commitUiScale(fitted.uiScale); } catch (_) {} }
+      if (fitted.canvas && App.setCanvasPan) { try { App.setCanvasPan(fitted.canvas.x, fitted.canvas.y, true); } catch (_) {} }
+      Object.keys(fitted.geo || {}).forEach(id => Store.set('ac3_geo_' + id, fitted.geo[id]));
     }
     modulesOf(s).forEach(m => setTimeout(() => App.openModule(m), 0));
     setTimeout(render, 80);
+    // 窗口刚打开时 WinMgr 会按模块 minH 夹一次；自适应布局允许更矮的
+    // 窗口，所以再落一次位，确保小屏/横屏的窗口不会互相压住或跑出视口。
+    if (fitted !== s) setTimeout(() => { try { fitCurrent(); } catch (_) {} }, 180);
   }
 
   function closeSave() {
@@ -222,7 +235,6 @@ const SceneStore = (() => {
       scenes.map(s =>
         '<div class="ss-row" data-id="' + esc(s.id) + '">' +
         '<div class="ss-meta"><b>' + esc(sceneName(s)) + '</b><span>' + esc(sceneDesc(s)) + '</span></div>' +
-        '<button type="button" class="ss-overwrite" data-overwrite="' + esc(s.id) + '">覆盖</button>' +
         '</div>'
       ).join('');
   }
@@ -238,46 +250,18 @@ const SceneStore = (() => {
     if (!name) return;
     const exists = all().some(s => nameKey(sceneName(s)) === nameKey(name) || nameKey(s.name) === nameKey(name));
     if (exists) {
-      Utils.toast('同名场景已存在，请在列表中选中它进行覆盖，或换一个名称', 'warn');
+      Utils.toast('同名场景已存在，请换一个名称', 'warn');
       return;
     }
     const list = customs();
     list.push({id: 'c' + Date.now(), name: name, modules: layout.modules,
-               geo: layout.geo, uiScale: layout.uiScale, canvas: layout.canvas});
+               geo: layout.geo, uiScale: layout.uiScale, canvas: layout.canvas,
+               viewport: layout.viewport});
     saveCustom(list);
     render();
     renderSaveList();
     closeSave();
     Utils.toast('已保存场景：' + name);
-  }
-
-  function overwriteScene(id) {
-    const s = all().filter(x => x.id === id)[0];
-    if (!s) return;
-    const layout = currentLayout();
-    if (!layout) return;
-    if (!confirm('用当前布局覆盖场景「' + sceneName(s) + '」？\n将同时保存窗口位置、窗口大小和缩放。')) return;
-    if (DEFAULTS.some(x => x.id === id)) {
-      // 内置场景：覆盖写独立键，App 升级时默认定义不会回写这里。
-      const o = overrides();
-      o[id] = {
-        id: id, name: s.name, desc: s.desc,
-        modules: layout.modules, geo: layout.geo,
-        uiScale: layout.uiScale, canvas: layout.canvas, updatedAt: Date.now()
-      };
-      saveOverrides(o);
-      Store.set(HIDDEN, hiddenIds().filter(x => x !== id));
-    } else {
-      const list = customs().map(x => x.id === id
-        ? Object.assign({}, x, {modules: layout.modules, geo: layout.geo,
-            uiScale: layout.uiScale, canvas: layout.canvas, updatedAt: Date.now()})
-        : x);
-      saveCustom(list);
-    }
-    render();
-    renderSaveList();
-    closeSave();
-    Utils.toast('已覆盖场景：' + sceneName(s));
   }
 
   function remove(id) {
@@ -294,7 +278,61 @@ const SceneStore = (() => {
     renderSaveList();
   }
 
+  /* 转屏/窗口宽高比例变化：把当前已打开场景按新方向重排，避免横屏时
+     只在纵向等比缩小。用户手动拖动后的自由布局仍然保留，直到下一次转屏。 */
+  let lastLandscape = null;
+  function fitCurrent() {
+    if (typeof Adaptive === 'undefined' || typeof WinMgr === 'undefined') return false;
+    const mods = (App.openModules ? App.openModules() : []);
+    if (!mods.length) return false;
+    let s = all().filter(x => {
+      const m = modulesOf(x);
+      return m.length === mods.length && m.every(k => mods.indexOf(k) >= 0);
+    })[0];
+    if (!s) {
+      // 用户额外开了模块（当前布局不属于任何已保存场景）时，也要按当前
+      // 所有浮窗重排，不能让多出来的窗口留在旧方向的坐标里。
+      s = {
+        modules: mods,
+        geo: snapshotGeo(mods),
+        uiScale: (App.currentUiScale ? App.currentUiScale() : 1),
+        viewport: Adaptive.inferViewport(snapshotGeo(mods))
+      };
+    }
+    const fitted = Adaptive.fitScene(s, s.viewport || null, {force: true});
+    if (!fitted || !fitted.geo) return false;
+    const z = Number(fitted.uiScale) || 1;
+    if (App.commitUiScale) { try { App.commitUiScale(z); } catch (_) {} }
+    if (fitted.canvas && App.setCanvasPan) { try { App.setCanvasPan(fitted.canvas.x, fitted.canvas.y, true); } catch (_) {} }
+    Object.keys(fitted.geo).forEach(id => {
+      const g = fitted.geo[id];
+      const el = document.getElementById(id);
+      const ctl = el && WinMgr.find(el);
+      if (ctl && ctl.place) {
+        ctl.place({x: g.x, y: g.y, w: g.w * z, h: g.h * z}, true);
+      }
+    });
+    return true;
+  }
+  function watchOrientation() {
+    if (typeof Adaptive === 'undefined') return;
+    lastLandscape = Adaptive.isLandscape();
+    const check = () => {
+      const now = Adaptive.isLandscape();
+      if (now === lastLandscape) return;
+      lastLandscape = now;
+      setTimeout(fitCurrent, 180);
+      setTimeout(fitCurrent, 500);
+    };
+    window.addEventListener('resize', check);
+    window.addEventListener('orientationchange', () => {
+      lastLandscape = !Adaptive.isLandscape();
+      setTimeout(check, 120);
+    });
+  }
+
   function init() {
+    watchOrientation();
     render();
     const tabs = document.getElementById('scene-tabs');
     if (tabs) {
@@ -310,9 +348,7 @@ const SceneStore = (() => {
 
     const listEl = document.getElementById('ss-list');
     if (listEl) listEl.addEventListener('click', e => {
-      if (e.target.closest('.ss-new')) { createScene(); return; }
-      const row = e.target.closest('.ss-row');
-      if (row) overwriteScene(row.dataset.id);
+      if (e.target.closest('.ss-new')) createScene();
     });
     const cancel = document.getElementById('ss-cancel');
     if (cancel) cancel.onclick = closeSave;
@@ -335,5 +371,5 @@ const SceneStore = (() => {
   }
 
   return {init, render, saveCurrent, renderTabs, openSave, closeSave,
-          exportBuiltins, applyDefaults};
+          exportBuiltins, applyDefaults, fitCurrent};
 })();

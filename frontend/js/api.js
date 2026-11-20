@@ -46,6 +46,7 @@ const Api = (() => {
     thumbUrl: (p, size) => '/api/thumb?path=' + enc(p) + '&size=' + size,
     waveform: (p, n) => jfetch('/api/waveform?path=' + enc(p) + '&buckets=' + (n || 160)),
     imageUrl: p => '/api/image?path=' + enc(p),
+    folderCoverUrl: p => '/api/folder_cover?path=' + enc(p),
     coverUrl: p => '/api/cover?path=' + enc(p) + '&t=' + Date.now(),
     playbackOpen: (path, startMs, sampleRate, bitDepth, channels) => jpost('/api/playback/open', {path, startMs, sampleRate, bitDepth, channels}),
     playbackMeta: (path, tags) => jpost('/api/playback/meta', {

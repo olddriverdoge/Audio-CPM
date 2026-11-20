@@ -62,7 +62,7 @@ const Columns = (() => {
     function colById(id) { return active().find(c => c.id === id) || null; }
     function width(id) { return Number(cfg.widths[id]) || 0; }
     function setWidth(id, px) {
-      cfg.widths[id] = Math.max(44, Math.min(320, Math.round(px)));
+      cfg.widths[id] = Math.max(32, Math.min(320, Math.round(px)));
       save();
     }
     function move(fromId, toId) {
@@ -101,7 +101,7 @@ const Columns = (() => {
       // 列宽必须不可压缩（flex:0 0 auto）：否则总宽超过面板时各列被挤扁，
       // 内容看起来"超出框架"却又滑不到。name 留 200px 基准并可 grow，填满剩余空间。
       if (c.id === 'name') {
-        return ' style="width:' + (w || 200) + 'px;flex:1 0 auto"';
+        return ' style="width:' + (w || 120) + 'px;flex:1 0 auto"';
       }
       return w ? ' style="width:' + w + 'px;flex:0 0 auto"' : ' style="flex:0 0 auto"';
     }

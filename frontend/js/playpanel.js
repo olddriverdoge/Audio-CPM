@@ -41,8 +41,8 @@ function createPlayPanel() {
   function setCoverBackground(url) {
     if (!bgEl) return;
     if (url) {
-      bgEl.style.backgroundImage =
-        'linear-gradient(180deg, rgba(7,12,18,.42), rgba(7,12,18,.90)), ' + cssUrl(url);
+      // 只画封面本身；压暗交给 CSS ::after，避免在 JS 里再叠一层重渐变。
+      bgEl.style.backgroundImage = cssUrl(url);
       win.classList.add('has-cover');
     } else {
       bgEl.style.backgroundImage = '';

@@ -1,7 +1,229 @@
 {
   "schema": "audio-cpm-ui-defaults",
   "schemaVersion": 1,
-  "generatedBy": "placeholder",
-  "defaultScenes": [],
-  "prefs": {}
+  "exportedAt": "2026-11-20T16:18:37.721Z",
+  "defaultScenes": [
+    {
+      "id": "builtin-convert",
+      "name": "文件转码",
+      "desc": "文件选择 · 批处理 · 日志",
+      "modules": [
+        "browse",
+        "task",
+        "log"
+      ],
+      "geo": {
+        "fw-browse": {
+          "x": 0,
+          "y": 130,
+          "w": 530,
+          "h": 433,
+          "scale": 1.16
+        },
+        "fw-task": {
+          "x": 4,
+          "y": 603,
+          "w": 518,
+          "h": 355,
+          "scale": 1.31
+        },
+        "log-float": {
+          "x": 9,
+          "y": 992,
+          "w": 512,
+          "h": 219,
+          "scale": 1.06
+        }
+      },
+      "uiScale": 1.0798014313485351,
+      "canvas": {
+        "x": 0.3781954874164626,
+        "y": 8.587172419993976
+      }
+    },
+    {
+      "id": "builtin-organize",
+      "name": "文件整理",
+      "desc": "文件选择 · 目标路径（移动/复制）",
+      "modules": [
+        "browse",
+        "tree",
+        "spectrum"
+      ],
+      "geo": {
+        "fw-browse": {
+          "x": 1,
+          "y": 132,
+          "w": 522,
+          "h": 435,
+          "scale": 0.83
+        },
+        "fw-tree": {
+          "x": 1,
+          "y": 602,
+          "w": 514,
+          "h": 591,
+          "scale": 0.89
+        },
+        "spectrum-float": {
+          "x": 5,
+          "y": 992,
+          "w": 513,
+          "h": 234,
+          "scale": 1
+        }
+      },
+      "uiScale": 1.0798014313485351,
+      "canvas": {
+        "x": 0.3781954874164626,
+        "y": 8.587172419993976
+      }
+    },
+    {
+      "id": "builtin-listen",
+      "name": "听歌",
+      "desc": "文件选择 · 播放管理",
+      "modules": [
+        "browse",
+        "play",
+        "spectrum"
+      ],
+      "geo": {
+        "fw-browse": {
+          "x": 2,
+          "y": 143,
+          "w": 521,
+          "h": 410,
+          "scale": 0.74
+        },
+        "play-float": {
+          "x": 5,
+          "y": 890,
+          "w": 505,
+          "h": 320,
+          "scale": 1
+        },
+        "spectrum-float": {
+          "x": 1,
+          "y": 601,
+          "w": 516,
+          "h": 256,
+          "scale": 1
+        }
+      },
+      "uiScale": 1.1000175406657227,
+      "canvas": {
+        "x": 0,
+        "y": 0
+      }
+    }
+  ],
+  "prefs": {
+    "ac2_view_mode": "grid",
+    "ac2_grid_size": 192,
+    "ac2_layout_split3": 0.6157626561380691,
+    "ac2_tree_collapsed": false,
+    "ac3_ui_scale": 1.1000175406657227,
+    "ac3_canvas_pan": {
+      "x": 0,
+      "y": 0
+    },
+    "ac2_columns": {
+      "v": 3,
+      "ids": [
+        "title",
+        "album",
+        "composer",
+        "track",
+        "name",
+        "mtime"
+      ],
+      "custom": [],
+      "widths": {
+        "size": 91,
+        "name": 167
+      }
+    },
+    "ac2_columns_s2": {
+      "v": 3,
+      "ids": [
+        "track",
+        "title",
+        "composer",
+        "album",
+        "mtime"
+      ],
+      "custom": [],
+      "widths": {
+        "track": 44,
+        "title": 146,
+        "album": 82
+      }
+    },
+    "ac2_spectrum_size": {
+      "w": 472,
+      "h": 221
+    },
+    "ac2_spectrum_mode": "waterfall",
+    "ac2_spectrum_x": "lin",
+    "ac2_spectrum_db": -60,
+    "ac2_spectrum_rel": "fast",
+    "ac2_spectrum_peak": 2,
+    "ac2_spectrum_bars": 96,
+    "ac2_spectrum_stop": 5,
+    "ac2_wf_bright": "std",
+    "ac2_wf_top": 24000,
+    "ac2_wf_grid": 0,
+    "ac2_wf_pal": "audition",
+    "ac2_wf_bands": 512,
+    "ac2_wf_y": "lin",
+    "ac2_win_spectrum": {
+      "x": 2,
+      "y": 137
+    },
+    "ac2_win_log": {
+      "x": 4,
+      "y": 7
+    },
+    "ac2_meta_pos": {
+      "x": 63,
+      "y": 401
+    },
+    "ac2_meta_size": {
+      "w": 536,
+      "h": 262
+    },
+    "ac2_move_pos": {
+      "x": 336,
+      "y": 194
+    },
+    "ac3_audio_cfg": {
+      "eqOn": false,
+      "preset": 0,
+      "bands": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "speed": 1,
+      "bass": 0,
+      "preamp": 0,
+      "treble": 0,
+      "virt": 0
+    },
+    "ac2_play_mode": "shuffle",
+    "ac2_autoplay": false
+  },
+  "viewport": {
+    "w": 530,
+    "h": 1211,
+    "dpr": 1
+  }
 }

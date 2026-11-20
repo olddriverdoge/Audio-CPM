@@ -79,20 +79,21 @@
   #fw-tree{width:min(420px, calc(100vw - 24px));height:min(480px, 58vh)}
 
   /* ---------- 播放管理浮窗 ---------- */
-  .play-float{position:fixed;left:10px;bottom:96px;z-index:330;width:340px;height:440px;
+  .play-float{position:fixed;left:10px;bottom:96px;z-index:330;width:min(340px,calc(100vw - 20px));height:min(440px,calc(100vh - 120px));
     display:flex;flex-direction:column;background:linear-gradient(180deg,rgba(16,22,30,.94),rgba(9,13,19,.98));
     border:1px solid var(--border);border-radius:10px;
     box-shadow:0 18px 46px rgba(0,0,0,.62);overflow:hidden;isolation:isolate}
   .play-float.hidden{display:none}
-  /* 封面虚化背景：用当前曲目的封面铺满，暗色渐变保证文字可读 */
-  .pf-bg{position:absolute;inset:-22px;z-index:0;background-position:center;background-size:cover;
-    filter:blur(24px) saturate(1.32) brightness(.82);opacity:0;transform:scale(1.08);
-    transition:opacity .35s ease;pointer-events:none}
-  .play-float.has-cover .pf-bg{opacity:.58}
+  /* 封面背景：高清铺满（不虚化），只保留轻微亮度压暗和底部渐变保证文字可读。
+     不再用低透明度 + 严重模糊，避免工作台底色透上来把封面糊成一片。 */
+  .pf-bg{position:absolute;inset:0;z-index:0;background-position:center;background-size:cover;
+    filter:saturate(1.04) brightness(.90);opacity:0;transform:scale(1.01);
+    transition:opacity .28s ease;pointer-events:none}
+  .play-float.has-cover .pf-bg{opacity:1}
   .play-float .mf-head,.play-float .pf-body{position:relative;z-index:1}
-  .play-float.has-cover{background:rgba(8,13,19,.56)}
+  .play-float.has-cover{background:#080d13}
   .play-float::after{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;
-    background:linear-gradient(180deg,rgba(8,13,19,.18),rgba(8,13,19,.60) 52%,rgba(8,13,19,.92))}
+    background:linear-gradient(180deg,rgba(8,13,19,.10),rgba(8,13,19,.30) 46%,rgba(8,13,19,.80))}
   .pf-body{flex:1 1 auto;display:flex;flex-direction:column;gap:8px;padding:8px 10px;overflow:hidden;position:relative}
   .pf-now{display:flex;gap:10px;align-items:center;min-height:56px}
   .pf-cover{width:56px;height:56px;border-radius:8px;flex:0 0 auto;overflow:hidden;
@@ -153,7 +154,7 @@
   }
 
   /* ---------- 音频输出浮窗 ---------- */
-  .audio-float{position:fixed;right:10px;bottom:96px;z-index:330;width:330px;height:470px;
+  .audio-float{position:fixed;right:10px;bottom:96px;z-index:330;width:min(330px,calc(100vw - 20px));height:min(470px,calc(100vh - 120px));
     display:flex;flex-direction:column;background:rgba(13,18,24,.97);
     border:1px solid var(--border);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.6);overflow:hidden}
   .audio-float.hidden{display:none}
@@ -312,3 +313,32 @@
   .cfg-export-link{display:inline-flex;align-items:center;justify-content:center;height:28px;padding:0 10px;
     border:1px solid var(--border);border-radius:8px;background:var(--panel2);color:var(--text);text-decoration:none;font-size:11px}
   .cfg-export-link:hover{border-color:var(--accent);color:var(--accent)}
+
+
+  /* ---------- 跨 DPI / 窄屏 / 横屏：尺寸与字号自适应 ----------
+     不改用户拖出来的布局，只限制浮窗不要超出视口，并在窄屏/横屏把
+     字号、行高、按钮和顶部栏收紧一点；具体窗口位置仍由 WinMgr/Adaptive 决定。 */
+  @media (max-width: 430px){
+    body{font-size:13.5px}
+    .item.file,.item.dir{min-height:48px}
+    .hdr{padding-left:8px;padding-right:8px;gap:5px}
+    .modbar{padding-left:8px;padding-right:8px}
+    .mod-btn{font-size:11px;padding:3px 8px}
+    .play-float,.audio-float,.meta-float,.spectrum-float,.log-float,.fw-win{
+      max-width:calc(100vw - 16px)}
+  }
+  @media (max-width: 360px){
+    body{font-size:13px}
+    .item.file,.item.dir{min-height:44px}
+    .hdr .hdr-btn{height:26px;padding:0 7px}
+  }
+  @media (orientation: landscape) and (max-height: 520px){
+    body{font-size:13px;line-height:1.35}
+    .hdr{padding-top:2px;padding-bottom:2px}
+    body.app-mode .hdr{padding-top:calc(2px + var(--sat,0px))}
+    .modbar{padding-top:3px;padding-bottom:3px}
+    .mod-btn{font-size:10.8px;padding:2px 7px}
+    .item.file,.item.dir{min-height:40px}
+    .play-float,.audio-float,.meta-float,.spectrum-float,.log-float{
+      max-height:calc(100vh - 54px)}
+  }

@@ -43,6 +43,11 @@ const Defaults = (() => {
       exportedAt: new Date().toISOString(),
       defaultScenes: (typeof SceneStore !== 'undefined' && SceneStore.exportBuiltins)
         ? SceneStore.exportBuiltins() : [],
+      // 记录源设备视口，换手机/横竖屏时 SceneStore 用 Adaptive 等比适配，
+      // 不再把某一台手机的绝对 x/y/w/h 原样搬到另一台设备。
+      viewport: (typeof Adaptive !== 'undefined'
+        ? (() => { const v = Adaptive.currentViewport(); return {w: v.w, h: v.h, dpr: devicePixelRatio || 1}; })()
+        : {w: window.innerWidth, h: window.innerHeight, dpr: devicePixelRatio || 1}),
       prefs: prefs
     };
   }
@@ -62,7 +67,12 @@ const Defaults = (() => {
     return data;
   }
 
-  async function apply() {
+  async function apply(force) {
+    // 自动化测试需要可复现的原始默认，显式 ?defaults=0 跳过仓库 bundle；
+    // 生产环境不带该参数，首次启动仍会注入用户导出的真实配置。
+    try {
+      if (!force && new URLSearchParams(location.search).get('defaults') === '0') return 0;
+    } catch (_) {}
     let data = null;
     try {
       const r = await fetch('/defaults.json?t=' + Date.now(), {cache: 'no-store'});
@@ -79,7 +89,7 @@ const Defaults = (() => {
     } catch (_) {}
     let changed = 0;
     try {
-      changed += (SceneStore.applyDefaults(data.defaultScenes || []) || 0);
+      changed += (SceneStore.applyDefaults(data.defaultScenes || [], data.viewport || null) || 0);
     } catch (_) {}
     const prefs = data.prefs && typeof data.prefs === 'object' ? data.prefs : {};
     Object.keys(prefs).forEach(key => {
