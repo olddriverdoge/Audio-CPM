@@ -476,5 +476,17 @@
   "系统选择器不可用: {msg}": "Systemauswahl nicht verfügbar: {msg}",
   "系统选择器返回异常": "Systemauswahl lieferte ein ungültiges Ergebnis",
   "WebDAV 文件不支持替换封面，请切回本机数据源": "WebDAV-Dateien unterstützen keinen Cover-Ersatz; zur Gerätequelle wechseln",
-  "WebDAV 文件暂不支持元数据详情": "Metadatendetails für WebDAV-Dateien nicht verfügbar"
+  "WebDAV 文件暂不支持元数据详情": "Metadatendetails für WebDAV-Dateien nicht verfügbar",
+  "播放列表": "Wiedergabeliste",
+  "播放列表暂无音频": "Keine Audiodateien in der Wiedergabeliste",
+  "上级目录": "Übergeordneter Ordner",
+  "选择目录": "Ordner wählen",
+  "当前目录没有子目录": "Keine Unterordner",
+  "声谱 / 频谱": "Spektrogramm / Spektrum",
+  "长按调整": "Zum Anpassen lange drücken",
+  "声音增益": "Klangverstärkung",
+  "网页 / 原生播放音量": "Web-/native Wiedergabelautstärke",
+  "顺序播放：进入下一个目录 {name}": "Sequenzielle Wiedergabe: nächster Ordner {name}",
+  "已在最上层": "Bereits auf oberster Ebene",
+  "已移除收藏：{name}": "Lesezeichen entfernt: {name}"
 }

@@ -328,15 +328,17 @@ class UiRegression:
             self.page.locator("#s1-view-btn").click()
             self.page.wait_for_timeout(450)
             self.require(self.page.locator("#view1 .grid").count() > 0, "grid view did not render")
-            self.page.locator("#player-bar").wait_for(state="visible", timeout=4000)
+            # 底部播放条已经剔除，网格视图也不能再冒出来。
+            self.require(self.page.locator("#player-bar").is_visible() is False,
+                        "bottom player bar reappeared in grid view")
             self.require(self.page.locator("#pb-title").inner_text().lower().find("track one") >= 0,
                         "grid player title mismatch")
             self.shot("grid")
             # Return to list for the metadata/spectrum checks.
             self.page.locator("#s1-view-btn").click()
             self.page.wait_for_timeout(350)
-            return "grid + bottom player bar"
-        self.check("grid view reveals player bar", grid_bar)
+            return "grid + bottom player bar removed"
+        self.check("grid view keeps bottom player bar removed", grid_bar)
 
         def folder_grid():
             # 网格模式的目录封面也走 /api/folder_cover；没有图片时回落到音频封面。
@@ -422,6 +424,136 @@ class UiRegression:
             self.require(toggle.get_attribute("aria-expanded") == "true", "aria-expanded after expand")
             return "cover backdrop + persisted queue toggle"
         self.check("play panel cover backdrop and collapsible queue", play_style, "play-style")
+
+    def test_play_manager_navigation(self):
+        self.click_scene("builtin-listen")
+        self.page.locator("#fw-browse").wait_for(state="visible", timeout=5000)
+        self.page.evaluate("(p) => App.browse(p)", self.fx["ui_album_a"])
+        self.wait_file(self.fx["ui_track2"]).locator('.name').click()
+        self.page.wait_for_timeout(350)
+        self.require(self.page.evaluate("Player.current") == self.fx["ui_track2"], "track2 not playing")
+
+        def next_folder():
+            self.page.evaluate("() => App.playNext(false)")
+            self.page.wait_for_timeout(700)
+            cur = self.page.evaluate("Player.current")
+            path = self.page.evaluate("App.path")
+            self.require(path == self.fx["ui_album_b"], f"next folder path: {path}")
+            self.require(cur == self.fx["ui_covered"], f"next folder current: {cur}")
+            return "order continues in next folder"
+        self.check("order mode continues into next folder", next_folder)
+
+        def open_panel():
+            self.page.evaluate("() => App.openModule('play')")
+            self.page.locator("#play-float").wait_for(state="visible", timeout=5000)
+            self.page.wait_for_function(
+                "() => document.querySelector('#play-float').classList.contains('has-cover')",
+                timeout=10000,
+            )
+            title = self.page.locator("#pf-q-toggle .pf-qtitle").inner_text()
+            self.require(title == "播放列表", f"playlist title: {title}")
+            self.require(self.page.locator("#pf-vol").count() == 0, "old play-manager volume slider still present")
+            self.require(self.page.locator("#af-vol").count() == 1, "audio output gain slider missing")
+            btn_bg = self.page.evaluate("getComputedStyle(document.querySelector('#pf-play')).backgroundColor")
+            wave_bg = self.page.evaluate("getComputedStyle(document.querySelector('#pf-wave')).backgroundColor")
+            self.require("0.3" in (btn_bg or ""), f"transport button not 30% glass: {btn_bg}")
+            self.require("0.3" in (wave_bg or ""), f"waveform box not 30% glass: {wave_bg}")
+            self.require(self.page.locator("#player-bar").is_visible() is False, "bottom progress bar visible")
+            return "playlist title + 30% glass + gain moved"
+        self.check("play manager uses playlist label and 30% glass controls", open_panel)
+
+        def swipe_nav():
+            box = self.page.locator("#pf-queue").bounding_box()
+            self.require(box and box["width"] > 120, f"queue box: {box}")
+            # 右滑回上级
+            x0, y0 = box["x"] + 70, box["y"] + min(18, box["height"] - 1)
+            self.page.mouse.move(x0, y0)
+            self.page.mouse.down()
+            self.page.mouse.move(x0 + 130, y0, steps=6)
+            self.page.mouse.up()
+            self.page.wait_for_timeout(600)
+            self.require(self.page.evaluate("App.path") == self.fx["ui_root"],
+                        f"swipe-right did not go parent: {self.page.evaluate('App.path')}")
+            # 左滑打开目录选择
+            box = self.page.locator("#pf-queue").bounding_box()
+            x1 = box["x"] + box["width"] - 60
+            y1 = box["y"] + min(18, box["height"] - 1)
+            self.page.mouse.move(x1, y1)
+            self.page.mouse.down()
+            self.page.mouse.move(x1 - 140, y1, steps=6)
+            self.page.mouse.up()
+            self.page.wait_for_timeout(300)
+            self.require(self.page.locator("#pf-dir-picker").is_visible(), "swipe-left did not open folder picker")
+            rows = self.page.locator("#pf-dir-list .pf-dir-row").count()
+            self.require(rows >= 2, f"folder picker rows: {rows}")
+            return "swipe right parent / swipe left picker"
+        self.check("playlist swipe navigation", swipe_nav)
+
+        def picker_and_fav():
+            self.page.locator(f'#pf-dir-list .pf-dir-row[data-dir="{self.fx["ui_album_b"]}"]').click()
+            self.page.wait_for_function(
+                f"() => App.path === {self.fx['ui_album_b']!r}",
+                timeout=5000,
+            )
+            self.page.locator("#pf-fav-add").click()
+            self.page.wait_for_timeout(250)
+            favs = self.page.evaluate("App.favoriteList()")
+            self.require(self.fx["ui_album_b"] in favs, f"favorite not added: {favs}")
+            self.require(self.page.locator("#pf-fav-bar .pf-fav-chip").count() >= 1, "favorite chip missing")
+            return "picker opens folder + favorite synced"
+        self.check("folder picker and favorite sync", picker_and_fav)
+
+        def embedded_spectrum():
+            # 单曲 1 秒，顺序模式会自动续播到下一个目录；测试要固定住带封面
+            # 的曲目，先重播并暂停，避免封面在断言前被下一首替换。
+            self.page.evaluate("(p) => PlayMgr.play(p)", self.fx["ui_covered"])
+            self.page.wait_for_timeout(300)
+            if self.page.evaluate("Player.isPlaying()"):
+                self.page.evaluate("Player.toggle()")
+            self.page.wait_for_timeout(250)
+            self.page.wait_for_function(
+                "() => document.querySelector('#play-float').classList.contains('has-cover')",
+                timeout=8000,
+            )
+            self.page.locator("#pf-q-toggle").click()
+            self.page.wait_for_timeout(650)
+            self.require(self.page.evaluate("document.querySelector('#spectrum-float').parentElement.id") == "pf-sf-host",
+                        "spectrum not embedded in play manager")
+            self.require(self.page.locator("#pf-sf-sec").is_visible(), "spectrum section hidden")
+            self.require(self.page.locator("#sf-canvas").is_visible(), "embedded spectrum canvas hidden")
+            bg = self.page.evaluate("getComputedStyle(document.querySelector('#pf-bg')).opacity")
+            self.require(float(bg) >= 0.95, f"cover background lost behind spectrum: {bg}")
+            self.require(self.page.locator("#pf-sf-sec .pf-sf-mode").count() == 2, "spectrum mode tabs missing")
+            self.page.locator('#pf-sf-sec .pf-sf-mode[data-sf-mode="waterfall"]').click()
+            self.page.wait_for_timeout(250)
+            self.require(self.page.evaluate("Spectrum.mode") == "waterfall", "spectrum mode did not switch")
+            self.page.locator('#pf-sf-sec .pf-sf-mode[data-sf-mode="spectrum"]').click()
+            self.page.wait_for_timeout(150)
+            # 长按画布展开完整配置项（含延迟/配色/频段等 chip）
+            box = self.page.locator("#sf-canvas").bounding_box()
+            self.page.mouse.move(box["x"] + box["width"] * 0.7, box["y"] + box["height"] * 0.6)
+            self.page.mouse.down()
+            self.page.wait_for_timeout(650)
+            self.page.mouse.up()
+            self.page.wait_for_timeout(200)
+            self.require(self.page.locator("#sf-sub").is_visible(), "long-press config not shown")
+            chips = self.page.locator("#sf-sub .sf-chip").count()
+            self.require(chips >= 8, f"long-press config chips: {chips}")
+            return "embedded spectrum + long-press config + cover kept"
+        self.check("spectrum embedded under playlist with cover background", embedded_spectrum)
+
+        def gain_panel():
+            self.page.evaluate("() => App.openModule('audio')")
+            self.page.locator("#audio-float").wait_for(state="visible", timeout=5000)
+            self.require(self.page.locator("#af-vol").is_visible(), "audio gain slider not visible")
+            self.page.locator("#af-vol").fill("0.35")
+            self.page.locator("#af-vol").dispatch_event("input")
+            self.page.wait_for_timeout(200)
+            vol = self.page.evaluate("Player.getVolume()")
+            self.require(abs(float(vol) - 0.35) < 0.02, f"Player volume: {vol}")
+            self.require(self.page.locator("#af-vol-val").inner_text().strip() == "35%", "gain label mismatch")
+            return "gain slider controls playback volume"
+        self.check("audio output gain controls volume", gain_panel)
 
     def test_selection_and_delete(self):
         self.click_scene("builtin-organize")
@@ -704,6 +836,8 @@ try { return await Defaults.apply(true); } finally { window.fetch = realFetch; }
                 self.test_scene_modules_and_task_panels()
                 self.fresh_page()
                 self.test_browse_play_meta_spectrum()
+                self.fresh_page()
+                self.test_play_manager_navigation()
                 self.fresh_page()
                 self.test_selection_and_delete()
                 self.fresh_page()

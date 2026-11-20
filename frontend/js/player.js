@@ -26,6 +26,7 @@ const Player = (() => {
   coverEl.appendChild(coverImg);
   let seeking = false;
   let hifi = false, hifiPlaying = false, hifiPos = 0, hifiDur = 0, hifiTimer = 0;
+  let hifiEndedPath = '';
   /* 点击文件行时带了比例但时长未知：等原生返回 durationMs 后补一次 seek */
   let pendingRatio = 0;
   let reportedError = '';
@@ -96,6 +97,20 @@ const Player = (() => {
           return;
         }
         hifiPlaying = !!s.playing;
+        // ExoPlayer STATE_ENDED=4：顺序模式当前目录播完后，继续下一个兄弟目录。
+        // 原生 repeat=0 不会自己跨目录，所以这里只处理 order，避免和 all/one 的重复竞争。
+        const ended = Number(s.playbackState) === 4;
+        if (ended && s.path) {
+          const ref = 'local:' + s.path;
+          if (hifiEndedPath !== ref) {
+            hifiEndedPath = ref;
+            if (typeof App !== 'undefined' && App.playMode && App.playMode() === 'order') {
+              setTimeout(() => { try { App.autoplayNext(); } catch (_) {} }, 80);
+            }
+          }
+        } else if (hifiPlaying) {
+          hifiEndedPath = '';
+        }
         // seek 后恢复由真实播放状态驱动（替代频谱模块里的定时盲试）
         if (hifiPlaying && typeof Spectrum !== 'undefined' && Spectrum.isWaitingResume
             && Spectrum.isWaitingResume()) {
@@ -217,11 +232,11 @@ const Player = (() => {
     try { return !!(typeof App !== 'undefined' && App.isGridView && App.isGridView()); }
     catch (_) { return false; }
   }
-  // 播放条只在网格视图弹出；列表视图用行内波形当进度背景
+  // 底部播放条已剔除：播放控制统一收在「播放管理」浮窗，避免工作台最底部
+  // 再出现一条波形进度。保留 DOM 引用只为兼容旧调用，不再显示。
   function syncBar() {
-    const on = isGrid() && !!cur;
-    bar.classList.toggle('hidden', !on);
-    document.body.classList.toggle('has-player', on);
+    bar.classList.add('hidden');
+    document.body.classList.remove('has-player');
   }
   async function setWave(path) {
     curWave = '';
@@ -291,6 +306,7 @@ const Player = (() => {
     if (!path) throw new Error('空路径');
     const ratio = Math.max(0, Math.min(0.999, Number(startRatio) || 0));
     cur = path;
+    hifiEndedPath = '';
     try { if (typeof Spectrum !== 'undefined') Spectrum.onTrackChange(); } catch (_) {}
     // 切歌前先停掉 WebView 那一路，避免 HiFi 与网页播放同时出声（爆音/叠音）
     try { audio.pause(); } catch (_) {}
@@ -390,11 +406,15 @@ const Player = (() => {
   function positionSec() { return hifi ? hifiPos / 1000 : (audio.currentTime || 0); }
   function durationSec() { return hifi ? (hifiDur > 0 ? hifiDur / 1000 : 0) : (isFinite(audio.duration) ? audio.duration : 0); }
   function isPlaying() { return hifi ? hifiPlaying : !audio.paused; }
+  function getVolume() {
+    try { return Math.max(0, Math.min(1, Number(audio.volume))) || 0; } catch (_) { return 0; }
+  }
   function setVolume(v) {
     const x = Math.max(0, Math.min(1, Number(v) || 0));
     try { audio.volume = x; } catch (_) {}
     if (vol) vol.value = String(x);
     try { if (typeof Api !== 'undefined' && Api.playbackVolume) Api.playbackVolume(x).catch(() => {}); } catch (_) {}
+    try { document.dispatchEvent(new CustomEvent('ac2-volume', {detail:{volume:x}})); } catch (_) {}
   }
   function seekSec(t) {
     const d = durationSec();
@@ -540,7 +560,7 @@ const Player = (() => {
   seek.addEventListener('change', commitSeek);
   seek.addEventListener('pointerup', commitSeek);
 
-  vol.addEventListener('input', () => { audio.volume = Number(vol.value); });
+  vol.addEventListener('input', () => { setVolume(Number(vol.value)); });
   btnToggle.addEventListener('click', toggle);
   document.getElementById('pb-ext').addEventListener('click', external);
   document.getElementById('pb-close').addEventListener('click', close);
@@ -558,7 +578,7 @@ const Player = (() => {
   }, 2000);
 
   return {open, toggle, pause, close, external, syncBar, paintRows, pct, seekRatio, onMeta,
-          position: positionSec, duration: durationSec, isPlaying, setVolume, seekSec, replay,
+          position: positionSec, duration: durationSec, isPlaying, getVolume, setVolume, seekSec, replay,
           hifiActive: () => hifi, hifiPlaying: () => hifiPlaying,
           get current() { return cur; },
           get meta() { return curInfo ? Object.assign({}, curInfo) : null; },

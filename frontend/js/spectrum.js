@@ -30,6 +30,7 @@ const Spectrum = (() => {
   let mode = 'spectrum';                 // spectrum | spectrogram（内部值仍用 waterfall，兼容旧配置）
   const pos = {side: 'right', top: null};
   let winCtl = null;
+  let embedded = false, embeddedPrevOpen = false;
 
   // 声谱缓冲（时间轴横向、频率纵向；新数据从右侧进入，向左滚动）
   const wf = document.createElement('canvas');
@@ -1092,6 +1093,7 @@ const Spectrum = (() => {
   hideSub();
 
   function applySize() {
+    if (embedded) return;
     const s = Store.get(K.spectrumSize, null);
     if (s && Number(s.w) > 0 && Number(s.h) > 0) {
       box.style.width = Math.round(s.w) + 'px';
@@ -1100,6 +1102,7 @@ const Spectrum = (() => {
   }
 
   function applyPos() {
+    if (embedded) return;
     const st = Store.get(K.winSpectrum, null);
     if (st && Number.isFinite(Number(st.x)) && Number.isFinite(Number(st.y))) {
       box.style.left = Math.max(2, Math.min(window.innerWidth - 60, Number(st.x))) + 'px';
@@ -1133,10 +1136,11 @@ const Spectrum = (() => {
 
   function apply() {
     if (!box) return;
-    box.classList.toggle('hidden', !open);
-    if (fab) fab.style.display = open ? 'none' : '';
-    if (open) {
-      if (winCtl) winCtl.apply(); layoutCanvas(); paintTrack(); paintTabs(); paintScene();
+    const active = embedded || open;
+    box.classList.toggle('hidden', !active);
+    if (fab) fab.style.display = active ? 'none' : '';
+    if (active) {
+      if (winCtl && !embedded) winCtl.apply(); layoutCanvas(); paintTrack(); paintTabs(); paintScene();
       stopped = false; pausedAt = 0;
       suspended = false; switchTok++;    // 手动展开＝立刻恢复，取消切歌等待
       paramsSig = '';
@@ -1177,7 +1181,32 @@ const Spectrum = (() => {
   }
   bindLongPress();
 
+  /* 播放管理内嵌：把同一个频谱模块搬进播放管理，不复制第二套取数链。
+     这样模式、长按配置、配色/频段参数全部保留，背景由播放管理的封面提供。 */
+  function setEmbedded(on, host) {
+    if (!box) return;
+    if (on) {
+      if (!host) return;
+      if (!embedded) {
+        embeddedPrevOpen = open;
+        embedded = true;
+        box.classList.add('is-embedded');
+        if (box.parentNode !== host) host.appendChild(box);
+      }
+      open = true;
+      apply();
+    } else if (embedded) {
+      embedded = false;
+      box.classList.remove('is-embedded');
+      if (box.parentNode && box.parentNode !== document.body) document.body.appendChild(box);
+      open = embeddedPrevOpen;
+      applyPos(); applySize();
+      apply();
+    }
+  }
+
   function toggle() {
+    if (embedded) return;
     open = !open;
     apply();
     try { if (navigator.vibrate) navigator.vibrate(8); } catch (_) {}
@@ -1218,7 +1247,7 @@ const Spectrum = (() => {
     });
   }
 
-  return {init, toggle, setMode, onTrackChange, onSeek, resumeStream, onHidden, onVisible,
+  return {init, toggle, setEmbedded, setMode, onTrackChange, onSeek, resumeStream, onHidden, onVisible,
           isWaitingResume: () => waitResume,
           get open() { return open; }, get mode() { return mode; }};
 })();

@@ -278,6 +278,14 @@
     <button type="button" class="sf-btn" id="af-min" title="收起">—</button>
   </div>
   <div class="af-body" id="af-body">
+  <div class="af-sec af-gain" id="af-gain">
+    <div class="af-sec-h"><span>声音增益</span><em>网页 / 原生播放音量</em></div>
+    <div class="af-volrow">
+      <span id="af-vol-ico">🔊</span>
+      <input type="range" class="af-slider" id="af-vol" min="0" max="1" step="0.01" value="1" aria-label="声音增益">
+      <span class="af-db" id="af-vol-val">100%</span>
+    </div>
+  </div>
   <div class="af-playcfg" id="af-playcfg">
     <div class="af-route" id="af-route">
       <div class="af-sec-h"><span>输出设备</span><em>USB DAC / 系统默认</em></div>
@@ -345,17 +353,37 @@
       <button type="button" class="pf-btn" id="pf-stop" title="停止"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14"/></svg></button>
       <button type="button" class="pf-btn pf-mode" id="pf-mode" title="播放模式：顺序 / 列表循环 / 单曲循环 / 随机">顺序</button>
     </div>
-    <div class="pf-volrow">
-      <span class="pf-ico" id="pf-vol-ico">🔊</span>
-      <input type="range" class="pf-range" id="pf-vol" min="0" max="1" step="0.01" value="1">
-      <span class="pf-time" id="pf-vol-val">100%</span>
+    <div class="pf-qhead" id="pf-qhead">
+      <button type="button" class="pf-qtoggle" id="pf-q-toggle" aria-expanded="true" title="收起播放列表">
+        <span class="pf-qtitle">播放列表</span>
+        <span id="pf-qcount">0 首</span>
+        <span class="pf-q-caret" aria-hidden="true">⌃</span>
+      </button>
+      <button type="button" class="pf-qact" id="pf-q-up" title="返回上级目录">↑</button>
+      <button type="button" class="pf-qact" id="pf-q-pick" title="选择目录">📁</button>
     </div>
-    <button type="button" class="pf-qhead" id="pf-q-toggle" aria-expanded="true" title="收起播放列表">
-      <span class="pf-qtitle">当前目录</span>
-      <span id="pf-qcount">0 首</span>
-      <span class="pf-q-caret" aria-hidden="true">⌃</span>
-    </button>
-    <div class="pf-queue" id="pf-queue"><div class="detail-empty">当前目录没有音频文件</div></div>
+    <div class="pf-queue-tools" id="pf-queue-tools">
+      <div class="pf-favbar" id="pf-fav-bar"></div>
+    </div>
+    <div class="pf-queue" id="pf-queue"><div class="detail-empty">播放列表暂无音频</div></div>
+    <div class="pf-sf-sec" id="pf-sf-sec">
+      <div class="pf-sf-head">
+        <button type="button" class="pf-sf-toggle" id="pf-sf-toggle" aria-expanded="true" title="收起声谱/频谱">
+          <span>声谱 / 频谱</span>
+          <span class="pf-sf-meta" id="pf-sf-meta">长按调整</span>
+          <span class="pf-sf-caret" aria-hidden="true">⌃</span>
+        </button>
+        <span class="pf-sf-tabs">
+          <button type="button" class="pf-sf-mode active" data-sf-mode="spectrum">频谱</button>
+          <button type="button" class="pf-sf-mode" data-sf-mode="waterfall">声谱</button>
+        </span>
+      </div>
+      <div class="pf-sf-body" id="pf-sf-body"><div class="pf-sf-host" id="pf-sf-host"></div></div>
+    </div>
+    <div class="pf-dir-picker hidden" id="pf-dir-picker">
+      <div class="pf-dir-head"><span>选择目录</span><button type="button" class="sf-btn" id="pf-dir-close" title="关闭">✕</button></div>
+      <div class="pf-dir-list" id="pf-dir-list"></div>
+    </div>
   </div>
   <b class="fw-resize" id="pf-resize" title="拖动调整大小（或双指捏合）"></b>
 </div>

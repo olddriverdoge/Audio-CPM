@@ -476,5 +476,17 @@
   "系统选择器不可用: {msg}": "Bộ chọn hệ thống không khả dụng: {msg}",
   "系统选择器返回异常": "Bộ chọn hệ thống trả về kết quả không hợp lệ",
   "WebDAV 文件不支持替换封面，请切回本机数据源": "Tệp WebDAV không hỗ trợ thay bìa; hãy chuyển về nguồn trên thiết bị",
-  "WebDAV 文件暂不支持元数据详情": "Chi tiết siêu dữ liệu cho tệp WebDAV chưa được hỗ trợ"
+  "WebDAV 文件暂不支持元数据详情": "Chi tiết siêu dữ liệu cho tệp WebDAV chưa được hỗ trợ",
+  "播放列表": "Danh sách phát",
+  "播放列表暂无音频": "Danh sách phát chưa có âm thanh",
+  "上级目录": "Thư mục cha",
+  "选择目录": "Chọn thư mục",
+  "当前目录没有子目录": "Không có thư mục con",
+  "声谱 / 频谱": "Phổ âm / Phổ tần",
+  "长按调整": "Nhấn giữ để điều chỉnh",
+  "声音增益": "Tăng âm",
+  "网页 / 原生播放音量": "Âm lượng phát trên web / gốc",
+  "顺序播放：进入下一个目录 {name}": "Phát tuần tự: thư mục tiếp theo {name}",
+  "已在最上层": "Đã ở cấp cao nhất",
+  "已移除收藏：{name}": "Đã xóa mục yêu thích: {name}"
 }

@@ -105,40 +105,64 @@
   .pf-info{min-width:0;flex:1 1 auto}
   .pf-title{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .pf-sub{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
-  .pf-seekrow,.pf-volrow{display:flex;align-items:center;gap:8px}
+  .pf-seekrow{display:flex;align-items:center;gap:8px}
   .pf-time{font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:32px;text-align:center}
   .pf-range{flex:1 1 auto;min-width:0;accent-color:var(--accent)}
   .pf-transport{display:flex;align-items:center;gap:6px}
-  .pf-btn{flex:1 1 0;height:34px;border-radius:8px;border:1px solid var(--border);
-    background:var(--panel2);color:var(--text);font-size:15px;line-height:1;cursor:pointer;font-family:inherit}
-  .pf-btn:hover{border-color:#3d4a5c}
-  .pf-main{flex:1.4 1 0;background:rgba(56,189,248,.12);border-color:rgba(56,189,248,.5);color:var(--accent)}
-  .pf-mode{flex:1.6 1 0;font-size:11px;color:var(--muted)}
+  /* 30% 黑玻璃：按钮与波形压在封面上也不挡封面 */
+  .pf-btn{flex:1 1 0;height:34px;border-radius:8px;border:1px solid rgba(255,255,255,.16);
+    background:rgba(8,13,19,.30);color:rgba(255,255,255,.92);
+    font-size:15px;line-height:1;cursor:pointer;font-family:inherit;
+    -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+  .pf-btn:hover{border-color:rgba(255,255,255,.30);background:rgba(8,13,19,.46)}
+  .pf-main{flex:1.4 1 0;background:rgba(56,189,248,.30);border-color:rgba(56,189,248,.48);color:var(--accent)}
+  .pf-mode{flex:1.6 1 0;font-size:11px;color:rgba(255,255,255,.78)}
   .pf-ico{font-size:12px}
-  .pf-qhead{display:flex;align-items:center;gap:6px;width:100%;padding:5px 4px 4px;border:0;border-top:1px solid var(--border);
-    background:transparent;color:var(--muted);font:inherit;font-size:11px;text-align:left;cursor:pointer}
-.pf-qhead:hover{color:var(--text)}
-.pf-qtitle{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pf-q-caret{font-size:10px;opacity:.7;transition:transform .18s ease}
-.play-float.queue-collapsed .pf-q-caret{transform:rotate(180deg)}
+  .pf-qhead{display:flex;align-items:center;gap:3px;width:100%;padding:2px;border-top:1px solid rgba(255,255,255,.12);
+    background:rgba(8,13,19,.30);border-radius:7px;color:var(--muted);font:inherit;font-size:11px;
+    -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+  .pf-qtoggle{display:flex;align-items:center;gap:6px;flex:1 1 auto;min-width:0;padding:4px 3px;
+    border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+  .pf-qtoggle:hover{color:var(--text)}
+  .pf-qact{flex:0 0 26px;width:26px;height:24px;border-radius:6px;border:1px solid rgba(255,255,255,.14);
+    background:rgba(8,13,19,.30);color:var(--muted);font:inherit;font-size:12px;line-height:1;cursor:pointer}
+  .pf-qact:hover{color:var(--text);background:rgba(8,13,19,.48)}
+  .pf-qtitle{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pf-q-caret{font-size:10px;opacity:.7;transition:transform .18s ease}
+  .play-float.queue-collapsed .pf-q-caret{transform:rotate(180deg)}
 
+  .pf-queue-tools{flex:0 0 auto}
+  .play-float.queue-collapsed .pf-queue-tools{display:none}
+  .pf-favbar{display:flex;align-items:center;gap:4px;min-width:0;padding:3px 2px 2px}
+  .pf-fav-add{flex:none;width:24px;height:24px;padding:0;border:0;background:rgba(8,13,19,.30);
+    color:var(--accent);font-family:inherit;font-size:14px;font-weight:600;line-height:24px;
+    text-align:center;cursor:pointer;border-radius:5px}
+  .pf-fav-add:hover{color:var(--text);background:rgba(8,13,19,.50)}
+  .pf-fav-scroll{display:flex;align-items:center;gap:4px;flex:1 1 auto;min-width:0;
+    overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .pf-fav-scroll::-webkit-scrollbar{display:none}
+  .pf-fav-chip{display:inline-flex;align-items:center;font-family:inherit;flex:none;
+    border:1px solid rgba(255,255,255,.14);border-radius:999px;background:rgba(8,13,19,.30);
+    color:var(--muted);padding:2px 7px;font-size:10.5px;cursor:pointer}
+  .pf-fav-chip b{font-weight:500;max-width:92px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pf-fav-chip.active{color:var(--accent);border-color:rgba(56,189,248,.50);background:rgba(56,189,248,.14)}
   .pf-queue{flex:1 1 auto;min-height:40px;overflow:auto;-webkit-overflow-scrolling:touch;
-    border-top:1px solid var(--border);padding-top:4px}
+    border-top:1px solid var(--border);padding-top:4px;touch-action:pan-y}
   .play-float.queue-collapsed .pf-queue{display:none}
-  .play-float.queue-collapsed .pf-body{justify-content:center}
   .pf-q{display:flex;gap:6px;align-items:center;padding:5px 4px;border-radius:6px;font-size:11.5px;color:var(--muted);cursor:pointer;
-    background:rgba(7,12,18,.28);margin:1px 0}
-  .pf-q:hover{background:rgba(56,189,248,.06)}
-  .pf-q.on{color:var(--accent);background:rgba(56,189,248,.1)}
+    background:rgba(8,13,19,.30);margin:1px 0}
+  .pf-q:hover{background:rgba(56,189,248,.14)}
+  .pf-q.on{color:var(--accent);background:rgba(56,189,248,.20)}
   .pf-q-ico{width:14px;flex:0 0 auto;text-align:center}
   .pf-q-name{flex:1 1 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  /* 播放管理进度条：与底部播放条同款波形背景 */
+  /* 播放管理进度条：透明波形压在封面之上；30% 底只负责可读性 */
   .pf-wavebox{position:relative;flex:1 1 auto;height:26px;border-radius:6px;overflow:hidden;
-    background:#111820;border:1px solid var(--border)}
+    background:rgba(8,13,19,.30);border:1px solid rgba(255,255,255,.16);
+    -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
   .pf-wave-base,.pf-wave-hi{position:absolute;left:0;right:0;top:0;bottom:0;
     background-repeat:no-repeat;background-size:100% 100%}
-  .pf-wave-base{filter:saturate(.55) brightness(.8)}
-  .pf-wave-hi{filter:saturate(1.15) brightness(1.15)}
+  .pf-wave-base{filter:saturate(.55) brightness(.8);opacity:.32}
+  .pf-wave-hi{filter:saturate(1.15) brightness(1.15);opacity:.82}
   /* 进度条只保留波形，原生 range 隐藏（仍可拖动/点击定位） */
   .pf-seek{position:absolute;left:0;right:0;top:0;bottom:0;width:100%;height:100%;margin:0;
     opacity:0;background:transparent;-webkit-appearance:none;appearance:none;border:0}
@@ -152,6 +176,44 @@
       rgba(56,189,248,.18) var(--pf-pct,0%),
       rgba(56,189,248,.18) 100%);
   }
+
+  /* 播放列表目录选择 / 频谱内嵌区 */
+  .pf-dir-picker{position:absolute;left:8px;right:8px;top:8px;bottom:8px;z-index:8;
+    display:flex;flex-direction:column;background:rgba(8,13,19,.94);border:1px solid var(--border);
+    border-radius:8px;box-shadow:0 12px 30px rgba(0,0,0,.55);overflow:hidden}
+  .pf-dir-picker.hidden{display:none}
+  .pf-dir-head{display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid var(--border);
+    font-size:11.5px;color:var(--text);font-weight:600}
+  .pf-dir-head span{flex:1 1 auto}
+  .pf-dir-list{flex:1 1 auto;overflow:auto;padding:4px;-webkit-overflow-scrolling:touch}
+  .pf-dir-row{display:flex;align-items:center;gap:7px;width:100%;padding:7px 6px;border:0;border-radius:6px;
+    background:transparent;color:var(--muted);font:inherit;font-size:11.5px;text-align:left;cursor:pointer}
+  .pf-dir-row:hover{background:rgba(56,189,248,.12);color:var(--text)}
+  .pf-dir-ico{width:16px;flex:0 0 auto;text-align:center}
+
+  .pf-sf-sec{display:none;flex:1 1 auto;min-height:150px;flex-direction:column;margin-top:2px}
+  .play-float.queue-collapsed .pf-sf-sec{display:flex}
+  .pf-sf-sec.collapsed{flex:0 0 auto;min-height:0}
+  .pf-sf-sec.collapsed .pf-sf-body{display:none}
+  .pf-sf-head{display:flex;align-items:center;gap:4px;flex:0 0 auto;padding:2px;
+    background:rgba(8,13,19,.30);border-radius:7px;
+    -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+  .pf-sf-toggle{display:flex;align-items:center;gap:6px;flex:1 1 auto;min-width:0;padding:4px 3px;
+    border:0;background:transparent;color:var(--muted);font:inherit;font-size:11px;text-align:left;cursor:pointer}
+  .pf-sf-toggle:hover{color:var(--text)}
+  .pf-sf-meta{font-size:10px;color:#5b6b7d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pf-sf-caret{font-size:10px;opacity:.7;transition:transform .18s ease}
+  .pf-sf-tabs{display:flex;gap:2px;flex:0 0 auto}
+  .pf-sf-mode{border:1px solid transparent;background:transparent;color:var(--muted);font:inherit;
+    font-size:10.5px;padding:2px 7px;border-radius:5px;cursor:pointer}
+  .pf-sf-mode.active{color:var(--accent);border-color:rgba(56,189,248,.42);background:rgba(56,189,248,.16)}
+  .pf-sf-body{position:relative;flex:1 1 auto;min-height:120px;overflow:hidden}
+  .pf-sf-host{position:absolute;inset:0}
+
+  .af-gain{margin-bottom:10px}
+  .af-volrow{display:flex;align-items:center;gap:8px;padding:3px 0}
+  .af-volrow .af-slider{flex:1 1 auto}
+  .af-volrow .af-db{flex:0 0 42px;text-align:right;font-size:10.5px}
 
   /* ---------- 音频输出浮窗 ---------- */
   .audio-float{position:fixed;right:10px;bottom:96px;z-index:330;width:min(330px,calc(100vw - 20px));height:min(470px,calc(100vh - 120px));
@@ -342,3 +404,25 @@
     .play-float,.audio-float,.meta-float,.spectrum-float,.log-float{
       max-height:calc(100vh - 54px)}
   }
+
+  /* ---------- 频谱内嵌播放管理（保留封面背景） ---------- */
+  #spectrum-float.is-embedded{
+    position:absolute !important; left:0 !important; top:0 !important; right:0 !important; bottom:0 !important;
+    width:100% !important; height:100% !important; min-width:0 !important; min-height:0 !important;
+    max-width:none !important; max-height:none !important;
+    background:transparent !important; border:0 !important; border-radius:0 !important;
+    box-shadow:none !important; overflow:hidden !important; transform:none !important
+  }
+  #spectrum-float.is-embedded .sf-head,
+  #spectrum-float.is-embedded .sf-resize{display:none !important}
+  #spectrum-float.is-embedded canvas{
+    display:block;width:100%;height:100%;min-height:0;background:transparent !important
+  }
+  #spectrum-float.is-embedded .sf-sub{
+    left:0;top:0;bottom:0;width:min(142px,62%);
+    background:rgba(8,13,19,.90);
+    border:1px solid rgba(255,255,255,.14)
+  }
+
+  /* 底部旧播放条彻底退出工作台，播放控制统一走「播放管理」 */
+  #player-bar{display:none !important}

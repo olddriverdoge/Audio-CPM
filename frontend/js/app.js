@@ -121,6 +121,7 @@ const App = (() => {
       updateSelInfo();
       pushRecent(d.path);
       if (typeof Sources !== 'undefined') Sources.rememberPath(d.path);
+      try { document.dispatchEvent(new CustomEvent('ac2:browse-changed', {detail:{path:d.path,parent:d.parent||''}})); } catch (_) {}
       return true;
     } catch (e) {
       if (my !== seqNow) return false;
@@ -351,6 +352,20 @@ const App = (() => {
         '" data-fav="' + i + '" title="' + Utils.escapeHtml(p) + '">' +
         '<b>' + Utils.escapeHtml(treeBaseName(p) || p) + '</b></button>').join('') +
       '</div>';
+    try { document.dispatchEvent(new CustomEvent('ac2:fav-changed')); } catch (_) {}
+  }
+  function removeFavByIndex(i) {
+    const list = favs();
+    if (!(i >= 0 && i < list.length)) return false;
+    const p = list.splice(i, 1)[0];
+    saveFavs(list);
+    renderFavs();
+    Utils.toast('已移除收藏：' + (treeBaseName(p) || p));
+    return true;
+  }
+  function openFav(p) {
+    if (!p) return Promise.resolve(false);
+    return loadDir(p).catch(err => { Utils.toast('打开收藏失败: ' + (err && err.message || err), 'err'); return false; });
   }
   function addFavCurrent() {
     const uri = currentPath;
@@ -514,16 +529,62 @@ const App = (() => {
   }
   function autoplayOn() { return playMode() !== 'order'; }
   function paintAutoplay() { /* 顶部按钮已下架，状态看播放管理浮窗 */ }
-  function playNext(wrap) {
+  let advancingFolder = false;
+  /* 顺序模式播完当前目录后，继续找父目录里的下一个兄弟目录。
+     只把有音频的目录切进浏览视图，随后由该目录的可见列表继续顺序播放。 */
+  async function playNextFolder() {
+    if (advancingFolder) return false;
+    const here = currentPath, parent = currentParent;
+    if (!here || !parent) return false;
+    advancingFolder = true;
+    try {
+      const d = await Api.browse(parent);
+      const dirs = (d && Array.isArray(d.dirs) ? d.dirs : [])
+        .filter(x => x && x.path)
+        .slice()
+        .sort((a, b) => Utils.collator.compare(a.name || '', b.name || ''));
+      const idx = dirs.findIndex(x => normPath(x.path) === normPath(here));
+      if (idx < 0) return false;
+      for (let i = idx + 1; i < dirs.length; i++) {
+        const target = dirs[i].path;
+        let sub = null;
+        try { sub = await Api.browse(target); } catch (_) { continue; }
+        const audios = ((sub && sub.files) || []).filter(f => f && f.path && isAudioPath(f.path));
+        if (!audios.length) continue;
+        const ok = await loadDir(target);
+        if (!ok) continue;
+        const nextList = playbackList();
+        if (!nextList.length) continue;
+        PlayMgr.play(nextList[0].path, 0);
+        const msg = (typeof I18n !== 'undefined')
+          ? I18n.t('顺序播放：进入下一个目录 {name}').replace('{name}', dirs[i].name || Utils.basename(target))
+          : ('顺序播放：进入下一个目录 ' + (dirs[i].name || Utils.basename(target)));
+        Utils.toast(msg);
+        try { Utils.log('info', '顺序播放进入下一个目录: ' + target, 'workbench'); } catch (_) {}
+        return true;
+      }
+      return false;
+    } catch (e) {
+      try { Utils.log('warn', '查找下一个目录失败: ' + (e && e.message || e), 'workbench'); } catch (_) {}
+      return false;
+    } finally {
+      advancingFolder = false;
+    }
+  }
+  async function playNext(wrap) {
     if (playMode() === 'shuffle') return playRandom();
     const list = playbackList().filter(f => f && f.path);
     if (!list.length) return false;
     let i = list.findIndex(f => f.path === Player.current);
     if (i < 0) i = -1;
     const next = list[i + 1] || ((wrap || playMode() === 'all') ? list[0] : null);
-    if (!next) { Utils.toast('已播放到列表末尾', 'warn'); return false; }
-    PlayMgr.play(next.path, 0);
-    return true;
+    if (next) { PlayMgr.play(next.path, 0); return true; }
+    if (!wrap && playMode() === 'order') {
+      const moved = await playNextFolder();
+      if (moved) return true;
+    }
+    Utils.toast('已播放到列表末尾', 'warn');
+    return false;
   }
   function playPrev() {
     if (playMode() === 'shuffle') return playRandom();
@@ -1132,14 +1193,18 @@ const App = (() => {
 
   return {
     init, browse, onPlayed, updateMoveBar: () => MoveMgr.update(), isGridView, refreshColumns,
-    playNext, playPrev, autoplayNext, autoplayOn, applyPlayMode, playMode, cyclePlayMode,
+    playNext, playPrev, autoplayNext, autoplayOn, applyPlayMode, playMode, cyclePlayMode, playNextFolder,
     openModule, openModules, closeAllModules, openMod: openModule, openMeta,
     openCoverEditor: path => { if (typeof TaskRunner !== 'undefined') TaskRunner.openCoverEditor(path); },
     setUiScale, previewUiScale, commitUiScale, currentUiScale, setCanvasPan, applyCanvasPan, canvasPan, addTargetCurrent, addFavCurrent,
     playbackQueueList: () => playbackList().slice(), hifiQueue, toggleModule,
     get path() { return currentPath; },
     selection: () => (bv ? bv.selected() : []),
-    currentParent: () => currentParent
+    currentParent: () => currentParent,
+    directories: () => (bv ? bv.dirs() : []),
+    favoriteList: () => favs(),
+    removeFavorite: i => removeFavByIndex(i),
+    openFavorite: p => openFav(p)
   };
 })();
 

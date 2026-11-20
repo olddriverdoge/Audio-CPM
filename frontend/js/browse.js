@@ -507,6 +507,7 @@ function createBrowseView(cfg) {
     setSearch(q) { st.search = q || ''; render(); },
     setPlayedOnly(v) { st.playedOnly = !!v; render(); },
     selected() { return Array.from(st.sel); },
+    dirs() { return orderedDirs(); },
     count() { return st.sel.size; },
     selectAll(v) { selectAll(!!v); },
     clearSelection() { st.sel.clear(); st.selMode = false; render(); },

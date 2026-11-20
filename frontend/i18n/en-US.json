@@ -527,5 +527,17 @@
   "导出失败": "Export failed",
   "导出失败：{msg}": "Export failed: {msg}",
   "收起播放列表": "Collapse playlist",
-  "展开播放列表": "Expand playlist"
+  "展开播放列表": "Expand playlist",
+  "播放列表": "Playlist",
+  "播放列表暂无音频": "No audio in playlist",
+  "上级目录": "Parent folder",
+  "选择目录": "Choose folder",
+  "当前目录没有子目录": "No subfolders here",
+  "声谱 / 频谱": "Spectrogram / Spectrum",
+  "长按调整": "Long-press to adjust",
+  "声音增益": "Sound gain",
+  "网页 / 原生播放音量": "Web / native playback volume",
+  "顺序播放：进入下一个目录 {name}": "Sequential playback: next folder {name}",
+  "已在最上层": "Already at the top level",
+  "已移除收藏：{name}": "Bookmark removed: {name}"
 }

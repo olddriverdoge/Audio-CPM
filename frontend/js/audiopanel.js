@@ -607,6 +607,26 @@ function createAudioPanel() {
     applyAll();
   }
 
+  function bindVolume() {
+    const slider = document.getElementById('af-vol');
+    const val = document.getElementById('af-vol-val');
+    const ico = document.getElementById('af-vol-ico');
+    if (!slider) return;
+    function paint(v) {
+      const x = Math.max(0, Math.min(1, Number(v) || 0));
+      if (String(slider.value) !== String(x)) slider.value = String(x);
+      if (val) val.textContent = Math.round(x * 100) + '%';
+      if (ico) ico.textContent = x === 0 ? '🔇' : (x < 0.5 ? '🔉' : '🔊');
+    }
+    paint(typeof Player !== 'undefined' && Player.getVolume ? Player.getVolume() : 1);
+    slider.addEventListener('input', () => {
+      if (typeof Player !== 'undefined' && Player.setVolume) Player.setVolume(Number(slider.value));
+      paint(slider.value);
+    });
+    document.addEventListener('ac2-volume', e => paint((e.detail || {}).volume));
+  }
+
+  bindVolume();
   bindPlayCfg();
   const reloadDevices = bindRoute();
   fw.onToggle(open => {
