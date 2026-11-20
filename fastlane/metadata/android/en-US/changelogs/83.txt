@@ -1,0 +1,3 @@
+0.5.3:
+- Fix cover replacement failing because temp files had no extension.
+- Fix auto-rename failing on tracks without a composer tag.

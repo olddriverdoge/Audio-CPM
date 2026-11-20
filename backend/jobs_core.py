@@ -187,14 +187,19 @@ def manage_single_tags_v2(input_file: str, name_pattern: Optional[str]) -> str:
         raise Exception(detail['error'])
     tags = {k.lower(): v for k, v in (detail.get('tags') or {}).items()}
     cps = clean_text(tags.get('composer', ''))
-    if not cps:
-        raise Exception('no composer data')
     default_label = ''
     parent = os.path.basename(os.path.dirname(input_file))
     if ' - ' in parent:
         default_label = parent.split(' - ')[0].strip()
     raw_artist = tags.get('artist', default_label)
-    aats = raw_artist if raw_artist and raw_artist != cps else (default_label or '')
+    existing_aartist = clean_text(tags.get('album_artist', ''))
+    # 没有 composer 的普通歌曲也必须能重命名：退回 artist / album artist，
+    # 而不是把整个目录任务直接判失败；已有 album_artist 时不要覆盖它。
+    if not cps:
+        cps = clean_text(raw_artist) or existing_aartist or default_label or file_name
+        aats = existing_aartist or (default_label or '')
+    else:
+        aats = raw_artist if raw_artist and raw_artist != cps else (default_label or '')
 
     edits = {'artist': cps}
     if aats:
@@ -336,8 +341,11 @@ def modify_cover_v2(iopath, formats=None, only_files=None, cover_path=None, prog
     for idx, f in enumerate(files):
         cancel.check()
         try:
-            temp1 = os.path.join(iopath, f".{os.path.basename(f)}.ac2nocc")
-            temp2 = os.path.join(iopath, f".{os.path.basename(f)}.ac2cc")
+            ext = os.path.splitext(f)[1]
+            # ffmpeg 靠扩展名判断容器；临时文件若没有 .flac/.mp3/.m4a 扩展，
+            # 会报 "Unable to find a suitable output format"，导致封面任务全失败。
+            temp1 = os.path.join(iopath, f".{os.path.basename(f)}.ac2nocc{ext}")
+            temp2 = os.path.join(iopath, f".{os.path.basename(f)}.ac2cc{ext}")
             execute(ffbin.cmd('-y','-i',f,'-map','0','-map','-0:v',
                      '-c','copy','-metadata','cover=', temp1))
             ok, err = execute(ffbin.cmd('-y','-i',temp1,'-i',cover_path,
