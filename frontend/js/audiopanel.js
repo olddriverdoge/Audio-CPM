@@ -158,8 +158,7 @@ function createAudioPanel() {
         hint('切换失败: ' + ((e && e.message) || e));
       }
     });
-    // 不在 App.init 阶段枚举输出设备：新原生枚举在极少数 ROM 上会拖慢/打断
-    // WebView 首屏。等用户真正打开“音频输出”面板时再加载。
+    loadDevices();
     return loadDevices;
   }
 
