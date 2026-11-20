@@ -40,13 +40,12 @@ GitHub Actions 使用默认 `main_package=false`；构建产物包名应为
 
 ## 构建结果
 
-- 推送提交：`17c71eb`（`feat: direct folder playlist, idle dim, embedded spectrum polish (0.5.6)`）
-- GitHub Actions：run `44796709615`，`main_package=false`，结论 success
-- 产物：`Audio-CPM-0.5.6-86-dev-playlist-final.apk`（测试包）
-  - 包名 `com.github.olddriverdoge.audiocpm.dev`
+- 推送提交：`e25ad99`（`fix: decouple playlist view and keep play window geometry (0.5.6)`）
+- GitHub Actions：run `44802036809`，`main_package=false`、`build_release=false`，结论 success
+- 产物：`Audio-CPM-0.5.6-86-dev-playlist-tabs.apk`（测试包）
+  - 包名 `com.github.olddriverdoge.audiocpm.dev`（分支构建自动加 `.dev`）
   - versionName 0.5.6 / versionCode 86
-  - 大小 22,607,148 字节
-  - SHA256 `e291abeaed0d652dfd2721893046d3f780224d713bff78d03ffb3cb025016917`
-  - 证书 SHA256 `BBA5DC52438BAEE4C3AF9B7FD9F5D4C3A464E14D95BCA811EA184223BF920DF9`
-  - 下载：https://aka.doubaocdn.com/s/UVuJ3JHkw6
-- 包内确认：`playpanel.js` 23922B、`spectrum.js` 53494B、`index.html` 31074B、`workbench.css` 28605B；CDN 下载与本地产物 SHA256 一致。
+  - 大小 22,608,244 字节
+  - SHA256 `c5cc84ab2967def416e0c3d5febbfd1c176699f040ce0cb3b3bd74dddab37468`
+  - 下载：https://aka.doubaocdn.com/s/NNqPvteECX
+- 包内确认：`playpanel.js` 25103B、`spectrum.js` 53792B、`index.html` 31353B、`workbench.css` 28914B，均包含本轮目录/队列、10 秒淡化、透明声谱和几何修复。
