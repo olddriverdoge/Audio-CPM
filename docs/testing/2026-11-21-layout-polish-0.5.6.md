@@ -51,3 +51,16 @@ python3 packaging/tests/cloud/run_cloud_suite.py --keep --report /tmp/ac2_v057i_
 
 - 尚未重新打包；若要真机验证，需要用新 APK 安装后覆盖旧 0.5.6 包，或在后续版本提升 versionCode。
 - 工作树改动尚未合并 `main`、未发 tag/release。
+
+## 构建与交付
+
+- 远端分支：`feat/0.5.6-ui-defaults`，已从 `a79f7b9` 推送到 `c5382e1`。
+- 构建 workflow：`build-audio-cpm` run `44781461150`，`main_package=true`，结论 success。
+- 产物：`Audio-CPM-0.5.6-86-main-debug-layout.apk`
+  - 包名 `com.github.olddriverdoge.audiocpm`
+  - versionName 0.5.6 / versionCode 86
+  - 大小 22,597,128 字节
+  - SHA256 `e3d3195210169c345ac504668a621423ba0b2f0ddf205ceafd6e785f92ea216d`
+  - 证书 SHA256 `BB A5 DC 52 43 8B AE E4 C3 AF 9B 7F D9 F5 D4 C3 A4 64 E1 4D 95 BC A8 11 EA 18 42 23 BF 92 0D F9`，与 0.5.5/旧 0.5.6 主干 debug 包一致。
+  - 下载：https://aka.doubaocdn.com/s/P3Kf4MH9ro
+- 包内已确认包含 `assets/frontend/defaults.json`（4299 字节）、`frontend/js/adaptive.js`（7382 字节）和更新后的 `index.html`。
