@@ -36,14 +36,14 @@ const PlayMgr = (() => {
       Utils.toast('播放失败: ' + e.message, 'err');
     }
   }
-  async function play(path, startRatio) {
+  async function play(path, startRatio, opts) {
     if (!path) return;
     if (Settings.playMode() === 'system') return playExternal(path);
     if (Player.current === path && !startRatio) { Player.toggle(); return; }  // 同一首：播放 / 暂停
     try {
       await Player.open(path, startRatio);
       markPlayed(path);
-      App.onPlayed(path);
+      App.onPlayed(path, opts);
     } catch (e) {
       Utils.toast('播放失败: ' + e.message, 'err');
     }

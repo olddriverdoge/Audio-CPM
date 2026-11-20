@@ -334,9 +334,16 @@ const WinMgr = (() => {
       }));
     }
 
-    /* 打开 / 收起：打开时夹一次并置顶 */
+    /* 打开 / 收起：只在可见性真正变化时夹一次并置顶。
+       不能对任何 class 变化都 apply()：播放管理的 pf-idle-dim、has-cover，
+       频谱的 is-embedded 等都会改 class，apply() 会重新读 Store 里的旧几何，
+       表现就是点一下/自动淡化后窗口尺寸跳回预设默认。 */
+    let wasHidden = win.classList.contains('hidden');
     const obs = new MutationObserver(() => {
-      if (!win.classList.contains('hidden')) {
+      const hidden = win.classList.contains('hidden');
+      if (hidden === wasHidden) return;
+      wasHidden = hidden;
+      if (!hidden) {
         apply(); raise(win);
       } else {
         // 收起时手指可能还在屏上；清掉手势状态，避免下次单指拖动被旧触点干扰。

@@ -478,6 +478,8 @@
   "WebDAV 文件不支持替换封面，请切回本机数据源": "WebDAV-Dateien unterstützen keinen Cover-Ersatz; zur Gerätequelle wechseln",
   "WebDAV 文件暂不支持元数据详情": "Metadatendetails für WebDAV-Dateien nicht verfügbar",
   "播放列表": "Wiedergabeliste",
+  "目录": "Ordner",
+  "队列": "Warteschlange",
   "播放列表暂无音频": "Keine Audiodateien in der Wiedergabeliste",
   "上级目录": "Übergeordneter Ordner",
   "选择目录": "Ordner wählen",

@@ -130,6 +130,10 @@
   .pf-qtitle{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .pf-q-caret{font-size:10px;opacity:.7;transition:transform .18s ease}
   .play-float.queue-collapsed .pf-q-caret{transform:rotate(180deg)}
+  /* 播放列表分「目录 / 队列」两视图：停止与播放中都能自由切，不再靠播放状态锁死 */
+  .pf-qview{display:flex;gap:1px;flex:0 0 auto;padding:1px;border:1px solid rgba(255,255,255,.12);border-radius:5px;background:rgba(8,13,19,.24)}
+  .pf-qview-btn{border:0;background:transparent;color:var(--muted);font:inherit;font-size:10px;line-height:1;padding:4px 6px;border-radius:4px;cursor:pointer}
+  .pf-qview-btn.active{color:var(--accent);background:rgba(56,189,248,.18)}
 
   .pf-queue-tools{flex:0 0 auto}
   .play-float.queue-collapsed .pf-queue-tools{display:none}
@@ -422,7 +426,7 @@
   #player-bar{display:none !important}
 
 
-  /* ---------- 播放管理：播放中 5 秒无操作自动降到 10% 并锁定 ----------
+  /* ---------- 播放管理：播放中 10 秒无操作自动降到 10% 并锁定 ----------
      频谱/声谱展开时，只淡出周边控件；频谱/声谱内部保持默认透明度，
      封面背景保留给频谱作为可读背景。 */
   .pf-idle-guard{position:absolute;inset:0;z-index:20;display:none;background:transparent;touch-action:none}
@@ -436,9 +440,5 @@
   .play-float.pf-idle-dim #pf-queue,
   .play-float.pf-idle-dim .pf-sf-head,
   .play-float.pf-idle-dim #pf-resize{opacity:.1;transition:opacity .35s ease}
-  .play-float.pf-idle-dim #pf-bg{opacity:.1}
-  .play-float.pf-idle-dim::after{opacity:.1}
-  .play-float.pf-idle-dim{background:rgba(8,13,19,.10);border-color:transparent;box-shadow:none}
-  .play-float.pf-idle-dim.pf-sf-live{background:#080d13}
-  .play-float.pf-idle-dim.pf-sf-live #pf-bg{opacity:1}
-  .play-float.pf-idle-dim.pf-sf-live::after{opacity:1}
+  /* 背景封面不参与降透明：只淡出控件、列表、频谱头部和标题栏 */
+  .play-float.pf-idle-dim{border-color:transparent;box-shadow:none}

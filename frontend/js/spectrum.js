@@ -406,6 +406,15 @@ const Spectrum = (() => {
     return area;
   }
 
+  /* 声谱空白底：内嵌时透明，露出播放管理封面；独立浮窗仍用深色底，保证可读。 */
+  function clearWf() {
+    if (!wfCtx) return;
+    try { wfCtx.clearRect(0, 0, wfW, wfH); } catch (_) { return; }
+    if (!embedded) {
+      try { wfCtx.fillStyle = '#000'; wfCtx.fillRect(0, 0, wfW, wfH); } catch (_) {}
+    }
+  }
+
   function resizeWf(w, h) {
     const bw = Math.max(1, Math.round(w * WFDPR));
     const bh = Math.max(1, Math.round(h * WFDPR));
@@ -420,8 +429,7 @@ const Spectrum = (() => {
     try { wfTmpCtx = wfTmp.getContext('2d'); } catch (_) { wfTmpCtx = null; }
     wfW = bw; wfH = bh;
     if (!wfCtx) return;
-    wfCtx.fillStyle = '#000';
-    wfCtx.fillRect(0, 0, bw, bh);
+    clearWf();
     if (oldCtx) {
       try { wfCtx.drawImage(old, Math.max(0, bw - old.width), Math.max(0, bh - old.height)); } catch (_) {}
     }
@@ -623,8 +631,10 @@ const Spectrum = (() => {
       }
       if (mode === 'waterfall') {
         drawWaterfall(area);
-        g.fillStyle = 'rgba(0,0,0,.45)';
-        g.fillRect(area.x0, area.y0, area.gw, area.gh);
+        if (!embedded) {
+          g.fillStyle = 'rgba(0,0,0,.45)';
+          g.fillRect(area.x0, area.y0, area.gw, area.gh);
+        }
       } else {
         g.fillStyle = 'rgba(56,189,248,.20)';
         g.fillRect(area.x0, area.y0 + area.gh - 2, area.gw, 2);
@@ -717,7 +727,7 @@ const Spectrum = (() => {
       if (core.linbars) core.linbars.fill(0);
       if (core.spec && core.spec.length) core.spec.fill(0);
     }
-    try { if (wfCtx) { wfCtx.fillStyle = '#000'; wfCtx.fillRect(0, 0, wfW, wfH); } } catch (_) {}
+    clearWf();
     paramsSig = '';                      // 新 processor 是默认参数，必须重新下发
     if (!open) return;                   // 收起时不重启任何计算
     suspendForSwitch();
@@ -846,7 +856,7 @@ const Spectrum = (() => {
     dataSeq = 0; wfSeq = -1;
     lastDataAt = performance.now();
     lastHeal = 0; badFrames = 0;
-    try { if (wfCtx) { wfCtx.fillStyle = '#000'; wfCtx.fillRect(0, 0, wfW, wfH); } } catch (_) {}
+    clearWf();
     if (core && core.native) {
       if (core.data) core.data.fill(0);
       if (core.levels) core.levels.fill(0);
@@ -1223,6 +1233,7 @@ const Spectrum = (() => {
       if (!embedded) {
         embeddedPrevOpen = open;
         embedded = true;
+        wfW = 0; wfH = 0; wfCtx = null;
         box.classList.add('is-embedded');
         if (box.parentNode !== host) host.appendChild(box);
       }
@@ -1232,6 +1243,7 @@ const Spectrum = (() => {
     } else if (embedded) {
       stopEmbedRO();
       embedded = false;
+      wfW = 0; wfH = 0; wfCtx = null;   // 回到独立浮窗时恢复深色声谱底
       box.classList.remove('is-embedded');
       if (box.parentNode && box.parentNode !== document.body) document.body.appendChild(box);
       open = embeddedPrevOpen;

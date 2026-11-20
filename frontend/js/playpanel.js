@@ -25,6 +25,7 @@ function createPlayPanel() {
   const waveHi = document.getElementById('pf-wave-hi');
   const qEl = document.getElementById('pf-queue');
   const qCount = document.getElementById('pf-qcount');
+  const qView = document.getElementById('pf-qview');
   const sfSec = document.getElementById('pf-sf-sec');
   const sfToggle = document.getElementById('pf-sf-toggle');
   const sfBody = document.getElementById('pf-sf-body');
@@ -40,6 +41,7 @@ function createPlayPanel() {
   let sfCollapsed = Store.get('ac3_play_sf_collapsed', false) === true;
   let favHold = null, favHoldEl = null, favHoldStart = null, suppressFavClickUntil = 0;
   let idleTimer = 0, idleDimmed = false, lastPlaying = false, wakeSuppressUntil = 0;
+  let queueView = 'browse';
 
   function cssUrl(url) {
     return 'url("' + String(url || '').replace(/"/g, '%22').replace(/\)/g, '%29') + '")';
@@ -86,10 +88,10 @@ function createPlayPanel() {
     } catch (_) {}
   }
 
-  /* 播放开始后 5 秒无操作：整个播放管理降到 10% 并锁住；
+  /* 播放开始后 10 秒无操作：整个播放管理降到 10% 并锁住；
      点一下/滑一下只负责唤醒，不触发下面的按钮。频谱声谱展开时
      内部的 canvas 不受影响（仍是默认 50% 透明度）。 */
-  const IDLE_MS = 5000;
+  const IDLE_MS = 10000;
   function clearIdleTimer() {
     if (idleTimer) { clearTimeout(idleTimer); idleTimer = 0; }
   }
@@ -167,8 +169,8 @@ function createPlayPanel() {
     }).join('');
     html += audios.map((f, i) => {
       const p = f.path || '';
-      return '<div class="pf-q" data-i="' + i + '" data-path="' + Utils.escapeHtml(p) + '" title="' + Utils.escapeHtml(p) + '">' +
-        '<span class="pf-q-ico">♪</span>' +
+      return '<div class="pf-q' + (p === Player.current ? ' on' : '') + '" data-i="' + i + '" data-path="' + Utils.escapeHtml(p) + '" title="' + Utils.escapeHtml(p) + '">' +
+        '<span class="pf-q-ico">' + (p === Player.current ? '▶' : '♪') + '</span>' +
         '<span class="pf-q-name">' + Utils.escapeHtml(Utils.basename(p)) + '</span></div>';
     }).join('');
     if (!html) html = '<div class="detail-empty">' + Utils.escapeHtml(tr('当前目录没有文件夹或音频')) + '</div>';
@@ -196,9 +198,24 @@ function createPlayPanel() {
     qEl.dataset.view = 'queue';
   }
 
+  function paintQueueView() {
+    if (!qView) return;
+    qView.querySelectorAll('[data-qview]').forEach(b => {
+      const on = b.dataset.qview === queueView;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+
+  function setQueueView(view) {
+    queueView = view === 'queue' ? 'queue' : 'browse';
+    paintQueueView();
+    renderQueue();
+  }
+
   function renderQueue() {
-    if (Player.current) renderAudioQueue();
-    else renderBrowseQueue();
+    if (queueView === 'browse') renderBrowseQueue();
+    else renderAudioQueue();
   }
 
   /* 同步文件浏览的目录收藏：+ 收藏当前目录，点收藏切目录，长按收藏删除。 */
@@ -218,12 +235,16 @@ function createPlayPanel() {
   async function goParent() {
     const p = (typeof App !== 'undefined' && App.currentParent) ? App.currentParent() : '';
     if (!p) { Utils.toast(tr('已在最上层'), 'warn'); return; }
+    queueView = 'browse';
+    paintQueueView();
     try { await App.browse(p); } catch (e) { Utils.toast('打开上级目录失败: ' + (e && e.message || e), 'err'); }
     renderQueue();
   }
 
   async function openDir(path) {
     if (!path) return;
+    queueView = 'browse';
+    paintQueueView();
     try {
       await App.browse(path);
       renderQueue();
@@ -276,10 +297,11 @@ function createPlayPanel() {
     // 播放/暂停显示音频队列；停止显示当前目录的文件夹 + 音频。
     // 目录、当前曲目或队列变化都要重画。
     const active = !!Player.current;
+    if (!active && queueView !== 'browse') { queueView = 'browse'; paintQueueView(); }
     const path = (typeof App !== 'undefined' && App.path) ? App.path : '';
     const list = (typeof App !== 'undefined' && App.playbackQueueList) ? App.playbackQueueList() : [];
     const dirs = (typeof App !== 'undefined' && App.directories) ? App.directories() : [];
-    const sig = active
+    const sig = queueView === 'queue'
       ? 'q|' + list.length + ':' + ((list[0] && list[0].path) || '') + ':' + ((list[list.length - 1] && list[list.length - 1].path) || '')
       : 'b|' + path + '|' + dirs.map(d => d.path || '').join('|') + '|' + list.map(f => f.path || '').join('|');
     if (qEl.dataset.sig !== sig) { qEl.dataset.sig = sig; renderQueue(); }
@@ -328,15 +350,18 @@ function createPlayPanel() {
     if (!Player.current) {
       const list = (typeof App !== 'undefined' && App.playbackQueueList) ? App.playbackQueueList() : [];
       if (!list.length) { Utils.toast(tr('播放列表暂无音频'), 'warn'); return; }
-      PlayMgr.play(list[0].path);
+      PlayMgr.play(list[0].path, 0, {quiet: true});
       return;
     }
     Player.toggle();
   });
-  document.getElementById('pf-prev').addEventListener('click', () => { if (App.playPrev) App.playPrev(); });
-  document.getElementById('pf-next').addEventListener('click', () => { if (App.playNext) App.playNext(); });
+  document.getElementById('pf-prev').addEventListener('click', () => { if (App.playPrev) App.playPrev({quiet: true}); });
+  document.getElementById('pf-next').addEventListener('click', () => { if (App.playNext) App.playNext(false, {quiet: true}); });
   document.getElementById('pf-stop').addEventListener('click', () => {
     try { Player.close(); } catch (_) {}
+    queueView = 'browse';
+    paintQueueView();
+    renderQueue();
   });
   modeBtn.addEventListener('click', () => {
     if (App.cyclePlayMode) App.cyclePlayMode();
@@ -358,6 +383,14 @@ function createPlayPanel() {
   seek.addEventListener('change', commitSeek);
   seek.addEventListener('pointerup', commitSeek);
 
+  if (qView) {
+    qView.addEventListener('click', e => {
+      e.stopPropagation();
+      const b = e.target.closest('[data-qview]');
+      if (!b) return;
+      setQueueView(b.dataset.qview);
+    });
+  }
   if (qToggle) {
     qToggle.addEventListener('click', () => {
       queueCollapsed = !queueCollapsed;
@@ -453,7 +486,7 @@ function createPlayPanel() {
     pressRow = null;
     if (!row) return;
     if (row.dataset.dir) { openDir(row.dataset.dir); return; }
-    if (row.dataset.path) PlayMgr.play(row.dataset.path);
+    if (row.dataset.path) PlayMgr.play(row.dataset.path, 0, {quiet: true});
   }, true);
 
   if (favBar) {
@@ -501,7 +534,7 @@ function createPlayPanel() {
 
   Player.onMeta(() => { renderMeta(); renderState(); });
 
-  /* 只有播放管理内部的第一次操作会重置 5 秒倒计时；如果是淡化锁定状态，
+  /* 只有播放管理内部的第一次操作会重置 10 秒倒计时；如果是淡化锁定状态，
      任意一次点击/滑动都只负责唤醒，并吞掉本次 click，避免误触按钮。 */
   document.addEventListener('pointerdown', e => {
     if (idleDimmed) {
@@ -530,7 +563,7 @@ function createPlayPanel() {
 
   fw.onToggle(open => {
     if (open) {
-      renderMeta(); renderQueue(); renderFavorites(); renderState(); paintSfState();
+      renderMeta(); paintQueueView(); renderQueue(); renderFavorites(); renderState(); paintSfState();
       clearInterval(timer);
       timer = setInterval(tick, 500);
       armIdleTimer();
@@ -547,6 +580,7 @@ function createPlayPanel() {
   document.addEventListener('ac2:browse-changed', () => { renderQueue(); renderFavorites(); });
 
   paintQueueState();
+  paintQueueView();
   paintSfState();
   setModeButtonState();
   renderMeta();
@@ -554,6 +588,6 @@ function createPlayPanel() {
   renderFavorites();
   renderState();
   return Object.assign(fw, {
-    refresh: () => { renderMeta(); renderQueue(); renderFavorites(); renderState(); paintQueueState(); paintSfState(); setModeButtonState(); }
+    refresh: () => { renderMeta(); paintQueueView(); renderQueue(); renderFavorites(); renderState(); paintQueueState(); paintSfState(); setModeButtonState(); }
   });
 }

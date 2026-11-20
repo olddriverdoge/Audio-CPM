@@ -473,15 +473,17 @@ const App = (() => {
     openModule('meta');
   }
 
-  function onPlayed(path) {
+  function onPlayed(path, opts) {
     if (bv) bv.onExternalPlayed(path);
     if (metaFloat) metaFloat.load(path);
     // 切歌后重新下发一次音效参数：原生静态状态通常还在，但播放器/Sink 重建
     // 或进程被系统回收时不能依赖“上次已经设过”。
     try { if (window.__ac2ReapplyAudioFx) window.__ac2ReapplyAudioFx(); } catch (_) {}
     updateSelInfo();
-    /* 内置播放器起播：自动展开声谱；网格视图再自动调出播放管理 */
-    if (Player.current && Player.current === path) {
+    /* 内置播放器起播：从文件浏览/网格起播时才自动展开声谱。
+       从播放管理内部选曲走 quiet，不再二次弹窗。 */
+    const quiet = !!(opts && opts.quiet);
+    if (!quiet && Player.current && Player.current === path) {
       const spWin = document.getElementById('spectrum-float');
       const wasClosed = spWin ? spWin.classList.contains('hidden') : false;
       openModule('spectrum');
@@ -532,7 +534,7 @@ const App = (() => {
   let advancingFolder = false;
   /* 顺序模式播完当前目录后，继续找父目录里的下一个兄弟目录。
      只把有音频的目录切进浏览视图，随后由该目录的可见列表继续顺序播放。 */
-  async function playNextFolder() {
+  async function playNextFolder(opts) {
     if (advancingFolder) return false;
     const here = currentPath, parent = currentParent;
     if (!here || !parent) return false;
@@ -555,7 +557,7 @@ const App = (() => {
         if (!ok) continue;
         const nextList = playbackList();
         if (!nextList.length) continue;
-        PlayMgr.play(nextList[0].path, 0);
+        PlayMgr.play(nextList[0].path, 0, opts);
         const msg = (typeof I18n !== 'undefined')
           ? I18n.t('顺序播放：进入下一个目录 {name}').replace('{name}', dirs[i].name || Utils.basename(target))
           : ('顺序播放：进入下一个目录 ' + (dirs[i].name || Utils.basename(target)));
@@ -571,38 +573,38 @@ const App = (() => {
       advancingFolder = false;
     }
   }
-  async function playNext(wrap) {
-    if (playMode() === 'shuffle') return playRandom();
+  async function playNext(wrap, opts) {
+    if (playMode() === 'shuffle') return playRandom(opts);
     const list = playbackList().filter(f => f && f.path);
     if (!list.length) return false;
     let i = list.findIndex(f => f.path === Player.current);
     if (i < 0) i = -1;
     const next = list[i + 1] || ((wrap || playMode() === 'all') ? list[0] : null);
-    if (next) { PlayMgr.play(next.path, 0); return true; }
+    if (next) { PlayMgr.play(next.path, 0, opts); return true; }
     if (!wrap && playMode() === 'order') {
-      const moved = await playNextFolder();
+      const moved = await playNextFolder(opts);
       if (moved) return true;
     }
     Utils.toast('已播放到列表末尾', 'warn');
     return false;
   }
-  function playPrev() {
-    if (playMode() === 'shuffle') return playRandom();
+  function playPrev(opts) {
+    if (playMode() === 'shuffle') return playRandom(opts);
     const list = playbackList().filter(f => f && f.path);
     if (!list.length) return false;
     let i = list.findIndex(f => f.path === Player.current);
     if (i <= 0) i = list.length;
-    PlayMgr.play(list[i - 1].path, 0);
+    PlayMgr.play(list[i - 1].path, 0, opts);
     return true;
   }
-  function playRandom() {
+  function playRandom(opts) {
     const list = playbackList().filter(f => f && f.path);
     if (!list.length) return false;
-    if (list.length === 1) { PlayMgr.play(list[0].path, 0); return true; }
+    if (list.length === 1) { PlayMgr.play(list[0].path, 0, opts); return true; }
     let n = 0, pick = null;
     do { pick = list[Math.floor(Math.random() * list.length)]; n++; }
     while (pick.path === Player.current && n < 8);
-    PlayMgr.play(pick.path, 0);
+    PlayMgr.play(pick.path, 0, opts);
     return true;
   }
   function autoplayNext() {

@@ -494,22 +494,52 @@ class UiRegression:
                          "subfolder rows should be empty in Album A")
             self.require(self.page.locator("#pf-queue .pf-q[data-path]").count() >= 2,
                          "stopped folder view missing audio rows")
+            # 固定一个非默认窗口尺寸，后面点击/自动淡化都不能把它读回预设尺寸。
+            self.page.evaluate("""() => {
+              const c = WinMgr.find(document.querySelector('#play-float'));
+              if (c) c.place({x: 30, y: 120, w: 520, h: 620}, true);
+            }""")
+            self.page.wait_for_timeout(200)
+            size0 = self.page.evaluate("() => { const r = document.querySelector('#play-float').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }")
+            sp_before = self.page.evaluate("document.querySelector('#spectrum-float').classList.contains('hidden')")
             self.page.locator(f'#pf-queue .pf-q[data-path="{self.fx["ui_track1"]}"]').click()
-            self.page.wait_for_timeout(350)
+            self.page.wait_for_timeout(500)
             self.require(self.page.evaluate("Player.current") == self.fx["ui_track1"], "audio click did not play")
-            # 播放/暂停态维持音频队列，不出现文件夹行。
+            size1 = self.page.evaluate("() => { const r = document.querySelector('#play-float').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }")
+            self.require(size1 == size0, f"play window size changed after track click: {size0} -> {size1}")
+            self.require(self.page.evaluate("document.querySelector('#spectrum-float').classList.contains('hidden')") == sp_before,
+                         "playlist track click opened a second spectrum window")
+            # 播放中也能从目录视图返回上级、进别的目录；再切到队列看纯音频列表。
+            self.page.evaluate("(p) => App.browse(p)", self.fx["ui_root"])
+            self.page.wait_for_timeout(400)
+            self.require(self.page.locator("#pf-queue .pf-qdir").count() >= 3,
+                         "playing folder view empty")
+            self.page.locator(f'#pf-queue .pf-qdir[data-dir="{self.fx["ui_album_b"]}"]').click()
+            self.page.wait_for_timeout(500)
+            self.require(self.page.evaluate("App.path") == self.fx["ui_album_b"],
+                         "playing state could not open another folder")
+            self.page.locator('#pf-qview [data-qview="queue"]').click()
+            self.page.wait_for_timeout(200)
+            self.require(self.page.locator("#pf-queue .pf-qdir").count() == 0,
+                         "audio queue mixed with folders")
+            self.require(self.page.locator("#pf-queue .pf-q[data-path]").count() >= 1,
+                         "audio queue empty while playing")
+            self.page.locator('#pf-qview [data-qview="browse"]').click()
+            self.page.evaluate("(p) => App.browse(p)", self.fx["ui_root"])
+            self.page.wait_for_timeout(400)
             if self.page.evaluate("Player.isPlaying()"):
                 self.page.evaluate("Player.toggle()")
-            self.page.wait_for_timeout(150)
-            self.require(self.page.locator("#pf-queue .pf-qdir").count() == 0,
-                         "audio queue mixed with folders in pause state")
+            self.page.wait_for_timeout(200)
+            # 暂停不会强制切视图；目录视图里仍可继续浏览。
+            self.require(self.page.locator("#pf-queue .pf-qdir").count() >= 1,
+                         "pause should not lock the directory view")
             # 停止后回到文件夹浏览视图，而不是停在音频队列。
             self.page.evaluate("Player.close()")
             self.page.evaluate("(p) => App.browse(p)", self.fx["ui_root"])
             self.page.wait_for_timeout(450)
             self.require(self.page.locator("#pf-queue .pf-qdir").count() >= 3,
                          "stopped state did not return to folder view")
-            return "stopped folder view + direct folder/audio click"
+            return "stopped/playing folder tabs + direct actions + size kept"
         self.check("stopped playlist shows folders and direct actions", stopped_folder_view)
 
         def swipe_nav():
@@ -627,6 +657,14 @@ class UiRegression:
             self.page.wait_for_timeout(700)
             self.require(self.page.evaluate("getComputedStyle(document.querySelector('#sf-canvas')).opacity") == "0.5",
                         "waterfall canvas is not 50% transparent")
+            # 声谱空背景必须透明，不能再在 canvas 里铺黑色底。
+            bg_alpha = self.page.evaluate("""() => {
+              const c = document.querySelector('#sf-canvas');
+              const x = Math.max(40, Math.round(c.width * 0.35));
+              const y = Math.max(20, Math.round(c.height * 0.12));
+              return c.getContext('2d').getImageData(x, y, 1, 1).data[3];
+            }""")
+            self.require(bg_alpha <= 4, f"waterfall background is not transparent: alpha={bg_alpha}")
             # 收尾：还原本用例伪造的 HiFi 状态，避免影响后续面板。
             self.page.evaluate("""() => {
               Player.hifiActive = window.__ac2OrigHifiActive;
@@ -638,20 +676,34 @@ class UiRegression:
         self.check("spectrum embedded, swipe mode, 50% visuals and config", embedded_spectrum)
 
         def idle_dim():
-            # 用 8 秒长音轨撑过 5 秒倒计时；展开频谱，验证内部保持默认 50%。
+            # 用 16 秒长音轨撑过 10 秒倒计时；展开频谱，验证内部保持默认 50%。
+            # 先把窗口落成一个非默认尺寸，再等自动淡化；淡化/点击都不能把尺寸
+            # 重新读成预设默认（WinMgr 只应在可见性变化时 apply）。
+            self.page.evaluate("""() => {
+              const c = WinMgr.find(document.querySelector('#play-float'));
+              if (c) c.place({x: 30, y: 120, w: 520, h: 620}, true);
+            }""")
+            self.page.wait_for_timeout(200)
+            size0 = self.page.evaluate("() => { const r = document.querySelector('#play-float').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }")
             self.page.evaluate("(p) => PlayMgr.play(p)", self.fx["ui_long"])
-            self.page.wait_for_timeout(350)
+            self.page.wait_for_timeout(500)
+            bg0 = self.page.evaluate("() => getComputedStyle(document.querySelector('#pf-bg')).opacity")
             if not self.page.locator("#pf-sf-sec").is_visible():
                 self.page.locator("#pf-q-toggle").click()
                 self.page.wait_for_timeout(300)
-            self.page.wait_for_timeout(5600)
+            self.page.wait_for_timeout(10600)
             self.require(self.page.evaluate("document.querySelector('#play-float').classList.contains('pf-idle-dim')"),
-                         "play manager did not dim after 5 seconds")
+                         "play manager did not dim after 10 seconds")
             for sel in ("#pf-head", ".pf-now", ".pf-transport", "#pf-qhead", ".pf-sf-head"):
                 op = self.page.evaluate("(s) => getComputedStyle(document.querySelector(s)).opacity", sel)
                 self.require(float(op) <= 0.11, f"{sel} not at 10% opacity: {op}")
             self.require(self.page.evaluate("getComputedStyle(document.querySelector('#sf-canvas')).opacity") == "0.5",
                          "spectrum canvas was dimmed with the chrome")
+            bg1 = self.page.evaluate("() => getComputedStyle(document.querySelector('#pf-bg')).opacity")
+            self.require(bg1 == bg0 and float(bg1) >= 0.9,
+                         f"cover background was dimmed with the chrome: {bg0} -> {bg1}")
+            size1 = self.page.evaluate("() => { const r = document.querySelector('#play-float').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }")
+            self.require(size1 == size0, f"play window size changed after idle dim: {size0} -> {size1}")
             self.require(self.page.locator("#pf-idle-guard").is_visible(), "idle guard not visible")
             # 第一次点击只唤醒，不触发下面的停止按钮。
             stop = self.page.locator("#pf-stop").bounding_box()
@@ -665,8 +717,8 @@ class UiRegression:
             self.require(self.page.locator("#pf-idle-guard").is_visible() is False, "idle guard stayed visible")
             op = self.page.evaluate("getComputedStyle(document.querySelector('#pf-head')).opacity")
             self.require(float(op) >= 0.9, f"play manager did not restore opacity: {op}")
-            return "5s idle dim + lock + click wake"
-        self.check("play manager 5s idle dim and lock", idle_dim)
+            return "10s idle dim + lock + click wake + size/background kept"
+        self.check("play manager 10s idle dim and lock", idle_dim)
 
         def gain_panel():
             self.page.evaluate("() => App.openModule('audio')")
