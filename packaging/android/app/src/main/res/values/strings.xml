@@ -12,6 +12,9 @@
     <string name="notif_settings">去设置</string>
     <string name="notif_known">知道了</string>
     <string name="channel_playback">播放控制</string>
+    <string name="channel_server">本地服务</string>
+    <string name="server_notif_title">Audio-CPM 本地服务</string>
+    <string name="server_notif_text">浏览器可通过 127.0.0.1:8765 访问；点此返回应用</string>
     <string name="action_prev">上一首</string>
     <string name="action_pause">暂停</string>
     <string name="action_play">播放</string>

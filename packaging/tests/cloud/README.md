@@ -25,10 +25,10 @@ python3 packaging/tests/cloud/run_cloud_suite.py
 # 只跑 API，适合提交前快速回归
 python3 packaging/tests/cloud/run_cloud_suite.py --no-ui
 
-# 只跑 UI，保留夹具和截图
+# 只跑 UI，保留夹具和日志
 python3 packaging/tests/cloud/run_cloud_suite.py --no-api --keep
 
-# 保留现场：夹具、server.log、data/ac2.log、screenshots、report.json
+# 保留现场：夹具、server.log、data/ac2.log、report.json
 python3 packaging/tests/cloud/run_cloud_suite.py --keep
 
 # 指定端口（默认自动挑选空闲端口）
@@ -64,12 +64,13 @@ python3 packaging/tests/cloud/run_cloud_suite.py --keep --report /tmp/ac2-report
 - UI 发起的转换任务真实完成，并检查磁盘输出文件
 - 音频输出面板、保存场景、390×844 移动端布局
 - 更新设置卡显示当前版本/通道/已是最新，更新横幅渲染与关闭
+- 设置里的英文语言链接可点击；浏览器无原生桥时后台运行按钮正确降级
 
 ## 测试结构
 
 - `fixtures.py`：用 ffmpeg 合成确定性音频/封面，建立 `api` 与 `ui` 两套互不干扰的目录。
 - `api_regression.py`：用 `httpx` 直接打真实 HTTP 路由；每个任务都通过 SSE/轮询等待完成。
-- `ui_regression.py`：Playwright 真实浏览器操作；失败时自动截图，成功时保留关键步骤截图。
+- `ui_regression.py`：Playwright 真实浏览器操作；默认只做 DOM/文本断言，不截图。需要留证据时设 `AC2_UI_SCREENSHOTS=1`。
 - `run_cloud_suite.py`：分配空闲端口、启动本地假 GitHub 更新 feed、设置隔离环境变量、启动/关闭后端、汇总结果、写 JSON 报告。
 
 ## 已知边界

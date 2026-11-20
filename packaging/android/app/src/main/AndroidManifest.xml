@@ -18,6 +18,10 @@
     <!-- HiFi 播放的前台服务与通知栏 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- 本地 HTTP 服务保活：Android 14+ 需要声明 specialUse 前台服务类型 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- 引导用户把本应用加入电池优化白名单 -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- MediaSession 在锁屏/通知栏显示媒体控制 -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -56,6 +60,16 @@
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService" />
             </intent-filter>
+        </service>
+
+        <!-- 本地 HTTP 服务保活：浏览器在后台访问 127.0.0.1:8765 时保持进程存活 -->
+        <service
+            android:name=".ServerKeepAliveService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="local_http_server" />
         </service>
     </application>
 </manifest>

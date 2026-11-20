@@ -914,6 +914,7 @@ const App = (() => {
     Layout.init();
     Settings.init();
     if (typeof UpdateChecker !== 'undefined') UpdateChecker.init();
+    if (typeof BackgroundKeeper !== 'undefined') BackgroundKeeper.init();
     Columns.bindSheet();
     const columns1 = Columns.create(K.columns);
     bv = createBrowseView({

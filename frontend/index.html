@@ -416,7 +416,7 @@
       </select>
     </div>
     <div class="hint lang-hint" data-i18n-skip lang="en">
-      Can't find your language? No problem — open <b>http://127.0.0.1:8765/</b> in a browser and turn on auto-translate.
+      Can't find your language? No problem — open <a id="lang-hint-open" href="http://127.0.0.1:8765/" target="_blank" rel="noopener">http://127.0.0.1:8765/</a> in a browser and turn on auto-translate.
     </div>
 
     <div style="border-top:1px solid var(--border);margin:12px 0 0"></div>
@@ -443,6 +443,21 @@
           <button type="button" class="small" id="upd-later">稍后</button>
           <button type="button" class="primary small" id="upd-download">下载更新</button>
         </div>
+      </div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);margin:12px 0 0"></div>
+    <div class="bg-section">
+      <div class="upd-head">
+        <h3>后台运行</h3>
+        <span id="bg-badge" class="upd-badge" data-i18n-skip></span>
+      </div>
+      <div id="bg-status" class="hint upd-status" data-i18n-skip></div>
+      <div class="hint bg-note">浏览器访问 127.0.0.1:8765 时，系统可能回收后台；建议允许无限制后台并关闭电池优化。小米/华为还需允许自启动。</div>
+      <div class="row upd-actions" style="justify-content:flex-start">
+        <button type="button" class="small primary" id="bg-allow">允许后台运行</button>
+        <button type="button" class="small" id="bg-settings">应用设置</button>
+        <button type="button" class="small" id="bg-battery">电池设置</button>
       </div>
     </div>
 
@@ -517,6 +532,7 @@ WebDAV 支持浏览 / 播放 / 元数据 / 下载（后续）与远端内部移�
 <script src="/js/layout.js"></script>
 <script src="/js/spectrum.js"></script>
 <script src="/js/update.js"></script>
+<script src="/js/background.js"></script>
 <script src="/js/app.js"></script>
 
 </body>

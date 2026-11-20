@@ -18,6 +18,7 @@ import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.PowerManager;
 import android.provider.Settings;
 import android.provider.OpenableColumns;
 import android.util.Log;
@@ -33,8 +34,6 @@ import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
-import com.chaquo.python.Python;
-import com.chaquo.python.android.AndroidPlatform;
 
 import java.io.File;
 import java.io.IOException;
@@ -49,7 +48,7 @@ import org.json.JSONObject;
 
 public class MainActivity extends Activity {
     private static final String TAG = "Audio-CPM";
-    private static final int PORT = 8765;
+    private static final int PORT = ServerRuntime.PORT;
 
     private static final int REQ_ALL_FILES = 1001;
     private static final int REQ_MEDIA_AUDIO = 1002;
@@ -145,9 +144,81 @@ public class MainActivity extends Activity {
             }
 
             /**
-             * 调起系统文件选择器选封面。结果通过 window.AudioCpmPickResult(json) 异步回传。
-             * 不用应用内自绘选择器：用户明确要求系统组件，而且系统选择器能到最前台。
+             * 设置里的英文语言提示：在系统浏览器打开本地服务，方便启用浏览器自动翻译。
+             * 只放行本机 127.0.0.1:8765 / localhost:8765，避免变成任意 URL 跳转口。
              */
+            @android.webkit.JavascriptInterface
+            public String openExternalUrl(String url) {
+                try {
+                    Uri u = Uri.parse(String.valueOf(url));
+                    String scheme = u.getScheme() == null ? "" : u.getScheme().toLowerCase();
+                    String host = u.getHost() == null ? "" : u.getHost().toLowerCase();
+                    if (!("http".equals(scheme) || "https".equals(scheme))
+                            || !("127.0.0.1".equals(host) || "localhost".equals(host))
+                            || u.getPort() != PORT) {
+                        return "{\"ok\":false,\"error\":\"untrusted url\"}";
+                    }
+                    startActivity(new Intent(Intent.ACTION_VIEW, u));
+                    return "{\"ok\":true}";
+                } catch (Throwable t) {
+                    return "{\"ok\":false,\"error\":" + JSONObject.quote(String.valueOf(t)) + "}";
+                }
+            }
+
+            /** 设置页后台运行状态：是否被系统电池优化限制。 */
+            @android.webkit.JavascriptInterface
+            public String backgroundStatus() {
+                try {
+                    PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+                    boolean ignoring = pm != null && pm.isIgnoringBatteryOptimizations(getPackageName());
+                    JSONObject j = new JSONObject();
+                    j.put("ok", true);
+                    j.put("battery_optimized", !ignoring);
+                    j.put("ignoring_battery", ignoring);
+                    j.put("manufacturer", Build.MANUFACTURER == null ? "" : Build.MANUFACTURER);
+                    return j.toString();
+                } catch (Throwable t) {
+                    return "{\"ok\":false,\"error\":" + JSONObject.quote(String.valueOf(t)) + "}";
+                }
+            }
+
+            /** 引导用户把本应用加入“不优化电池”名单；失败时退到电池优化列表。 */
+            @android.webkit.JavascriptInterface
+            public String requestBackground() {
+                try {
+                    Intent i = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                    i.setData(Uri.parse("package:" + getPackageName()));
+                    startActivity(i);
+                    return "{\"ok\":true}";
+                } catch (Throwable t) {
+                    return openBatterySettings();
+                }
+            }
+
+            /** 打开系统电池优化列表（部分 ROM 没有直接请求页时用这个）。 */
+            @android.webkit.JavascriptInterface
+            public String openBatterySettings() {
+                try {
+                    startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+                    return "{\"ok\":true}";
+                } catch (Throwable t) {
+                    return "{\"ok\":false,\"error\":" + JSONObject.quote(String.valueOf(t)) + "}";
+                }
+            }
+
+            /** 打开本应用系统详情页：小米/华为等自启动、后台限制通常在这里。 */
+            @android.webkit.JavascriptInterface
+            public String openAppSettings() {
+                try {
+                    Intent i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.parse("package:" + getPackageName()));
+                    startActivity(i);
+                    return "{\"ok\":true}";
+                } catch (Throwable t) {
+                    return "{\"ok\":false,\"error\":" + JSONObject.quote(String.valueOf(t)) + "}";
+                }
+            }
+
             /**
              * 下载更新 APK：交给系统 DownloadManager，完成后通知栏可点开安装。
              * 只允许本仓库 releases/download/http(s) 地址，避免任意 URL 被注入下载。
@@ -178,6 +249,10 @@ public class MainActivity extends Activity {
                 }
             }
 
+            /**
+             * 调起系统文件选择器选封面。结果通过 window.AudioCpmPickResult(json) 异步回传。
+             * 不用应用内自绘选择器：用户明确要求系统组件，而且系统选择器能到最前台。
+             */
             @android.webkit.JavascriptInterface
             public String pickImage() {
                 if (pickerActive) return "{\"ok\":false,\"error\":\"busy\"}";
@@ -275,17 +350,13 @@ public class MainActivity extends Activity {
             Log.e(TAG, "write config failed", e);
         }
 
-        if (!Python.isStarted()) {
-            Python.start(new AndroidPlatform(this));
+        ServerRuntime.start(this, config.getAbsolutePath());
+        try {
+            // 前台保活服务：浏览器在后台调用 127.0.0.1:8765 时，进程仍保有前台优先级。
+            ServerKeepAliveService.start(this);
+        } catch (Throwable t) {
+            Log.e(TAG, "start keepalive service failed", t);
         }
-        final String cfgPath = config.getAbsolutePath();
-        new Thread(() -> {
-            try {
-                Python.getInstance().getModule("backend.boot").callAttr("run", cfgPath);
-            } catch (Throwable t) {
-                Log.e(TAG, "python server failed", t);
-            }
-        }, "audio-cpm-python").start();
 
         new Thread(this::waitAndLoad, "audio-cpm-wait").start();
 

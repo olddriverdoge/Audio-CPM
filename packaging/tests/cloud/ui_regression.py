@@ -31,6 +31,8 @@ class UiRegression:
         self.console_errors = []
         self.page_errors = []
         self._idx = 0
+        # 默认不截图：日常回归用 DOM/文本断言，报告里只保留结构化结果。
+        self.screenshots = os.environ.get("AC2_UI_SCREENSHOTS", "0") == "1"
 
     def require(self, cond: bool, msg: str):
         if not cond:
@@ -43,6 +45,8 @@ class UiRegression:
         self.results.append({"name": name, "ok": False, "detail": detail})
 
     def shot(self, stem: str) -> str:
+        if not self.screenshots:
+            return ""
         self._idx += 1
         path = self.shot_dir / f"{self._idx:02d}-{stem}.png"
         try:
@@ -137,6 +141,14 @@ class UiRegression:
             self.require(hint.startswith("Can't find your language?"), f"hint: {hint}")
             self.require("http://127.0.0.1:8765/" in hint, "URL missing from hint")
             self.require("auto-translate" in hint, "auto-translate missing")
+            link = self.page.locator("#lang-hint-open")
+            self.require(link.count() == 1, "language hint link missing")
+            self.require(link.get_attribute("href") == "http://127.0.0.1:8765/",
+                         f"language link href: {link.get_attribute('href')!r}")
+            self.require(link.get_attribute("target") == "_blank", "language link should open a browser tab")
+            bg = self.page.locator("#bg-status").inner_text().strip()
+            self.require("仅 Android App 内可配置后台运行" in bg, f"browser background status: {bg!r}")
+            self.require(self.page.locator("#bg-allow").is_disabled(), "browser background action should be disabled")
             return hint
         self.check("settings language hint is English", settings_hint, "settings-hint")
 
@@ -189,7 +201,27 @@ class UiRegression:
             )
             status = self.page.locator("#upd-status").inner_text().strip()
             self.require("0.5.3" in status, f"status: {status!r}")
-            self.shot("update-settings")
+            # 模拟 Android 桥，验证语言链接走外部浏览器、后台状态与按钮可用；
+            # 这里只做 DOM/返回值断言，不截图。
+            self.page.evaluate("""() => {
+                window.__langUrl = '';
+                window.AudioCpmNative = {
+                    openExternalUrl: url => { window.__langUrl = url; return '{"ok":true}'; },
+                    backgroundStatus: () => '{"ok":true,"battery_optimized":true,"ignoring_battery":false,"manufacturer":"Xiaomi"}',
+                    requestBackground: () => '{"ok":true}',
+                    openAppSettings: () => '{"ok":true}',
+                    openBatterySettings: () => '{"ok":true}',
+                    downloadUpdate: () => '{"ok":false}'
+                };
+                BackgroundKeeper.refresh();
+            }""")
+            self.page.locator("#lang-hint-open").click()
+            self.require(self.page.evaluate("window.__langUrl") == "http://127.0.0.1:8765/",
+                         "language link did not reach native browser bridge")
+            bg = self.page.locator("#bg-status").inner_text().strip()
+            self.require("电池优化未关闭" in bg, f"battery status: {bg!r}")
+            self.require("受限" in self.page.locator("#bg-badge").inner_text(), "battery badge")
+            self.require(not self.page.locator("#bg-allow").is_disabled(), "background action should be enabled with bridge")
             if self.page.locator("#player-sheet").is_visible():
                 self.page.locator("#cfg-cancel").click()
                 self.page.locator("#player-sheet").wait_for(state="hidden", timeout=3000)

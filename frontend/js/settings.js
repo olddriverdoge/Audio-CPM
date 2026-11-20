@@ -18,6 +18,7 @@ const Settings = (() => {
     if (el) el.textContent = msg || '';
   }
   function open() {
+    if (typeof BackgroundKeeper !== 'undefined') BackgroundKeeper.refresh();
     const cs = document.getElementById('cols-sheet');
     if (cs) cs.classList.add('hidden');
     const ps = document.getElementById('player-sheet');
@@ -42,6 +43,20 @@ const Settings = (() => {
     if (lang && typeof I18n !== 'undefined') {
       lang.value = I18n.mode;
       lang.onchange = () => I18n.setLocale(lang.value);
+    }
+    const langLink = document.getElementById('lang-hint-open');
+    if (langLink) {
+      langLink.addEventListener('click', e => {
+        const b = window.AudioCpmNative;
+        if (!b || typeof b.openExternalUrl !== 'function') return;
+        e.preventDefault();
+        try {
+          const r = JSON.parse(b.openExternalUrl(langLink.href) || '{}');
+          if (!r.ok) Utils.toast(I18n.tr('无法打开浏览器，请手动访问 ') + langLink.href, 'warn');
+        } catch (_) {
+          Utils.toast(I18n.tr('无法打开浏览器，请手动访问 ') + langLink.href, 'warn');
+        }
+      });
     }
     document.getElementById('sheet-overlay').addEventListener('click', e => {
       if (e.target.id === 'sheet-overlay') close();

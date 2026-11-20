@@ -499,5 +499,22 @@
   "已开始下载更新包": "Update download started",
   "已打开下载页面": "Download page opened",
   "无法打开下载页面": "Unable to open download page",
-  "仅 Android App 内支持更新检查": "Update checks are available in the Android app."
+  "仅 Android App 内支持更新检查": "Update checks are available in the Android app.",
+  "后台运行": "Background",
+  "前台保活": "Foreground service",
+  "已启用": "Enabled",
+  "受限": "Restricted",
+  "浏览器": "Browser",
+  "仅 Android App 内可配置后台运行": "Background settings are available in the Android app.",
+  "电池优化未关闭，后台可能被系统中断。": "Battery optimization is on; background work may be interrupted.",
+  "后台服务运行中，电池优化未限制。": "Background service is running; battery optimization is unrestricted.",
+  "后台状态读取失败": "Could not read background status",
+  "允许后台运行": "Allow background",
+  "应用设置": "App settings",
+  "电池设置": "Battery settings",
+  "无法打开系统电池设置": "Unable to open battery settings",
+  "无法打开应用设置": "Unable to open app settings",
+  "已打开系统设置，请选择“不限制后台”或关闭电池优化": "System settings opened. Choose “No restrictions” or disable battery optimization.",
+  "浏览器访问 127.0.0.1:8765 时，系统可能回收后台；建议允许无限制后台并关闭电池优化。小米/华为还需允许自启动。": "When a browser uses 127.0.0.1:8765, Android may reclaim the background process. Allow unrestricted background and disable battery optimization; Xiaomi/Huawei also need autostart enabled.",
+  "无法打开浏览器，请手动访问 ": "Unable to open browser; visit "
 }

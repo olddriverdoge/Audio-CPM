@@ -1,0 +1,4 @@
+0.5.5:
+- Keep the local HTTP server alive with a foreground service.
+- Guide users to battery optimization and app background settings.
+- Make the English language hint link open in the system browser.
