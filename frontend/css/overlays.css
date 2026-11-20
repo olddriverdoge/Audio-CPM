@@ -56,6 +56,8 @@
     padding:14px;width:min(92vw,430px);box-shadow:0 12px 40px rgba(0,0,0,.6);
     max-height:88vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
   .sheet .hint{font-size:11.5px;color:var(--muted);line-height:1.5}
+  .sheet .lang-hint{margin:5px 0 0;font-size:11px;line-height:1.55;word-break:break-word}
+  .sheet .lang-hint b{color:var(--text);font-family:ui-monospace,Menlo,monospace;font-weight:600}
   .sheet input{font-family:ui-monospace,Menlo,monospace;font-size:12px}
   .scene-save-sheet{display:flex;flex-direction:column;overflow:hidden}
   .ss-sub{font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:8px}

@@ -1,0 +1,2 @@
+0.5.2:
+- Added an English hint below the interface language selector: if your language is missing, open http://127.0.0.1:8765/ in a browser and enable auto-translate.
