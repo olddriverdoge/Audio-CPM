@@ -50,36 +50,49 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
     private boolean bypass = false;
 
     /* ---------------- 外部调参 ---------------- */
-    public static void setEnabled(boolean on) { enabled = on; rev++; persist(); }
+    public static void setEnabled(boolean on) {
+        if (enabled == on) return;
+        enabled = on; rev++; persist();
+    }
     public static boolean isEnabled() { return enabled; }
 
     public static void setBand(int band, int mb) {
         if (band < 0 || band >= BANDS) return;
-        gainsMb[band] = Math.max(-MAX_BAND_MB, Math.min(MAX_BAND_MB, mb));
+        int v = Math.max(-MAX_BAND_MB, Math.min(MAX_BAND_MB, mb));
+        if (gainsMb[band] == v) return;
+        gainsMb[band] = v;
         rev++;
         persist();
     }
 
     public static void setBass(int amount) {
-        bassAmount = Math.max(0, Math.min(1000, amount));
+        int v = Math.max(0, Math.min(1000, amount));
+        if (bassAmount == v) return;
+        bassAmount = v;
         rev++;
         persist();
     }
 
     public static void setTreble(int amount) {
-        trebleAmount = Math.max(0, Math.min(1000, amount));
+        int v = Math.max(0, Math.min(1000, amount));
+        if (trebleAmount == v) return;
+        trebleAmount = v;
         rev++;
         persist();
     }
 
     public static void setVirt(int amount) {
-        virtAmount = Math.max(0, Math.min(1000, amount));
+        int v = Math.max(0, Math.min(1000, amount));
+        if (virtAmount == v) return;
+        virtAmount = v;
         rev++;
         persist();
     }
 
     public static void setPreamp(int mb) {
-        preampMb = Math.max(-1000, Math.min(1000, mb));
+        int v = Math.max(-1000, Math.min(1000, mb));
+        if (preampMb == v) return;
+        preampMb = v;
         rev++;
         persist();
     }
@@ -89,7 +102,12 @@ public class SoftwareEqProcessor extends BaseAudioProcessor {
     /** preset 0..5（5=保持当前自定义值） */
     public static void setPreset(int preset) {
         if (preset < 0 || preset >= PRESETS.length || PRESETS[preset] == null) return;
-        for (int i = 0; i < BANDS; i++) gainsMb[i] = (int) Math.round(PRESETS[preset][i] * 100);
+        boolean changed = false;
+        for (int i = 0; i < BANDS; i++) {
+            int v = (int) Math.round(PRESETS[preset][i] * 100);
+            if (gainsMb[i] != v) { gainsMb[i] = v; changed = true; }
+        }
+        if (!changed) return;
         rev++;
         persist();
     }

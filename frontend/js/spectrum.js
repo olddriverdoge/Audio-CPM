@@ -980,6 +980,12 @@ const Spectrum = (() => {
     paintBarsChip();
   }
 
+  function delayLabelText() {
+    const raw = (typeof I18n !== 'undefined')
+      ? I18n.tr('延迟（{dev}）', {dev: delayShort}) : ('延迟（' + delayShort + '）');
+    return String(raw).replace('{dev}', delayShort);
+  }
+
   function applyOutputDevice(detail) {
     detail = detail || {};
     const key = String(detail.key || 'default') || 'default';
@@ -990,8 +996,7 @@ const Spectrum = (() => {
     delayShort = short;
     delayFull = full;
     if (delayLab) {
-      delayLab.textContent = (typeof I18n !== 'undefined')
-        ? I18n.tr('延迟（{dev}）', {dev: delayShort}) : ('延迟（' + delayShort + '）');
+      delayLab.textContent = delayLabelText();
       delayLab.title = '当前输出：' + delayFull;
     }
     loadDelayForCurrent();
@@ -1019,8 +1024,7 @@ const Spectrum = (() => {
     const row = document.createElement('div');
     row.className = 'sf-line';
     const lab = document.createElement('label');
-    lab.textContent = (typeof I18n !== 'undefined')
-      ? I18n.tr('延迟（{dev}）', {dev: delayShort}) : ('延迟（' + delayShort + '）');
+    lab.textContent = delayLabelText();
     lab.title = '当前输出：' + delayFull;
     lab.htmlFor = 'sf-delay';
     const inp = document.createElement('input');
