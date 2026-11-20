@@ -26,7 +26,7 @@ jobs:
       ANDROID_HOME: /usr/local/lib/android/sdk
       ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Android NDK
         run: |
@@ -37,7 +37,7 @@ jobs:
 
       - name: Cache ffmpeg output
         id: cache-ffmpeg
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: packaging/android/ffmpeg/out
           key: ffmpeg-8.0.1-arm64-${{ hashFiles('packaging/android/ffmpeg/build_ffmpeg_android.sh') }}
@@ -65,7 +65,7 @@ jobs:
           ls -l packaging/android/ffmpeg/out/libffmpegbin.so
           file packaging/android/ffmpeg/out/libffmpegbin.so
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ffmpeg-android-arm64
           path: packaging/android/ffmpeg/out/libffmpegbin.so
@@ -79,14 +79,14 @@ jobs:
       ANDROID_HOME: /usr/local/lib/android/sdk
       ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
 
@@ -97,7 +97,7 @@ jobs:
           "$SDKM" "platforms;android-35" "build-tools;35.0.0" "cmake;3.22.1" "ndk;27.0.12077973"
 
       - name: Download ffmpeg binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ffmpeg-android-arm64
           path: packaging/android/app/src/main/jniLibs/arm64-v8a
@@ -105,7 +105,7 @@ jobs:
       - name: Show jniLibs
         run: ls -l packaging/android/app/src/main/jniLibs/arm64-v8a/
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: "8.10.2"
 
@@ -153,7 +153,7 @@ jobs:
           "$APKSIGNER" verify --print-certs packaging/android/app/build/outputs/apk/release/Audio-CPM-release.apk
           jarsigner -verify packaging/android/app/build/outputs/bundle/release/Audio-CPM-release.aab | tail -3
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: ${{ github.ref_type != 'tag' && github.event.inputs.build_release != 'true' }}
         with:
           name: audio-cpm-apk
@@ -182,7 +182,7 @@ jobs:
           echo "published debug-latest asset: $ASSET"
 
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: ${{ github.ref_type == 'tag' || github.event.inputs.build_release == 'true' }}
         with:
           name: audio-cpm-release
