@@ -15,7 +15,7 @@
 
 - [ ] 生成离线 release keystore，并写入 4 个 GitHub Secrets
 - [ ] 生成 512×512 图标、1024×500 功能图和 5 张真实截图
-- [ ] 合并到 `main` 后启用 GitHub Pages，确认隐私政策 URL 可访问
+- [x] GitHub Pages 已在功能分支 `/docs` 上线：https://olddriverdoge.github.io/Audio-CPM/privacy/（合并后切回 `main`）
 - [ ] Google Play Console 账号（US$25，企业需 D-U-N-S）
 - [ ] 国内商店：企业开发者账号、软件著作权、App 备案
 - [ ] 评估 `MANAGE_EXTERNAL_STORAGE`：补齐 SAF 目录授权模式，或准备 All files access 声明

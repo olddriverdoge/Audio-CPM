@@ -149,7 +149,7 @@ Release 构建需要配置 4 个签名 Secrets，步骤见 [docs/store/RELEASE_S
 ## 商店与合规材料
 
 - [PRIVACY.md](PRIVACY.md)：隐私政策源文件
-- [docs/privacy/](docs/privacy/)：GitHub Pages 公开版本
+- [隐私政策公开页](https://olddriverdoge.github.io/Audio-CPM/privacy/)：GitHub Pages 版本
 - [docs/store/README.md](docs/store/README.md)：上架准备清单
 - [docs/store/RELEASE_SIGNING.md](docs/store/RELEASE_SIGNING.md)：release keystore、GitHub Secrets、AAB 构建
 - [docs/store/DATA_SAFETY.md](docs/store/DATA_SAFETY.md)：数据安全与权限底稿
