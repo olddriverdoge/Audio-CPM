@@ -31,6 +31,7 @@ const Spectrum = (() => {
   const pos = {side: 'right', top: null};
   let winCtl = null;
   let embedded = false, embeddedPrevOpen = false;
+  let embedRO = null, embedTick = 0;
 
   // 声谱缓冲（时间轴横向、频率纵向；新数据从右侧进入，向左滚动）
   const wf = document.createElement('canvas');
@@ -726,8 +727,11 @@ const Spectrum = (() => {
     if (!g) return;
     try {
       g.setTransform(1, 0, 0, 1, 0, 0);
-      g.fillStyle = '#0f1419';
-      g.fillRect(0, 0, canvas.width, canvas.height);
+      g.clearRect(0, 0, canvas.width, canvas.height);
+      if (!embedded) {
+        g.fillStyle = '#0f1419';
+        g.fillRect(0, 0, canvas.width, canvas.height);
+      }
       g.fillStyle = 'rgba(148,163,184,.75)';
       g.textAlign = 'center'; g.textBaseline = 'middle';
       g.font = Math.round(12 * DPR) + 'px ui-monospace, Menlo, monospace';
@@ -1183,6 +1187,35 @@ const Spectrum = (() => {
 
   /* 播放管理内嵌：把同一个频谱模块搬进播放管理，不复制第二套取数链。
      这样模式、长按配置、配色/频段参数全部保留，背景由播放管理的封面提供。 */
+  /* 内嵌时宿主刚挂载可能还是 0×0；等两帧再量一次，并监听尺寸变化。
+     以前只在 setEmbedded 当下 layoutCanvas，canvas 位图可能是 120×60 的兜底尺寸，
+     显示出来就是“透明背景、没有柱子”。 */
+  function stopEmbedRO() {
+    if (embedRO) { try { embedRO.disconnect(); } catch (_) {} embedRO = null; }
+    if (embedTick) { cancelAnimationFrame(embedTick); embedTick = 0; }
+  }
+  function armEmbedLayout(host) {
+    if (!embedded) return;
+    cssW = 0; cssH = 0; lastMeasure = 0;
+    if (embedTick) cancelAnimationFrame(embedTick);
+    embedTick = requestAnimationFrame(() => {
+      embedTick = requestAnimationFrame(() => {
+        embedTick = 0;
+        if (!embedded) return;
+        layoutCanvas();
+        if (open && !raf && !stopped) start();
+      });
+    });
+    if (window.ResizeObserver && host && !embedRO) {
+      embedRO = new ResizeObserver(() => {
+        if (!embedded) return;
+        layoutCanvas();
+        if (open && !raf && !stopped) start();
+      });
+      try { embedRO.observe(host); } catch (_) {}
+    }
+  }
+
   function setEmbedded(on, host) {
     if (!box) return;
     if (on) {
@@ -1195,7 +1228,9 @@ const Spectrum = (() => {
       }
       open = true;
       apply();
+      armEmbedLayout(host);
     } else if (embedded) {
+      stopEmbedRO();
       embedded = false;
       box.classList.remove('is-embedded');
       if (box.parentNode && box.parentNode !== document.body) document.body.appendChild(box);

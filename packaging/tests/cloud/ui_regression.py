@@ -459,53 +459,98 @@ class UiRegression:
             self.require("0.3" in (btn_bg or ""), f"transport button not 30% glass: {btn_bg}")
             self.require("0.3" in (wave_bg or ""), f"waveform box not 30% glass: {wave_bg}")
             self.require(self.page.locator("#player-bar").is_visible() is False, "bottom progress bar visible")
-            return "playlist title + 30% glass + gain moved"
+            self.require(not self.page.locator("#pf-cover").is_visible(), "top-left cover thumbnail still visible")
+            # 封面缩略图隐藏后，原“点封面进元数据”的入口改到标题。
+            self.page.locator("#pf-title").click()
+            self.page.wait_for_timeout(250)
+            self.require(self.page.locator("#meta-float").is_visible(), "title did not open metadata")
+            if self.page.locator("#mf-min").is_visible():
+                self.page.locator("#mf-min").click()
+                self.page.wait_for_timeout(150)
+            return "playlist title + 30% glass + gain moved + no cover thumb + title meta entry"
         self.check("play manager uses playlist label and 30% glass controls", open_panel)
 
-        def swipe_nav():
-            box = self.page.locator("#pf-queue").bounding_box()
-            self.require(box and box["width"] > 120, f"queue box: {box}")
-            # 右滑回上级
-            x0, y0 = box["x"] + 70, box["y"] + min(18, box["height"] - 1)
-            self.page.mouse.move(x0, y0)
-            self.page.mouse.down()
-            self.page.mouse.move(x0 + 130, y0, steps=6)
-            self.page.mouse.up()
-            self.page.wait_for_timeout(600)
-            self.require(self.page.evaluate("App.path") == self.fx["ui_root"],
-                        f"swipe-right did not go parent: {self.page.evaluate('App.path')}")
-            # 左滑打开目录选择
-            box = self.page.locator("#pf-queue").bounding_box()
-            x1 = box["x"] + box["width"] - 60
-            y1 = box["y"] + min(18, box["height"] - 1)
-            self.page.mouse.move(x1, y1)
-            self.page.mouse.down()
-            self.page.mouse.move(x1 - 140, y1, steps=6)
-            self.page.mouse.up()
-            self.page.wait_for_timeout(300)
-            self.require(self.page.locator("#pf-dir-picker").is_visible(), "swipe-left did not open folder picker")
-            rows = self.page.locator("#pf-dir-list .pf-dir-row").count()
-            self.require(rows >= 2, f"folder picker rows: {rows}")
-            return "swipe right parent / swipe left picker"
-        self.check("playlist swipe navigation", swipe_nav)
-
-        def picker_and_fav():
-            self.page.locator(f'#pf-dir-list .pf-dir-row[data-dir="{self.fx["ui_album_b"]}"]').click()
+        def stopped_folder_view():
+            # 停止状态：播放列表直接列出当前目录的文件夹 + 音频，不再借用目录选择器。
+            self.page.evaluate("() => Player.close()")
+            self.page.evaluate("(p) => App.browse(p)", self.fx["ui_root"])
+            self.page.wait_for_timeout(500)
+            if not self.page.locator("#pf-queue").is_visible():
+                self.page.locator("#pf-q-toggle").click()
+                self.page.wait_for_timeout(250)
+            folder_rows = self.page.locator("#pf-queue .pf-qdir").count()
+            self.require(folder_rows >= 3, f"stopped playlist folders: {folder_rows}")
+            count = self.page.locator("#pf-qcount").inner_text()
+            self.require("文件夹" in count, f"stopped count missing folders: {count!r}")
+            self.require(self.page.locator("#pf-q-up").count() == 0, "old up button still present")
+            self.require(self.page.locator("#pf-q-pick").count() == 0, "old folder-pick button still present")
+            self.require(self.page.locator("#pf-dir-picker").count() == 0, "old folder picker still present")
+            # 点文件夹直接进入，点音频直接播放，不依赖文件浏览模块的额外点击。
+            self.page.locator(f'#pf-queue .pf-qdir[data-dir="{self.fx["ui_album_a"]}"]').click()
             self.page.wait_for_function(
-                f"() => App.path === {self.fx['ui_album_b']!r}",
-                timeout=5000,
-            )
+                f"() => App.path === {self.fx['ui_album_a']!r}", timeout=5000)
+            self.page.wait_for_timeout(250)
+            self.require(self.page.locator("#pf-queue .pf-qdir").count() == 0,
+                         "subfolder rows should be empty in Album A")
+            self.require(self.page.locator("#pf-queue .pf-q[data-path]").count() >= 2,
+                         "stopped folder view missing audio rows")
+            self.page.locator(f'#pf-queue .pf-q[data-path="{self.fx["ui_track1"]}"]').click()
+            self.page.wait_for_timeout(350)
+            self.require(self.page.evaluate("Player.current") == self.fx["ui_track1"], "audio click did not play")
+            # 播放/暂停态维持音频队列，不出现文件夹行。
+            if self.page.evaluate("Player.isPlaying()"):
+                self.page.evaluate("Player.toggle()")
+            self.page.wait_for_timeout(150)
+            self.require(self.page.locator("#pf-queue .pf-qdir").count() == 0,
+                         "audio queue mixed with folders in pause state")
+            # 停止后回到文件夹浏览视图，而不是停在音频队列。
+            self.page.evaluate("Player.close()")
+            self.page.evaluate("(p) => App.browse(p)", self.fx["ui_root"])
+            self.page.wait_for_timeout(450)
+            self.require(self.page.locator("#pf-queue .pf-qdir").count() >= 3,
+                         "stopped state did not return to folder view")
+            return "stopped folder view + direct folder/audio click"
+        self.check("stopped playlist shows folders and direct actions", stopped_folder_view)
+
+        def swipe_nav():
+            def swipe_queue(dx):
+                box = self.page.locator("#pf-queue").bounding_box()
+                self.require(box and box["width"] > 120, f"queue box: {box}")
+                x0 = box["x"] + (70 if dx > 0 else box["width"] - 70)
+                y0 = box["y"] + min(18, box["height"] - 1)
+                self.page.mouse.move(x0, y0)
+                self.page.mouse.down()
+                self.page.mouse.move(x0 + dx, y0, steps=6)
+                self.page.mouse.up()
+                self.page.wait_for_timeout(600)
+            # 从 Album A 右滑回根；从根进 Album B 后左滑也回根。
+            self.page.evaluate("(p) => App.browse(p)", self.fx["ui_album_a"])
+            self.page.wait_for_timeout(300)
+            swipe_queue(130)
+            self.require(self.page.evaluate("App.path") == self.fx["ui_root"],
+                         f"swipe-right did not go parent: {self.page.evaluate('App.path')}")
+            self.page.locator(f'#pf-queue .pf-qdir[data-dir="{self.fx["ui_album_b"]}"]').click()
+            self.page.wait_for_function(
+                f"() => App.path === {self.fx['ui_album_b']!r}", timeout=5000)
+            swipe_queue(-140)
+            self.require(self.page.evaluate("App.path") == self.fx["ui_root"],
+                         f"swipe-left did not go parent: {self.page.evaluate('App.path')}")
+            return "swipe right/left both return parent"
+        self.check("playlist swipe navigation returns parent in both directions", swipe_nav)
+
+        def favorite_sync():
+            self.page.evaluate("(p) => App.browse(p)", self.fx["ui_album_b"])
+            self.page.wait_for_timeout(300)
             self.page.locator("#pf-fav-add").click()
             self.page.wait_for_timeout(250)
             favs = self.page.evaluate("App.favoriteList()")
             self.require(self.fx["ui_album_b"] in favs, f"favorite not added: {favs}")
             self.require(self.page.locator("#pf-fav-bar .pf-fav-chip").count() >= 1, "favorite chip missing")
-            return "picker opens folder + favorite synced"
-        self.check("folder picker and favorite sync", picker_and_fav)
+            return "favorite still synced from direct folder view"
+        self.check("playlist favorite sync", favorite_sync)
 
         def embedded_spectrum():
-            # 单曲 1 秒，顺序模式会自动续播到下一个目录；测试要固定住带封面
-            # 的曲目，先重播并暂停，避免封面在断言前被下一首替换。
+            # 固定一首带封面的短曲，展开频谱后再做交互断言。
             self.page.evaluate("(p) => PlayMgr.play(p)", self.fx["ui_covered"])
             self.page.wait_for_timeout(300)
             if self.page.evaluate("Player.isPlaying()"):
@@ -521,17 +566,30 @@ class UiRegression:
                         "spectrum not embedded in play manager")
             self.require(self.page.locator("#pf-sf-sec").is_visible(), "spectrum section hidden")
             self.require(self.page.locator("#sf-canvas").is_visible(), "embedded spectrum canvas hidden")
+            self.require(self.page.evaluate("getComputedStyle(document.querySelector('#sf-canvas')).opacity") == "0.5",
+                        "embedded canvas is not 50% transparent")
             bg = self.page.evaluate("getComputedStyle(document.querySelector('#pf-bg')).opacity")
             self.require(float(bg) >= 0.95, f"cover background lost behind spectrum: {bg}")
             self.require(self.page.locator("#pf-sf-sec .pf-sf-mode").count() == 2, "spectrum mode tabs missing")
-            self.page.locator('#pf-sf-sec .pf-sf-mode[data-sf-mode="waterfall"]').click()
-            self.page.wait_for_timeout(250)
-            self.require(self.page.evaluate("Spectrum.mode") == "waterfall", "spectrum mode did not switch")
             self.page.locator('#pf-sf-sec .pf-sf-mode[data-sf-mode="spectrum"]').click()
-            self.page.wait_for_timeout(150)
-            # 长按画布展开完整配置项（含延迟/配色/频段等 chip）
+            self.page.wait_for_timeout(200)
             box = self.page.locator("#sf-canvas").bounding_box()
-            self.page.mouse.move(box["x"] + box["width"] * 0.7, box["y"] + box["height"] * 0.6)
+            self.require(box and box["width"] > 120, f"embedded canvas box: {box}")
+            # 频谱/声谱展开时，左右滑切换两种模式。
+            self.page.mouse.move(box["x"] + box["width"] * .72, box["y"] + box["height"] * .55)
+            self.page.mouse.down()
+            self.page.mouse.move(box["x"] + box["width"] * .22, box["y"] + box["height"] * .55, steps=6)
+            self.page.mouse.up()
+            self.page.wait_for_timeout(300)
+            self.require(self.page.evaluate("Spectrum.mode") == "waterfall", "swipe-left did not switch to waterfall")
+            self.page.mouse.move(box["x"] + box["width"] * .25, box["y"] + box["height"] * .55)
+            self.page.mouse.down()
+            self.page.mouse.move(box["x"] + box["width"] * .75, box["y"] + box["height"] * .55, steps=6)
+            self.page.mouse.up()
+            self.page.wait_for_timeout(250)
+            self.require(self.page.evaluate("Spectrum.mode") == "spectrum", "swipe-right did not switch back to spectrum")
+            # 长按配置：背景必须半透明，不再是 90% 纯黑。
+            self.page.mouse.move(box["x"] + box["width"] * .7, box["y"] + box["height"] * .6)
             self.page.mouse.down()
             self.page.wait_for_timeout(650)
             self.page.mouse.up()
@@ -539,8 +597,76 @@ class UiRegression:
             self.require(self.page.locator("#sf-sub").is_visible(), "long-press config not shown")
             chips = self.page.locator("#sf-sub .sf-chip").count()
             self.require(chips >= 8, f"long-press config chips: {chips}")
-            return "embedded spectrum + long-press config + cover kept"
-        self.check("spectrum embedded under playlist with cover background", embedded_spectrum)
+            sub_bg = self.page.evaluate("getComputedStyle(document.querySelector('#sf-sub')).backgroundColor")
+            self.require("0.38" in (sub_bg or ""), f"long-press config still opaque black: {sub_bg}")
+
+            # 用原生桥的假帧验证柱子真的画进 canvas；CSS opacity 再把它压到 50%。
+            self.page.evaluate("""() => {
+              window.__ac2OrigHifiActive = Player.hifiActive;
+              window.__ac2OrigHifiPlaying = Player.hifiPlaying;
+              Player.hifiActive = () => true;
+              Player.hifiPlaying = () => true;
+              const mk = n => Array.from({length:n}, (_, i) => 0.15 + 0.85 * Math.abs(Math.sin(i * 0.31)));
+              window.AudioCpmNative = {spectrum: () => JSON.stringify({
+                ok: true, sampleRate: 48000,
+                bands: mk(96), levels: mk(96), bars: mk(48), linbars: mk(48), spec: mk(128)
+              })};
+              Spectrum.setMode('spectrum');
+              Spectrum.resumeStream();
+            }""")
+            self.page.wait_for_timeout(900)
+            pixels = self.page.evaluate("""() => {
+              const c = document.querySelector('#sf-canvas');
+              const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+              let n = 0, max = 0;
+              for (let i = 0; i < d.length; i += 4) { if (d[i+3] > 0) n++; if (d[i+3] > max) max = d[i+3]; }
+              return {w: c.width, h: c.height, n, max};
+            }""")
+            self.require(pixels["n"] > 100, f"spectrum bars did not draw pixels: {pixels}")
+            self.page.locator('#pf-sf-sec .pf-sf-mode[data-sf-mode="waterfall"]').click()
+            self.page.wait_for_timeout(700)
+            self.require(self.page.evaluate("getComputedStyle(document.querySelector('#sf-canvas')).opacity") == "0.5",
+                        "waterfall canvas is not 50% transparent")
+            # 收尾：还原本用例伪造的 HiFi 状态，避免影响后续面板。
+            self.page.evaluate("""() => {
+              Player.hifiActive = window.__ac2OrigHifiActive;
+              Player.hifiPlaying = window.__ac2OrigHifiPlaying;
+              delete window.AudioCpmNative;
+              Spectrum.setMode('spectrum');
+            }""")
+            return "embedded spectrum + swipe mode + 50% bars/waterfall + transparent long-press config"
+        self.check("spectrum embedded, swipe mode, 50% visuals and config", embedded_spectrum)
+
+        def idle_dim():
+            # 用 8 秒长音轨撑过 5 秒倒计时；展开频谱，验证内部保持默认 50%。
+            self.page.evaluate("(p) => PlayMgr.play(p)", self.fx["ui_long"])
+            self.page.wait_for_timeout(350)
+            if not self.page.locator("#pf-sf-sec").is_visible():
+                self.page.locator("#pf-q-toggle").click()
+                self.page.wait_for_timeout(300)
+            self.page.wait_for_timeout(5600)
+            self.require(self.page.evaluate("document.querySelector('#play-float').classList.contains('pf-idle-dim')"),
+                         "play manager did not dim after 5 seconds")
+            for sel in ("#pf-head", ".pf-now", ".pf-transport", "#pf-qhead", ".pf-sf-head"):
+                op = self.page.evaluate("(s) => getComputedStyle(document.querySelector(s)).opacity", sel)
+                self.require(float(op) <= 0.11, f"{sel} not at 10% opacity: {op}")
+            self.require(self.page.evaluate("getComputedStyle(document.querySelector('#sf-canvas')).opacity") == "0.5",
+                         "spectrum canvas was dimmed with the chrome")
+            self.require(self.page.locator("#pf-idle-guard").is_visible(), "idle guard not visible")
+            # 第一次点击只唤醒，不触发下面的停止按钮。
+            stop = self.page.locator("#pf-stop").bounding_box()
+            self.require(stop and stop["width"] > 0, f"stop button box: {stop}")
+            cur_before = self.page.evaluate("Player.current")
+            self.page.mouse.click(stop["x"] + stop["width"] / 2, stop["y"] + stop["height"] / 2)
+            self.page.wait_for_timeout(450)
+            self.require(not self.page.evaluate("document.querySelector('#play-float').classList.contains('pf-idle-dim')"),
+                         "click did not restore play manager")
+            self.require(self.page.evaluate("Player.current") == cur_before, "first click activated a locked control")
+            self.require(self.page.locator("#pf-idle-guard").is_visible() is False, "idle guard stayed visible")
+            op = self.page.evaluate("getComputedStyle(document.querySelector('#pf-head')).opacity")
+            self.require(float(op) >= 0.9, f"play manager did not restore opacity: {op}")
+            return "5s idle dim + lock + click wake"
+        self.check("play manager 5s idle dim and lock", idle_dim)
 
         def gain_panel():
             self.page.evaluate("() => App.openModule('audio')")

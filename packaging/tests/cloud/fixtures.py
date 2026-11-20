@@ -124,6 +124,9 @@ def build_fixture(root: Path, ffmpeg: str = "ffmpeg") -> Dict[str, str]:
     # UI fixtures: intentionally simpler, no task tests mutate this branch.
     shutil.copy2(track1, ui / "Album A" / "Track One.flac")
     shutil.copy2(track2, ui / "Album A" / "Track Two.wav")
+    # 5 秒无操作自动淡化需要一首比等待时间更长的音频；放最前面，
+    # 不改变原有 Track One → Track Two 的顺序断言。
+    _tone(ffmpeg, ui / "Album A" / "A Long Tone.flac", 523, 8.0)
     shutil.copy2(cover, ui / "Album A" / "cover.jpg")
     shutil.copy2(covered, ui / "Album B" / "Track With Cover.flac")
     (ui / "Album B" / "notes.txt").write_text("hello", encoding="utf-8")
@@ -148,6 +151,7 @@ def build_fixture(root: Path, ffmpeg: str = "ffmpeg") -> Dict[str, str]:
         "tasks": f"local:{api / 'tasks'}",
         "ui_album_a": f"local:{ui / 'Album A'}",
         "ui_album_b": f"local:{ui / 'Album B'}",
+        "ui_long": f"local:{ui / 'Album A' / 'A Long Tone.flac'}",
         "ui_track1": f"local:{ui / 'Album A' / 'Track One.flac'}",
         "ui_covered": f"local:{ui / 'Album B' / 'Track With Cover.flac'}",
         "ui_track2": f"local:{ui / 'Album A' / 'Track Two.wav'}",

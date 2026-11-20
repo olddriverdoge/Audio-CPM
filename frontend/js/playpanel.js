@@ -13,8 +13,6 @@ function createPlayPanel() {
   const coverImg = document.getElementById('pf-cover-img');
   const bgEl = document.getElementById('pf-bg');
   const qToggle = document.getElementById('pf-q-toggle');
-  const qUp = document.getElementById('pf-q-up');
-  const qPick = document.getElementById('pf-q-pick');
   const qTools = document.getElementById('pf-queue-tools');
   const favBar = document.getElementById('pf-fav-bar');
   const seek = document.getElementById('pf-seek');
@@ -27,14 +25,12 @@ function createPlayPanel() {
   const waveHi = document.getElementById('pf-wave-hi');
   const qEl = document.getElementById('pf-queue');
   const qCount = document.getElementById('pf-qcount');
-  const dirPicker = document.getElementById('pf-dir-picker');
-  const dirList = document.getElementById('pf-dir-list');
-  const dirClose = document.getElementById('pf-dir-close');
   const sfSec = document.getElementById('pf-sf-sec');
   const sfToggle = document.getElementById('pf-sf-toggle');
   const sfBody = document.getElementById('pf-sf-body');
   const sfHost = document.getElementById('pf-sf-host');
   const sfMeta = document.getElementById('pf-sf-meta');
+  const idleGuard = document.getElementById('pf-idle-guard');
   if (!win) return fw;
 
   const MODE_LABEL = {order: '顺序', all: '列表循环', one: '单曲循环', shuffle: '随机'};
@@ -43,6 +39,7 @@ function createPlayPanel() {
   let queueCollapsed = Store.get('ac3_play_queue_collapsed', false) === true;
   let sfCollapsed = Store.get('ac3_play_sf_collapsed', false) === true;
   let favHold = null, favHoldEl = null, favHoldStart = null, suppressFavClickUntil = 0;
+  let idleTimer = 0, idleDimmed = false, lastPlaying = false, wakeSuppressUntil = 0;
 
   function cssUrl(url) {
     return 'url("' + String(url || '').replace(/"/g, '%22').replace(/\)/g, '%29') + '")';
@@ -80,12 +77,38 @@ function createPlayPanel() {
     // 频谱只在播放列表收起后有空间显示；这里同步把真实频谱模块挂进来/放回去。
     try {
       const active = queueCollapsed && !sfCollapsed && !win.classList.contains('hidden');
+      win.classList.toggle('pf-sf-live', active);
       if (active && typeof Spectrum !== 'undefined' && Spectrum.setEmbedded) {
         Spectrum.setEmbedded(true, sfHost);
       } else if (typeof Spectrum !== 'undefined' && Spectrum.setEmbedded) {
         Spectrum.setEmbedded(false);
       }
     } catch (_) {}
+  }
+
+  /* 播放开始后 5 秒无操作：整个播放管理降到 10% 并锁住；
+     点一下/滑一下只负责唤醒，不触发下面的按钮。频谱声谱展开时
+     内部的 canvas 不受影响（仍是默认 50% 透明度）。 */
+  const IDLE_MS = 5000;
+  function clearIdleTimer() {
+    if (idleTimer) { clearTimeout(idleTimer); idleTimer = 0; }
+  }
+  function armIdleTimer() {
+    clearIdleTimer();
+    if (!Player.isPlaying() || win.classList.contains('hidden')) return;
+    idleTimer = setTimeout(() => {
+      idleTimer = 0;
+      if (!Player.isPlaying() || win.classList.contains('hidden')) return;
+      idleDimmed = true;
+      win.classList.add('pf-idle-dim');
+    }, IDLE_MS);
+  }
+  function wakeFromIdle() {
+    if (!idleDimmed) return;
+    idleDimmed = false;
+    win.classList.remove('pf-idle-dim');
+    wakeSuppressUntil = Date.now() + 400;
+    armIdleTimer();
   }
 
   function setModeButtonState() {
@@ -129,21 +152,53 @@ function createPlayPanel() {
     }
   }
 
-  function renderQueue() {
+  /* 停止状态：直接显示当前目录的文件夹与音频。
+     文件夹/音频都在这里完成一级操作，不再弹独立的目录选择器。 */
+  function renderBrowseQueue() {
+    const dirs = (typeof App !== 'undefined' && App.directories) ? App.directories() : [];
+    const audios = (typeof App !== 'undefined' && App.playbackQueueList) ? App.playbackQueueList() : [];
+    qCount.textContent = dirs.length + ' ' + tr('个文件夹') + ' · ' + audios.length + ' ' + tr('首音频');
+    let html = '';
+    html += dirs.map(d => {
+      const p = d.path || '';
+      return '<div class="pf-q pf-qdir" data-dir="' + Utils.escapeHtml(p) + '" title="' + Utils.escapeHtml(p) + '">' +
+        '<span class="pf-q-ico">📁</span>' +
+        '<span class="pf-q-name">' + Utils.escapeHtml(d.name || Utils.basename(p)) + '</span></div>';
+    }).join('');
+    html += audios.map((f, i) => {
+      const p = f.path || '';
+      return '<div class="pf-q" data-i="' + i + '" data-path="' + Utils.escapeHtml(p) + '" title="' + Utils.escapeHtml(p) + '">' +
+        '<span class="pf-q-ico">♪</span>' +
+        '<span class="pf-q-name">' + Utils.escapeHtml(Utils.basename(p)) + '</span></div>';
+    }).join('');
+    if (!html) html = '<div class="detail-empty">' + Utils.escapeHtml(tr('当前目录没有文件夹或音频')) + '</div>';
+    qEl.innerHTML = html;
+    qEl.dataset.view = 'browse';
+    qEl.dataset.cur = '';
+  }
+
+  /* 播放/暂停状态：维持当前音频队列，不混入文件夹。 */
+  function renderAudioQueue() {
     const list = (typeof App !== 'undefined' && App.playbackQueueList) ? App.playbackQueueList() : [];
-    qCount.textContent = list.length + ' 首';
+    qCount.textContent = list.length + ' ' + tr('首音频');
     if (!list.length) {
       qEl.innerHTML = '<div class="detail-empty">' + Utils.escapeHtml(tr('播放列表暂无音频')) + '</div>';
+      qEl.dataset.view = 'queue';
       return;
     }
     const cur = Player.current;
     qEl.innerHTML = list.map((f, i) => {
       const p = f.path || '';
-      const label = Utils.basename(p);
-      return '<div class="pf-q' + (p === cur ? ' on' : '') + '" data-i="' + i + '" title="' + Utils.escapeHtml(p) + '">' +
+      return '<div class="pf-q' + (p === cur ? ' on' : '') + '" data-i="' + i + '" data-path="' + Utils.escapeHtml(p) + '" title="' + Utils.escapeHtml(p) + '">' +
         '<span class="pf-q-ico">' + (p === cur ? '▶' : '♪') + '</span>' +
-        '<span class="pf-q-name">' + Utils.escapeHtml(label) + '</span></div>';
+        '<span class="pf-q-name">' + Utils.escapeHtml(Utils.basename(p)) + '</span></div>';
     }).join('');
+    qEl.dataset.view = 'queue';
+  }
+
+  function renderQueue() {
+    if (Player.current) renderAudioQueue();
+    else renderBrowseQueue();
   }
 
   /* 同步文件浏览的目录收藏：+ 收藏当前目录，点收藏切目录，长按收藏删除。 */
@@ -160,31 +215,6 @@ function createPlayPanel() {
       '</div>';
   }
 
-  function renderDirList() {
-    if (!dirList) return;
-    const dirs = (typeof App !== 'undefined' && App.directories) ? App.directories() : [];
-    const parent = (typeof App !== 'undefined' && App.currentParent) ? App.currentParent() : '';
-    let html = '';
-    if (parent) {
-      html += '<button type="button" class="pf-dir-row" data-dir="' + Utils.escapeHtml(parent) + '">' +
-        '<span class="pf-dir-ico">⬆</span><span>.. ' + Utils.escapeHtml(tr('上级目录')) + '</span></button>';
-    }
-    html += dirs.map(d => '<button type="button" class="pf-dir-row" data-dir="' + Utils.escapeHtml(d.path || '') + '">' +
-      '<span class="pf-dir-ico">📁</span><span>' + Utils.escapeHtml(d.name || Utils.basename(d.path)) + '</span></button>').join('');
-    if (!html) html = '<div class="detail-empty">' + Utils.escapeHtml(tr('当前目录没有子目录')) + '</div>';
-    dirList.innerHTML = html;
-  }
-
-  function openDirPicker(show) {
-    if (!dirPicker) return;
-    if (show) {
-      renderDirList();
-      dirPicker.classList.remove('hidden');
-    } else {
-      dirPicker.classList.add('hidden');
-    }
-  }
-
   async function goParent() {
     const p = (typeof App !== 'undefined' && App.currentParent) ? App.currentParent() : '';
     if (!p) { Utils.toast(tr('已在最上层'), 'warn'); return; }
@@ -196,7 +226,6 @@ function createPlayPanel() {
     if (!path) return;
     try {
       await App.browse(path);
-      openDirPicker(false);
       renderQueue();
     } catch (e) {
       Utils.toast('打开目录失败: ' + (e && e.message || e), 'err');
@@ -244,11 +273,21 @@ function createPlayPanel() {
 
   function tick() {
     if (win.classList.contains('hidden')) return;
-    // 换目录/换歌曲时队列结构变了 → 重画
+    // 播放/暂停显示音频队列；停止显示当前目录的文件夹 + 音频。
+    // 目录、当前曲目或队列变化都要重画。
+    const active = !!Player.current;
+    const path = (typeof App !== 'undefined' && App.path) ? App.path : '';
     const list = (typeof App !== 'undefined' && App.playbackQueueList) ? App.playbackQueueList() : [];
-    const sig = list.length + ':' + ((list[0] && list[0].path) || '') + ':' + ((list[list.length - 1] && list[list.length - 1].path) || '');
+    const dirs = (typeof App !== 'undefined' && App.directories) ? App.directories() : [];
+    const sig = active
+      ? 'q|' + list.length + ':' + ((list[0] && list[0].path) || '') + ':' + ((list[list.length - 1] && list[list.length - 1].path) || '')
+      : 'b|' + path + '|' + dirs.map(d => d.path || '').join('|') + '|' + list.map(f => f.path || '').join('|');
     if (qEl.dataset.sig !== sig) { qEl.dataset.sig = sig; renderQueue(); }
     renderState();
+    const playing = Player.isPlaying();
+    if (playing && !lastPlaying) armIdleTimer();
+    if (!playing) { clearIdleTimer(); if (idleDimmed) wakeFromIdle(); }
+    lastPlaying = playing;
   }
 
   coverImg.addEventListener('load', () => {
@@ -263,21 +302,24 @@ function createPlayPanel() {
     coverSrc = '';
     setCoverBackground('');
   });
-  /* 播放管理封面也能进元数据：之前只有右下角 meta-fab 一个入口。 */
-  if (coverBox) {
-    coverBox.title = '点击查看元数据';
-    coverBox.setAttribute('role', 'button');
-    coverBox.setAttribute('tabindex', '0');
-    const openMeta = () => {
-      const p = Player.current;
-      if (!p) return;
-      if (p.indexOf('dav:') === 0) { Utils.toast('WebDAV 文件暂不支持元数据详情', 'warn'); return; }
-      if (typeof App !== 'undefined' && App.openMeta) App.openMeta(p);
-    };
-    coverBox.addEventListener('click', openMeta);
-    coverBox.addEventListener('keydown', e => {
+  /* 左上角封面已隐藏，元数据入口改到标题文字上。 */
+  const openMeta = () => {
+    const p = Player.current;
+    if (!p) return;
+    if (p.indexOf('dav:') === 0) { Utils.toast('WebDAV 文件暂不支持元数据详情', 'warn'); return; }
+    if (typeof App !== 'undefined' && App.openMeta) App.openMeta(p);
+  };
+  if (titleEl) {
+    titleEl.title = '点击查看元数据';
+    titleEl.setAttribute('role', 'button');
+    titleEl.setAttribute('tabindex', '0');
+    titleEl.addEventListener('click', openMeta);
+    titleEl.addEventListener('keydown', e => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMeta(); }
     });
+  }
+  if (coverBox) {
+    coverBox.addEventListener('click', openMeta);
   }
 
   playBtn.addEventListener('click', () => {
@@ -324,15 +366,6 @@ function createPlayPanel() {
       paintSfState();
     });
   }
-  if (qUp) qUp.addEventListener('click', goParent);
-  if (qPick) qPick.addEventListener('click', () => openDirPicker(dirPicker && dirPicker.classList.contains('hidden')));
-  if (dirClose) dirClose.addEventListener('click', () => openDirPicker(false));
-  if (dirList) {
-    dirList.addEventListener('click', e => {
-      const row = e.target.closest('.pf-dir-row[data-dir]');
-      if (row) openDir(row.dataset.dir);
-    });
-  }
   if (sfToggle) {
     sfToggle.addEventListener('click', () => {
       sfCollapsed = !sfCollapsed;
@@ -349,18 +382,59 @@ function createPlayPanel() {
     });
   });
 
-  /* 播放列表左右滑动：右滑回上级，左滑打开目录选择；纵向仍然正常滚动。 */
-  let swipe = null, suppressQueueClickUntil = 0;
+  /* 频谱/声谱展开时，在画布上左右滑切换两种模式；长按配置仍归 Spectrum 自己处理。 */
+  let sfSwipe = null;
+  sfBody.addEventListener('pointerdown', e => {
+    if (Date.now() < wakeSuppressUntil) return;
+    if (e.target.closest('button')) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    sfSwipe = {id: e.pointerId, x: e.clientX, y: e.clientY, moved: false, captured: false};
+    // 这里也不能立刻捕获：否则 Spectrum 的长按 pointerup 被重定向，松开后还会弹配置。
+  }, {passive: true});
+  sfBody.addEventListener('pointermove', e => {
+    if (!sfSwipe || sfSwipe.id !== e.pointerId) return;
+    const dx = e.clientX - sfSwipe.x, dy = e.clientY - sfSwipe.y;
+    if (Math.abs(dx) > 12 || Math.abs(dy) > 12) sfSwipe.moved = true;
+    if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.35) {
+      e.preventDefault();
+      if (!sfSwipe.captured) {
+        sfSwipe.captured = true;
+        try { sfBody.setPointerCapture(e.pointerId); } catch (_) {}
+      }
+    }
+  }, {passive: false});
+  sfBody.addEventListener('pointerup', e => {
+    if (!sfSwipe || sfSwipe.id !== e.pointerId) { sfSwipe = null; return; }
+    const dx = e.clientX - sfSwipe.x, dy = e.clientY - sfSwipe.y;
+    sfSwipe = null;
+    if (Math.abs(dx) <= 48 || Math.abs(dx) <= Math.abs(dy) * 1.35) return;
+    const cur = (typeof Spectrum !== 'undefined' && Spectrum.mode) ? Spectrum.mode : 'spectrum';
+    const next = cur === 'spectrum' ? 'waterfall' : 'spectrum';
+    try { if (typeof Spectrum !== 'undefined' && Spectrum.setMode) Spectrum.setMode(next); } catch (_) {}
+    setModeButtonState();
+  });
+  sfBody.addEventListener('pointercancel', () => { sfSwipe = null; });
+
+  /* 播放列表左右滑动：两个方向都返回上一级；纵向仍然正常滚动。
+     pointerdown 不能立刻 setPointerCapture，否则 click 会重定向到 #pf-queue，
+     行内按钮就永远点不中了；只在确认横向滑动后再捕获。 */
+  let swipe = null, pressRow = null, suppressQueueClickUntil = 0;
   qEl.addEventListener('pointerdown', e => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-    swipe = {id: e.pointerId, x: e.clientX, y: e.clientY, moved: false};
-    try { qEl.setPointerCapture(e.pointerId); } catch (_) {}
+    pressRow = e.target.closest('.pf-q');
+    swipe = {id: e.pointerId, x: e.clientX, y: e.clientY, moved: false, captured: false};
   }, {passive: true});
   qEl.addEventListener('pointermove', e => {
     if (!swipe || swipe.id !== e.pointerId) return;
     const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
     if (Math.abs(dx) > 12 || Math.abs(dy) > 12) swipe.moved = true;
-    if (Math.abs(dx) > 56 && Math.abs(dx) > Math.abs(dy) * 1.35) e.preventDefault();
+    if (Math.abs(dx) > 56 && Math.abs(dx) > Math.abs(dy) * 1.35) {
+      e.preventDefault();
+      if (!swipe.captured) {
+        swipe.captured = true;
+        try { qEl.setPointerCapture(e.pointerId); } catch (_) {}
+      }
+    }
   }, {passive: false});
   qEl.addEventListener('pointerup', e => {
     if (!swipe || swipe.id !== e.pointerId) { swipe = null; return; }
@@ -368,17 +442,18 @@ function createPlayPanel() {
     const done = swipe.moved || Math.abs(dx) > 56;
     swipe = null;
     if (!done || Math.abs(dx) <= 56 || Math.abs(dx) <= Math.abs(dy) * 1.35) return;
+    pressRow = null;
     suppressQueueClickUntil = Date.now() + 450;
-    if (dx > 0) goParent(); else openDirPicker(true);
+    goParent();
   });
-  qEl.addEventListener('pointercancel', () => { swipe = null; });
+  qEl.addEventListener('pointercancel', () => { swipe = null; pressRow = null; });
   qEl.addEventListener('click', e => {
     if (Date.now() < suppressQueueClickUntil) { e.preventDefault(); e.stopPropagation(); return; }
-    const row = e.target.closest('.pf-q');
+    const row = e.target.closest('.pf-q') || pressRow;
+    pressRow = null;
     if (!row) return;
-    const list = (typeof App !== 'undefined' && App.playbackQueueList) ? App.playbackQueueList() : [];
-    const it = list[Number(row.dataset.i)];
-    if (it && it.path) PlayMgr.play(it.path);
+    if (row.dataset.dir) { openDir(row.dataset.dir); return; }
+    if (row.dataset.path) PlayMgr.play(row.dataset.path);
   }, true);
 
   if (favBar) {
@@ -426,14 +501,44 @@ function createPlayPanel() {
 
   Player.onMeta(() => { renderMeta(); renderState(); });
 
+  /* 只有播放管理内部的第一次操作会重置 5 秒倒计时；如果是淡化锁定状态，
+     任意一次点击/滑动都只负责唤醒，并吞掉本次 click，避免误触按钮。 */
+  document.addEventListener('pointerdown', e => {
+    if (idleDimmed) {
+      e.preventDefault();
+      e.stopPropagation();
+      wakeFromIdle();
+      return;
+    }
+    if (win.contains(e.target)) armIdleTimer();
+  }, true);
+  document.addEventListener('keydown', e => {
+    if (idleDimmed) {
+      e.preventDefault();
+      e.stopPropagation();
+      wakeFromIdle();
+      return;
+    }
+    if (win.contains(e.target)) armIdleTimer();
+  }, true);
+  document.addEventListener('click', e => {
+    if (Date.now() < wakeSuppressUntil) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, true);
+
   fw.onToggle(open => {
     if (open) {
       renderMeta(); renderQueue(); renderFavorites(); renderState(); paintSfState();
       clearInterval(timer);
       timer = setInterval(tick, 500);
+      armIdleTimer();
     } else {
       clearInterval(timer);
       timer = 0;
+      clearIdleTimer();
+      wakeFromIdle();
       try { if (typeof Spectrum !== 'undefined' && Spectrum.setEmbedded) Spectrum.setEmbedded(false); } catch (_) {}
     }
   });

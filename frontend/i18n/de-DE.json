@@ -488,5 +488,8 @@
   "网页 / 原生播放音量": "Web-/native Wiedergabelautstärke",
   "顺序播放：进入下一个目录 {name}": "Sequenzielle Wiedergabe: nächster Ordner {name}",
   "已在最上层": "Bereits auf oberster Ebene",
-  "已移除收藏：{name}": "Lesezeichen entfernt: {name}"
+  "已移除收藏：{name}": "Lesezeichen entfernt: {name}",
+  "个文件夹": "Ordner",
+  "首音频": "Titel",
+  "当前目录没有文件夹或音频": "Keine Ordner oder Audiodateien in diesem Verzeichnis"
 }

@@ -539,5 +539,8 @@
   "网页 / 原生播放音量": "Web / native playback volume",
   "顺序播放：进入下一个目录 {name}": "Sequential playback: next folder {name}",
   "已在最上层": "Already at the top level",
-  "已移除收藏：{name}": "Bookmark removed: {name}"
+  "已移除收藏：{name}": "Bookmark removed: {name}",
+  "个文件夹": "folders",
+  "首音频": "tracks",
+  "当前目录没有文件夹或音频": "No folders or audio in this folder"
 }

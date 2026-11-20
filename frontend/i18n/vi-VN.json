@@ -488,5 +488,8 @@
   "网页 / 原生播放音量": "Âm lượng phát trên web / gốc",
   "顺序播放：进入下一个目录 {name}": "Phát tuần tự: thư mục tiếp theo {name}",
   "已在最上层": "Đã ở cấp cao nhất",
-  "已移除收藏：{name}": "Đã xóa mục yêu thích: {name}"
+  "已移除收藏：{name}": "Đã xóa mục yêu thích: {name}",
+  "个文件夹": "thư mục",
+  "首音频": "âm thanh",
+  "当前目录没有文件夹或音频": "Thư mục này không có thư mục con hoặc âm thanh"
 }

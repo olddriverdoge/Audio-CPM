@@ -96,6 +96,8 @@
     background:linear-gradient(180deg,rgba(8,13,19,.10),rgba(8,13,19,.30) 46%,rgba(8,13,19,.80))}
   .pf-body{flex:1 1 auto;display:flex;flex-direction:column;gap:8px;padding:8px 10px;overflow:hidden;position:relative}
   .pf-now{display:flex;gap:10px;align-items:center;min-height:56px}
+  /* 播放管理左上角不再显示封面缩略图；封面只作为背景使用 */
+  .pf-now .pf-cover{display:none}
   .pf-cover{width:56px;height:56px;border-radius:8px;flex:0 0 auto;overflow:hidden;
     background:linear-gradient(135deg,#1e2833,#2a3644);display:flex;align-items:center;justify-content:center;
     cursor:pointer;border:1px solid transparent;transition:border-color .15s}
@@ -103,7 +105,8 @@
   .pf-cover img{width:100%;height:100%;object-fit:cover;display:none}
   .pf-cover.on img{display:block}
   .pf-info{min-width:0;flex:1 1 auto}
-  .pf-title{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pf-title{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+  .pf-title:hover,.pf-title:focus-visible{color:var(--accent);outline:none}
   .pf-sub{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
   .pf-seekrow{display:flex;align-items:center;gap:8px}
   .pf-time{font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:32px;text-align:center}
@@ -124,9 +127,6 @@
   .pf-qtoggle{display:flex;align-items:center;gap:6px;flex:1 1 auto;min-width:0;padding:4px 3px;
     border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
   .pf-qtoggle:hover{color:var(--text)}
-  .pf-qact{flex:0 0 26px;width:26px;height:24px;border-radius:6px;border:1px solid rgba(255,255,255,.14);
-    background:rgba(8,13,19,.30);color:var(--muted);font:inherit;font-size:12px;line-height:1;cursor:pointer}
-  .pf-qact:hover{color:var(--text);background:rgba(8,13,19,.48)}
   .pf-qtitle{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .pf-q-caret{font-size:10px;opacity:.7;transition:transform .18s ease}
   .play-float.queue-collapsed .pf-q-caret{transform:rotate(180deg)}
@@ -155,6 +155,10 @@
   .pf-q.on{color:var(--accent);background:rgba(56,189,248,.20)}
   .pf-q-ico{width:14px;flex:0 0 auto;text-align:center}
   .pf-q-name{flex:1 1 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* 停止状态直接浏览当前目录：文件夹行与音频行共用列表，不再另开选择器 */
+  .pf-q.pf-qdir{color:var(--text);background:rgba(8,13,19,.18)}
+  .pf-q.pf-qdir .pf-q-ico{color:var(--accent)}
+  .pf-q.pf-qdir:hover{background:rgba(56,189,248,.12)}
   /* 播放管理进度条：透明波形压在封面之上；30% 底只负责可读性 */
   .pf-wavebox{position:relative;flex:1 1 auto;height:26px;border-radius:6px;overflow:hidden;
     background:rgba(8,13,19,.30);border:1px solid rgba(255,255,255,.16);
@@ -177,20 +181,7 @@
       rgba(56,189,248,.18) 100%);
   }
 
-  /* 播放列表目录选择 / 频谱内嵌区 */
-  .pf-dir-picker{position:absolute;left:8px;right:8px;top:8px;bottom:8px;z-index:8;
-    display:flex;flex-direction:column;background:rgba(8,13,19,.94);border:1px solid var(--border);
-    border-radius:8px;box-shadow:0 12px 30px rgba(0,0,0,.55);overflow:hidden}
-  .pf-dir-picker.hidden{display:none}
-  .pf-dir-head{display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid var(--border);
-    font-size:11.5px;color:var(--text);font-weight:600}
-  .pf-dir-head span{flex:1 1 auto}
-  .pf-dir-list{flex:1 1 auto;overflow:auto;padding:4px;-webkit-overflow-scrolling:touch}
-  .pf-dir-row{display:flex;align-items:center;gap:7px;width:100%;padding:7px 6px;border:0;border-radius:6px;
-    background:transparent;color:var(--muted);font:inherit;font-size:11.5px;text-align:left;cursor:pointer}
-  .pf-dir-row:hover{background:rgba(56,189,248,.12);color:var(--text)}
-  .pf-dir-ico{width:16px;flex:0 0 auto;text-align:center}
-
+  /* 频段/声谱内嵌区 */
   .pf-sf-sec{display:none;flex:1 1 auto;min-height:150px;flex-direction:column;margin-top:2px}
   .play-float.queue-collapsed .pf-sf-sec{display:flex}
   .pf-sf-sec.collapsed{flex:0 0 auto;min-height:0}
@@ -207,7 +198,7 @@
   .pf-sf-mode{border:1px solid transparent;background:transparent;color:var(--muted);font:inherit;
     font-size:10.5px;padding:2px 7px;border-radius:5px;cursor:pointer}
   .pf-sf-mode.active{color:var(--accent);border-color:rgba(56,189,248,.42);background:rgba(56,189,248,.16)}
-  .pf-sf-body{position:relative;flex:1 1 auto;min-height:120px;overflow:hidden}
+  .pf-sf-body{position:relative;flex:1 1 auto;min-height:120px;overflow:hidden;touch-action:pan-y}
   .pf-sf-host{position:absolute;inset:0}
 
   .af-gain{margin-bottom:10px}
@@ -416,13 +407,38 @@
   #spectrum-float.is-embedded .sf-head,
   #spectrum-float.is-embedded .sf-resize{display:none !important}
   #spectrum-float.is-embedded canvas{
-    display:block;width:100%;height:100%;min-height:0;background:transparent !important
+    display:block;width:100%;height:100%;min-height:0;background:transparent !important;
+    /* 频谱柱、声谱画面整体 50% 透明，露出播放管理封面 */
+    opacity:.5 !important
   }
   #spectrum-float.is-embedded .sf-sub{
     left:0;top:0;bottom:0;width:min(142px,62%);
-    background:rgba(8,13,19,.90);
-    border:1px solid rgba(255,255,255,.14)
+    background:rgba(8,13,19,.38) !important;
+    border:1px solid rgba(255,255,255,.14);
+    -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)
   }
 
   /* 底部旧播放条彻底退出工作台，播放控制统一走「播放管理」 */
   #player-bar{display:none !important}
+
+
+  /* ---------- 播放管理：播放中 5 秒无操作自动降到 10% 并锁定 ----------
+     频谱/声谱展开时，只淡出周边控件；频谱/声谱内部保持默认透明度，
+     封面背景保留给频谱作为可读背景。 */
+  .pf-idle-guard{position:absolute;inset:0;z-index:20;display:none;background:transparent;touch-action:none}
+  .play-float.pf-idle-dim .pf-idle-guard{display:block;pointer-events:auto}
+  .play-float.pf-idle-dim > #pf-head,
+  .play-float.pf-idle-dim .pf-now,
+  .play-float.pf-idle-dim .pf-seekrow,
+  .play-float.pf-idle-dim .pf-transport,
+  .play-float.pf-idle-dim #pf-qhead,
+  .play-float.pf-idle-dim #pf-queue-tools,
+  .play-float.pf-idle-dim #pf-queue,
+  .play-float.pf-idle-dim .pf-sf-head,
+  .play-float.pf-idle-dim #pf-resize{opacity:.1;transition:opacity .35s ease}
+  .play-float.pf-idle-dim #pf-bg{opacity:.1}
+  .play-float.pf-idle-dim::after{opacity:.1}
+  .play-float.pf-idle-dim{background:rgba(8,13,19,.10);border-color:transparent;box-shadow:none}
+  .play-float.pf-idle-dim.pf-sf-live{background:#080d13}
+  .play-float.pf-idle-dim.pf-sf-live #pf-bg{opacity:1}
+  .play-float.pf-idle-dim.pf-sf-live::after{opacity:1}
