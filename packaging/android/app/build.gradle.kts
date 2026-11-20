@@ -14,7 +14,9 @@ val buildRefName: String = System.getenv("GITHUB_REF_NAME")?.takeIf { it.isNotBl
     if (raw.startsWith("ref: refs/heads/")) raw.removePrefix("ref: refs/heads/") else "detached"
 }.getOrDefault("main")
 val buildRefType: String = System.getenv("GITHUB_REF_TYPE") ?: "branch"
-val stablePackage: Boolean = buildRefType == "tag" || buildRefName == "main"
+val forceStablePackage: Boolean = (System.getenv("AC2_FORCE_STABLE_PACKAGE") ?: "false")
+    .lowercase() in setOf("1", "true", "yes")
+val stablePackage: Boolean = forceStablePackage || buildRefType == "tag" || buildRefName == "main"
 val packageSuffix: String = if (stablePackage) "" else ".dev"
 
 /*

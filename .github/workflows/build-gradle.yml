@@ -11,6 +11,11 @@ on:
         required: false
         type: boolean
         default: false
+      main_package:
+        description: "用主干包名构建 debug APK（用于迁移正式版本机数据；不会写入 debug-latest）"
+        required: false
+        type: boolean
+        default: false
   push:
     tags:
       - "v*"
@@ -139,6 +144,8 @@ jobs:
       - name: Build debug APK
         if: ${{ github.ref_type != 'tag' && github.event.inputs.build_release != 'true' }}
         working-directory: packaging/android
+        env:
+          AC2_FORCE_STABLE_PACKAGE: ${{ github.event.inputs.main_package }}
         run: gradle assembleDebug --no-daemon --stacktrace
 
       - name: Build signed release APK + AAB
@@ -160,7 +167,7 @@ jobs:
           path: packaging/android/app/build/outputs/apk/debug/*.apk
 
       - name: Publish debug build to debug-latest
-        if: ${{ github.ref_type != 'tag' && github.event.inputs.build_release != 'true' }}
+        if: ${{ github.ref_type != 'tag' && github.event.inputs.build_release != 'true' && github.event.inputs.main_package != 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
