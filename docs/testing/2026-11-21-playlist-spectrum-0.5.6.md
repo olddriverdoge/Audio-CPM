@@ -142,3 +142,7 @@ SHA256 `710484d3f9dc344b8e4b3459e06f89e6a11c8055ad3f594a8781c6cef5e58bb5`，
    前端 `Api.playbackSpectrum()` 在浮窗模式下自动带 lease。
 
 回归：API 50/50 + UI 38/38 = **88/88**；浮窗用例新增“队列高度 ≥40px、声谱 ≥80px、队列在声谱上方”。
+
+构建（run `44909286542`，提交 `b4724fc`）：`Audio-CPM-0.5.9-89-dev-floatfix.apk`，22,619,089 字节，
+SHA256 `0599cc624028bd80254e190f97b94e09916618fab993d0d2053fae542f6e1ab7`，
+下载 https://aka.doubaocdn.com/s/fpxt4Xj3Y9 。
