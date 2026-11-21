@@ -170,6 +170,9 @@ const WinMgr = (() => {
       const b = bounds();
       const maxW = Math.max(80, b.right - b.left);
       const maxH = Math.max(80, b.bottom - b.top);
+      // 视口退化（后台、键盘动画中间态）时不做任何尺寸改写，避免把
+      // 用户尺寸压到下限后持久化。
+      if (maxW < 200 || maxH < 200) return;
       if (contentSized) {
         const z = uiScale();
         const w = Math.min((win.offsetWidth || maxW) * z, maxW);
@@ -382,6 +385,14 @@ const WinMgr = (() => {
         setRect(win, rect);
       }
       if (opts.onRectChange) { try { opts.onRectChange(rect); } catch (_) {} }
+      // 捏合过程中手指可能被系统手势/切后台打断，pointerup 收不到；
+      // 落一次防抖持久化，保证窗口尺寸和内容缩放不会丢回上一次（看起来像默认值）。
+      schedulePersist();
+    }
+    let pTimer = 0;
+    function schedulePersist() {
+      if (pTimer) clearTimeout(pTimer);
+      pTimer = setTimeout(() => { pTimer = 0; persist(); }, 450);
     }
     const ctl = {
       win,
@@ -415,6 +426,9 @@ const WinMgr = (() => {
   let stableVP = {w: window.innerWidth, h: window.innerHeight, at: 0};
   function vpTrusted() {
     const w = window.innerWidth, h = window.innerHeight;
+    // 后台/切前台时 Android WebView 会短暂报 0 或极小视口；这种尺寸绝不能
+    // 拿去 fit()，否则窗口会被压到最小并写回存储，回来就是“变回默认”。
+    if (w < 200 || h < 200) return false;
     if (!stableVP.w || !stableVP.h) { stableVP = {w: w, h: h, at: Date.now()}; return true; }
     // 同一方向下的骤然缩小（< 72% 宽或 < 60% 高）判为瞬时抖动，不重算。
     const sameOrient = (w > h) === (stableVP.w > stableVP.h);

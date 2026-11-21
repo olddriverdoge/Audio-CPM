@@ -1157,9 +1157,15 @@ const App = (() => {
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') {
         if (typeof Spectrum !== 'undefined') { try { Spectrum.onHidden(); } catch (_) {} }
+        // 切后台前把当前窗口几何/内容缩放落盘：手势没收到 pointerup 时
+        // 也不会在回来时退回上一次（用户会看成“尺寸被改回默认”）。
+        try { if (typeof WinMgr !== 'undefined') WinMgr.persistAll(); } catch (_) {}
         return;
       }
       softResume();
+    });
+    window.addEventListener('pagehide', () => {
+      try { if (typeof WinMgr !== 'undefined') WinMgr.persistAll(); } catch (_) {}
     });
     window.addEventListener('focus', softResume);
 

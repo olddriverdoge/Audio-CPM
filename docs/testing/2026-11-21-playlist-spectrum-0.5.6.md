@@ -70,3 +70,24 @@ GitHub Actions 使用默认 `main_package=false`；构建产物包名应为
 回归新增断言：`#pf-track` 不存在；淡出期间向 `#fw-browse` 派发 pointerdown 仍保持 `pf-idle-dim`，派发到 `#play-float` 才唤醒；窗口落到 340×520 后触发 `resize` + `SceneStore.fitCurrent()` 尺寸不变，关闭再打开仍为 340×520。结果 API 50/50 + UI 37/37 = 87/87。
 
 构建（run `44862875716`，提交 `947ef85`，`main_package=false` / `build_release=false`）：`Audio-CPM-0.5.6-86-dev-sizefix.apk`，22,604,448 字节，SHA256 `a9bb3a35bc071725d202bedcd474310fb075d8aeaac8bde3561a0e300687df62`，下载 https://aka.doubaocdn.com/s/DfVzJRbcmX 。
+
+## 第 19 轮：真机仍“改回默认”——抓到真因（提交 `9a7d731`）
+
+用前端真实交互复现（Playwright 移动视口 390×844）：
+
+1. 打开播放管理 → 落位 340×520；
+2. 双指捏合放大到 416×636、`--win-scale≈1.32`；
+3. 点停止 `#pf-stop` → 再点曲起播 → 窗口回到 **340×520、--win-scale=1**（CSS 默认）。
+
+根因：捏合只改 `rect` 和 `--win-scale`，几何**只在 pointerup 时 persist**。一旦 pointerup 没到
+（系统手势抢触摸、切后台、停止播放打断手势、pointercancel 丢失），存储里还是上一次/默认几何，
+下次 `apply()` 就按旧值恢复 —— 观感就是“尺寸被改回默认”，且 `--win-scale` 一起归 1。
+
+修正：
+
+- `WinMgr.zoomAt()` 结束后 450ms 防抖 `persist()`：即使 pointerup 丢失，尺寸与内容缩放也会落盘；
+- `document.visibilitychange→hidden` 和 `pagehide` 时 `WinMgr.persistAll()`：切后台前保底落盘；
+- 退化视口保护保留：`innerWidth/innerHeight < 200` 不参与 `fit()`，同方向骤缩（<72% 宽 / <60% 高）视为瞬时抖动。
+
+A/B 验证（同一条用例，只回退上面两条落盘改动）：缩放后停止再播 → `416×636` 回退 `340×520`，用例失败；
+带修正 → `416×636` / `--win-scale≈1.32` 保持不变，用例通过。全套 API 50/50 + UI 37/37 = 87/87。

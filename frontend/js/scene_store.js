@@ -334,6 +334,7 @@ const SceneStore = (() => {
     const mods = (App.openModules ? App.openModules() : []);
     if (!mods.length) return false;
     const vp = Adaptive.currentViewport();
+    if ((vp.right - vp.left) < 200 || (vp.bottom - vp.top) < 200) return false;
     /* 真正转屏且横屏时才按左右分列重排；其余情况只把跑出可视区的窗口
        收回来，绝不因为窗口之间正常重叠/顺序而重排成默认尺寸。 */
     if (force && Adaptive.isLandscape(vp)) {
@@ -385,6 +386,7 @@ const SceneStore = (() => {
        否则会把用户调好的窗口尺寸一遍遍改回场景默认值。 */
     const realFlip = () => {
       const w = window.innerWidth, h = window.innerHeight;
+      if (w < 200 || h < 200) return false;
       const crossed = (w > h) !== (w0 > h0);
       const swapped = Math.abs(w - h0) < 120 && Math.abs(h - w0) < 120;
       const delta = Math.abs(w - w0) > 80 || Math.abs(h - h0) > 80;

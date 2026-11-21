@@ -853,6 +853,47 @@ class UiRegression:
             self.page.wait_for_timeout(400)
             cur = self.page.evaluate("() => { const r = document.querySelector('#play-float').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }")
             self.require(cur == keep, f"reopening the window lost the user size: {keep} -> {cur}")
+
+            # 停止播放 / 后台切换回来（WebView 会先报极小视口）都不能改尺寸
+            self.page.evaluate("() => document.querySelector('#pf-stop').click()")
+            self.page.wait_for_timeout(700)
+            cur = self.page.evaluate("() => { const r = document.querySelector('#play-float').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }")
+            self.require(cur == keep, f"stop playback reset the window size: {keep} -> {cur}")
+            self.page.evaluate("() => PlayMgr.play(Player.current || '%s')" % self.fx["ui_long"])
+            self.page.wait_for_timeout(900)
+            before_bg = self.page.evaluate("() => { const r = document.querySelector('#play-float').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }")
+            self.page.set_viewport_size({"width": 390, "height": 150})     # 后台/过渡态的退化视口
+            self.page.wait_for_timeout(600)
+            self.page.evaluate("() => window.dispatchEvent(new Event('resize'))")
+            self.page.wait_for_timeout(300)
+            self.page.set_viewport_size({"width": 390, "height": 844})
+            self.page.wait_for_timeout(900)
+            self.page.evaluate("() => window.dispatchEvent(new Event('resize'))")
+            self.page.wait_for_timeout(600)
+            after_bg = self.page.evaluate("() => { const r = document.querySelector('#play-float').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }")
+            self.require(after_bg == before_bg, f"background/resume changed the window size: {before_bg} -> {after_bg}")
+
+            # 双指缩放（内容+窗口一起放大）后停止/再播，尺寸和 --win-scale
+            # 不能退回上一次（那正是“改回默认”的观感）。
+            self.page.evaluate("""() => {
+              const w = document.querySelector('#play-float');
+              const c = WinMgr.find(w);
+              WinMgr.zoomWindow(w, c.rect, 1.32, 200, 400, c.scale);
+            }""")
+            self.page.wait_for_timeout(700)
+            zoom_size = self.page.evaluate("() => { const r = document.querySelector('#play-float').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }")
+            zoom_scale = self.page.evaluate("() => parseFloat(document.querySelector('#play-float').style.getPropertyValue('--win-scale'))")
+            self.require(zoom_scale >= 1.15, f"zoom scale not applied: {zoom_scale}")
+            self.page.evaluate("() => document.querySelector('#pf-stop').click()")
+            self.page.wait_for_timeout(700)
+            self.page.evaluate("(p) => PlayMgr.play(p, 0)", self.fx["ui_long"])
+            self.page.wait_for_timeout(1100)
+            after_zoom_play = self.page.evaluate("() => { const r = document.querySelector('#play-float').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }")
+            after_zoom_scale = self.page.evaluate("() => parseFloat(document.querySelector('#play-float').style.getPropertyValue('--win-scale'))")
+            self.require(all(abs(a - b) <= 3 for a, b in zip(zoom_size, after_zoom_play)),
+                         f"playback reset the zoomed size: {zoom_size} -> {after_zoom_play}")
+            self.require(abs(after_zoom_scale - zoom_scale) <= 0.05,
+                         f"playback reset the zoom scale: {zoom_scale} -> {after_zoom_scale}")
             return "10s idle: only spectrum data, no axes/grid; outside clicks keep dim; size survives reopen"
         self.check("play manager 10s idle dim and lock", idle_dim)
 
