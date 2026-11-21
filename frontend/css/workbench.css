@@ -463,3 +463,8 @@
   .play-float.pf-idle-dim #pf-resize{opacity:.1;transition:opacity .35s ease}
   /* 背景封面不参与降透明：只淡出控件、列表、频谱头部和标题栏 */
   .play-float.pf-idle-dim{border-color:transparent;box-shadow:none}
+  /* 淡出后只留封面：控件淡了但铺底层还在，就会看着像蒙了一层灰。
+     所以控件区和标题栏的底色、以及整窗渐变遮罩一起撤掉。 */
+  .play-float.pf-idle-dim .pf-body,
+  .play-float.pf-idle-dim .mf-head{background:none}
+  .play-float.pf-idle-dim::after{display:none}

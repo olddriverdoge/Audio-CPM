@@ -759,6 +759,13 @@ class UiRegression:
                 self.require(float(op) <= 0.11, f"{sel} not at 10% opacity: {op}")
             self.require(self.page.evaluate("getComputedStyle(document.querySelector('#sf-canvas')).opacity") == "1",
                          "spectrum canvas was dimmed with the chrome")
+            # 淡出后必须只剩封面：任何铺底层都不能留在画面上，否则就是"控件淡了但还蒙层灰"。
+            self.require(self.page.evaluate("(getComputedStyle(document.querySelector('.pf-body')).backgroundImage)") == "none",
+                         "control scrim survived the idle dim")
+            self.require(self.page.evaluate("(getComputedStyle(document.querySelector('#pf-head')).backgroundImage)") == "none",
+                         "header scrim survived the idle dim")
+            self.require(self.page.evaluate("getComputedStyle(document.querySelector('#play-float'), '::after').display") == "none",
+                         "full-window scrim survived the idle dim")
             bg1 = self.page.evaluate("() => getComputedStyle(document.querySelector('#pf-bg')).opacity")
             self.require(bg1 == bg0 and float(bg1) >= 0.9,
                          f"cover background was dimmed with the chrome: {bg0} -> {bg1}")
