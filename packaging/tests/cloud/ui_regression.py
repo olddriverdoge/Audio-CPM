@@ -379,9 +379,12 @@ class UiRegression:
             self.page.locator("#spectrum-float").wait_for(state="visible", timeout=5000)
             self.page.wait_for_timeout(500)
             self.require(self.page.locator("#sf-canvas").is_visible(), "spectrum canvas hidden")
+            canvas_bg = self.page.evaluate("getComputedStyle(document.querySelector('#sf-canvas')).backgroundColor")
+            self.require(canvas_bg in ("rgba(0, 0, 0, 0)", "transparent"),
+                         f"standalone spectrum canvas still has a black fill: {canvas_bg}")
             tabs = self.page.locator("#spectrum-float .sf-tab").count()
             self.require(tabs == 2, f"expected spectrum/waterfall tabs, got {tabs}")
-            return "2 tabs + canvas"
+            return "2 tabs + transparent canvas"
         self.check("spectrum float opens", spectrum, "spectrum")
 
         def play_style():
@@ -600,6 +603,13 @@ class UiRegression:
                         "embedded canvas is not 50% transparent")
             bg = self.page.evaluate("getComputedStyle(document.querySelector('#pf-bg')).opacity")
             self.require(float(bg) >= 0.95, f"cover background lost behind spectrum: {bg}")
+            bg_img = self.page.evaluate("getComputedStyle(document.querySelector('#pf-bg')).backgroundImage")
+            self.require("/api/cover" in (bg_img or "") or "/api/folder_cover" in (bg_img or ""),
+                         f"cover image not loaded behind spectrum: {bg_img[:120]}")
+            for sel in ("#spectrum-float", "#pf-sf-body", "#pf-sf-host", "#sf-canvas"):
+                b = self.page.evaluate("(s) => getComputedStyle(document.querySelector(s)).backgroundColor", sel)
+                self.require(b in ("rgba(0, 0, 0, 0)", "transparent"),
+                             f"{sel} still paints an opaque backdrop: {b}")
             self.require(self.page.locator("#pf-sf-sec .pf-sf-mode").count() == 2, "spectrum mode tabs missing")
             self.page.locator('#pf-sf-sec .pf-sf-mode[data-sf-mode="spectrum"]').click()
             self.page.wait_for_timeout(200)
@@ -674,6 +684,23 @@ class UiRegression:
             }""")
             return "embedded spectrum + swipe mode + 50% bars/waterfall + transparent long-press config"
         self.check("spectrum embedded, swipe mode, 50% visuals and config", embedded_spectrum)
+
+        def cover_fallback():
+            # 单曲没有内嵌封面时，要退到所在目录的 cover.jpg，避免声谱后面
+            # 直接掉成纯黑。Album A 里有 cover.jpg，Track One 本身没有内嵌图。
+            self.page.evaluate("(p) => PlayMgr.play(p, 0, {quiet:true})", self.fx["ui_track1"])
+            self.page.wait_for_timeout(300)
+            self.page.evaluate("() => App.openModule('play')")
+            self.page.wait_for_function(
+                "() => getComputedStyle(document.querySelector('#pf-bg')).backgroundImage.includes('/api/folder_cover')",
+                timeout=8000,
+            )
+            self.page.wait_for_function(
+                "() => document.querySelector('#play-float').classList.contains('has-cover')",
+                timeout=5000,
+            )
+            return "folder cover fallback for track without embedded art"
+        self.check("track without cover falls back to folder image", cover_fallback)
 
         def idle_dim():
             # 用 16 秒长音轨撑过 10 秒倒计时；展开频谱，验证内部保持默认 50%。
@@ -771,7 +798,9 @@ class UiRegression:
         self.page.locator("#fw-browse").wait_for(state="visible", timeout=5000)
 
         def setup():
-            self.open_dir(self.fx["ui_root"])
+            # 新页面会继承上一次浏览路径；先直接回根，再进入输入目录。
+            self.page.evaluate("(p) => App.browse(p)", self.fx["ui_root"])
+            self.page.wait_for_timeout(450)
             self.open_dir(self.fx["ui_convert_in"])
             # Browsing raises the file browser, which can fully cover the task
             # window in the built-in convert scene.  Raise the task window
@@ -829,8 +858,28 @@ class UiRegression:
                 self.page.locator("#scene-tabs .scene-chip", has_text="Cloud Regression Sce").count() == 1,
                 "saved scene chip missing",
             )
-            return "scene persisted in localStorage"
-        self.check("save current layout as scene", save, "scene-save")
+            # 不再有单独的「覆盖」按钮，但点已有场景行必须能用当前布局更新它。
+            sid = self.page.evaluate("() => JSON.parse(localStorage.getItem('ac3_scenes') || '[]')[0].id")
+            # 临时改窗口几何让场景快照拿到新尺寸；更新完立刻还原，避免后续
+            # 用例的按钮被这个临时尺寸挡住。
+            orig = self.page.evaluate("() => JSON.parse(localStorage.getItem('ac3_geo_fw-browse') || 'null')")
+            self.page.evaluate("() => WinMgr.find(document.querySelector('#fw-browse')).place({x:42,y:96,w:488,h:360}, true)")
+            self.page.wait_for_timeout(250)
+            self.page.locator("#scene-add").click()
+            self.page.locator("#scene-save-overlay").wait_for(state="visible", timeout=4000)
+            self.require(self.page.locator(".ss-overwrite").count() == 0, "overwrite button came back")
+            self.page.once("dialog", lambda d: d.accept())
+            self.page.locator(f'.ss-row[data-id="{sid}"]').click()
+            self.page.wait_for_timeout(400)
+            self.require(self.page.locator("#scene-save-overlay").is_hidden(),
+                         "scene update did not close the save sheet")
+            updated = self.page.evaluate("(id) => JSON.parse(localStorage.getItem('ac3_scenes') || '[]').find(x => x.id === id)", sid)
+            self.page.evaluate("(g) => { if (g) WinMgr.find(document.querySelector('#fw-browse')).place(g, true); }", orig)
+            self.require(updated and updated.get("geo", {}).get("fw-browse", {}).get("w") == 488,
+                         f"scene row click did not update geometry: {updated}")
+            self.require(updated.get("updatedAt", 0) > 0, "scene update did not stamp updatedAt")
+            return "scene persisted + row click updates geometry"
+        self.check("save current layout and update via scene row", save, "scene-save")
 
     def test_defaults_import(self):
         def run():

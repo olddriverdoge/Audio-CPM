@@ -11,16 +11,19 @@
 4. 自动淡化从 5 秒改为 10 秒；`#pf-bg` 封面背景和 `::after` 不再被 `.pf-idle-dim` 压暗，只淡出标题、曲名、进度、传输按钮、列表、频谱头和 resize。
 5. 内嵌声谱空白区改为真正透明：`clearWf()` 在内嵌模式 `clearRect`，独立浮窗仍铺黑底；暂停时内嵌也不再盖黑色遮罩。进出内嵌会重置瀑布缓冲，避免复用旧黑底。
 6. 目录/队列文案补齐 en/de/ja/ru/vi/hi 六语言。
+7. 「保存场景」不再放单独的覆盖按钮，但已有场景行可点击：确认后用当前布局更新该场景，窗口位置/大小/缩放/视口一起更新；＋ 新建仍另存一份。
+8. 单曲没有内嵌封面时回退到所在文件夹封面（cover.jpg 或同目录第一首带封面的音频）；仍没有封面时用暗蓝玻璃底图，不再直接黑块。
+9. 播放管理底部遮罩从 80% 降到 30%，顶部文字区仍保留足够压暗；独立频谱/声谱浮窗也改成透明 canvas + 玻璃底板，不再铺纯黑。
 
 ## 回归
 
 命令：
 
 ```bash
-python3 packaging/tests/cloud/run_cloud_suite.py --keep --report /tmp/ac2_v057j_suite_round5.json
+python3 packaging/tests/cloud/run_cloud_suite.py --keep --report /tmp/ac2_v057j_suite_round10.json
 ```
 
-结果：**API 50/50 + UI 36/36 = 86/86**，71.95 秒；`console_errors=[]`、`page_errors=[]`，未使用截图。
+结果：**API 50/50 + UI 37/37 = 87/87**，80.2 秒；`console_errors=[]`、`page_errors=[]`，未使用截图。
 
 本轮新增/加强的 UI 断言：
 
@@ -28,7 +31,10 @@ python3 packaging/tests/cloud/run_cloud_suite.py --keep --report /tmp/ac2_v057j_
 - 播放列表点曲后 `#spectrum-float` 可见状态不变，不二次弹窗；窗口固定 520×620 后点曲尺寸不跳回预设。
 - 普通起播仍自动展开声谱，兼容原有浏览/网格入口。
 - 10.6 秒无操作后 `.pf-idle-dim` 出现，周边控件 0.1、canvas 0.5、封面背景 `#pf-bg` 保持 ≥0.9 且数值不变、窗口仍 520×620。
-- 内嵌声谱 canvas 取空白像素 alpha ≤ 4，确认不是黑底；柱子/瀑布像素与 0.5 透明度仍通过。
+- 内嵌声谱 canvas 取空白像素 alpha ≤ 4，确认不是黑底；柱子/瀑布像素与 0.5 透明度仍通过；`#spectrum-float`、`#pf-sf-body`、`#pf-sf-host`、`#sf-canvas` 均无 opaque 背景。
+- 独立频谱浮窗 canvas 背景为透明，不再是 `#080c11` 黑底。
+- 无内嵌封面的 Track One 能回退到 `cover.jpg`（`/api/folder_cover`），播放管理仍保持 `has-cover`。
+- 保存场景：新建后用 `.ss-row` 点击更新，确认弹窗、窗口几何 `w=488` 落库、`updatedAt` 写入；`.ss-overwrite` 按钮仍不存在。
 - 左右滑、收藏同步、标题进元数据、增益滑杆等旧用例继续通过。
 
 ## 打包约定

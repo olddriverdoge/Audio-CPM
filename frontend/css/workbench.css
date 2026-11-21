@@ -80,20 +80,27 @@
 
   /* ---------- 播放管理浮窗 ---------- */
   .play-float{position:fixed;left:10px;bottom:96px;z-index:330;width:min(340px,calc(100vw - 20px));height:min(440px,calc(100vh - 120px));
-    display:flex;flex-direction:column;background:linear-gradient(180deg,rgba(16,22,30,.94),rgba(9,13,19,.98));
+    display:flex;flex-direction:column;background:linear-gradient(180deg,rgba(30,41,55,.96),rgba(20,29,40,.98));
     border:1px solid var(--border);border-radius:10px;
     box-shadow:0 18px 46px rgba(0,0,0,.62);overflow:hidden;isolation:isolate}
   .play-float.hidden{display:none}
   /* 封面背景：高清铺满（不虚化），只保留轻微亮度压暗和底部渐变保证文字可读。
      不再用低透明度 + 严重模糊，避免工作台底色透上来把封面糊成一片。 */
   .pf-bg{position:absolute;inset:0;z-index:0;background-position:center;background-size:cover;
-    filter:saturate(1.04) brightness(.90);opacity:0;transform:scale(1.01);
+    /* 没有封面时的底图：暗蓝玻璃而不是纯黑，声谱透明区域至少有层次。 */
+    background-image:radial-gradient(120% 85% at 72% 108%,rgba(56,189,248,.16) 0%,rgba(56,189,248,0) 58%),
+      linear-gradient(150deg,#2a394b 0%,#17222f 58%,#1d2c3c 100%);
+    filter:saturate(1.10) brightness(1.02);opacity:0;transform:scale(1.01);
     transition:opacity .28s ease;pointer-events:none}
   .play-float.has-cover .pf-bg{opacity:1}
+  .play-float:not(.has-cover) .pf-bg{opacity:1}
   .play-float .mf-head,.play-float .pf-body{position:relative;z-index:1}
-  .play-float.has-cover{background:#080d13}
+  .play-float.has-cover{background:#111923}
+  /* 只压暗顶部文字区和中部列表，底部频谱/声谱区保持轻遮罩，
+     让内嵌画布的透明区域真正透出封面，而不是被压成黑块。 */
   .play-float::after{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;
-    background:linear-gradient(180deg,rgba(8,13,19,.10),rgba(8,13,19,.30) 46%,rgba(8,13,19,.80))}
+    background:linear-gradient(180deg,rgba(8,13,19,.52) 0%,rgba(8,13,19,.22) 24%,
+      rgba(8,13,19,.10) 55%,rgba(8,13,19,.30) 100%)}
   .pf-body{flex:1 1 auto;display:flex;flex-direction:column;gap:8px;padding:8px 10px;overflow:hidden;position:relative}
   .pf-now{display:flex;gap:10px;align-items:center;min-height:56px}
   /* 播放管理左上角不再显示封面缩略图；封面只作为背景使用 */

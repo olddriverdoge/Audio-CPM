@@ -233,13 +233,47 @@ const SceneStore = (() => {
     const scenes = all();
     listEl.innerHTML = '<button type="button" class="ss-new">＋ 新建场景</button>' +
       scenes.map(s =>
-        '<div class="ss-row" data-id="' + esc(s.id) + '">' +
+        '<div class="ss-row" data-id="' + esc(s.id) + '" role="button" tabindex="0" ' +
+        'title="用当前布局更新「' + esc(sceneName(s)) + '」">' +
         '<div class="ss-meta"><b>' + esc(sceneName(s)) + '</b><span>' + esc(sceneDesc(s)) + '</span></div>' +
+        '<span class="ss-update" aria-hidden="true">点击更新</span>' +
         '</div>'
       ).join('');
   }
 
   function saveCurrent() { openSave(); }
+
+  /* 行点击即可用当前布局更新已有场景：不再保留单独的「覆盖」按钮，
+     但仍保留一次确认，避免误点把调好的布局冲掉。 */
+  function overwriteScene(id) {
+    const s = all().filter(x => x.id === id)[0];
+    if (!s) return;
+    const layout = currentLayout();
+    if (!layout) return;
+    if (!confirm('用当前布局更新场景「' + sceneName(s) + '」？\n会同时保存窗口位置、窗口大小和缩放。')) return;
+    if (isBuiltin(s)) {
+      const o = overrides();
+      o[id] = Object.assign({}, o[id] || {}, {
+        id: id, name: s.name, desc: s.desc,
+        modules: layout.modules, geo: layout.geo,
+        uiScale: layout.uiScale, canvas: layout.canvas,
+        viewport: layout.viewport, updatedAt: Date.now()
+      });
+      saveOverrides(o);
+      Store.set(HIDDEN, hiddenIds().filter(x => x !== id));
+    } else {
+      const list = customs().map(x => x.id === id
+        ? Object.assign({}, x, {modules: layout.modules, geo: layout.geo,
+            uiScale: layout.uiScale, canvas: layout.canvas,
+            viewport: layout.viewport, updatedAt: Date.now()})
+        : x);
+      saveCustom(list);
+    }
+    render();
+    renderSaveList();
+    closeSave();
+    Utils.toast('已更新场景：' + sceneName(s));
+  }
 
   function createScene() {
     const layout = currentLayout();
@@ -348,7 +382,16 @@ const SceneStore = (() => {
 
     const listEl = document.getElementById('ss-list');
     if (listEl) listEl.addEventListener('click', e => {
-      if (e.target.closest('.ss-new')) createScene();
+      if (e.target.closest('.ss-new')) { createScene(); return; }
+      const row = e.target.closest('.ss-row');
+      if (row) overwriteScene(row.dataset.id);
+    });
+    if (listEl) listEl.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const row = e.target.closest('.ss-row');
+      if (!row) return;
+      e.preventDefault();
+      overwriteScene(row.dataset.id);
     });
     const cancel = document.getElementById('ss-cancel');
     if (cancel) cancel.onclick = closeSave;

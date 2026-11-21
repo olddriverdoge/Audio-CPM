@@ -406,13 +406,11 @@ const Spectrum = (() => {
     return area;
   }
 
-  /* 声谱空白底：内嵌时透明，露出播放管理封面；独立浮窗仍用深色底，保证可读。 */
+  /* 声谱空白底一律透明：内嵌露出播放管理封面，独立浮窗露出工作台玻璃底。
+     canvas 本身支持 alpha，不需要也不应该再铺黑色。 */
   function clearWf() {
     if (!wfCtx) return;
-    try { wfCtx.clearRect(0, 0, wfW, wfH); } catch (_) { return; }
-    if (!embedded) {
-      try { wfCtx.fillStyle = '#000'; wfCtx.fillRect(0, 0, wfW, wfH); } catch (_) {}
-    }
+    try { wfCtx.clearRect(0, 0, wfW, wfH); } catch (_) {}
   }
 
   function resizeWf(w, h) {
@@ -631,10 +629,6 @@ const Spectrum = (() => {
       }
       if (mode === 'waterfall') {
         drawWaterfall(area);
-        if (!embedded) {
-          g.fillStyle = 'rgba(0,0,0,.45)';
-          g.fillRect(area.x0, area.y0, area.gw, area.gh);
-        }
       } else {
         g.fillStyle = 'rgba(56,189,248,.20)';
         g.fillRect(area.x0, area.y0 + area.gh - 2, area.gw, 2);
@@ -738,10 +732,6 @@ const Spectrum = (() => {
     try {
       g.setTransform(1, 0, 0, 1, 0, 0);
       g.clearRect(0, 0, canvas.width, canvas.height);
-      if (!embedded) {
-        g.fillStyle = '#0f1419';
-        g.fillRect(0, 0, canvas.width, canvas.height);
-      }
       g.fillStyle = 'rgba(148,163,184,.75)';
       g.textAlign = 'center'; g.textBaseline = 'middle';
       g.font = Math.round(12 * DPR) + 'px ui-monospace, Menlo, monospace';

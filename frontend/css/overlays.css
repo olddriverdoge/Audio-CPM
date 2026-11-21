@@ -108,9 +108,9 @@
   .ss-meta{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 auto}
   .ss-meta b{font-size:12.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .ss-meta span{font-size:10.5px;color:var(--muted);line-height:1.45;word-break:break-all}
-  .ss-overwrite{flex:0 0 auto;padding:4px 8px;border-radius:6px;border:1px solid var(--border);
-    background:var(--panel2);color:var(--muted);font-size:11px;font-family:inherit;cursor:pointer}
-  .ss-row:hover .ss-overwrite{color:var(--accent);border-color:rgba(56,189,248,.45)}
+  .ss-update{flex:0 0 auto;font-size:10.5px;color:var(--muted);opacity:.72;white-space:nowrap}
+  .ss-row:hover .ss-update,.ss-row:focus-visible .ss-update{color:var(--accent);opacity:1}
+  .ss-row:focus-visible{outline:1px solid rgba(56,189,248,.55);outline-offset:1px}
   .ss-actions{display:flex;justify-content:flex-end;gap:8px;padding-top:9px;flex:0 0 auto}
   .scene-save-sheet .small{padding:5px 10px}
 
@@ -154,7 +154,8 @@
 
   .spectrum-float{position:fixed;right:10px;bottom:96px;z-index:331;width:min(320px,calc(100vw - 20px));height:min(170px,calc(100vh - 120px));
     min-width:180px;min-height:110px;max-width:92vw;max-height:70vh;
-    display:flex;flex-direction:column;background:rgba(13,18,24,.97);
+    display:flex;flex-direction:column;background:rgba(13,18,24,.78);
+    -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
     border:1px solid var(--border);border-radius:8px;
     box-shadow:0 8px 28px rgba(0,0,0,.6);overflow:hidden}
   body.has-player .spectrum-float{bottom:140px}
@@ -169,7 +170,7 @@
   .sf-btn{border:none;background:none;color:var(--muted);cursor:pointer;font-size:13px;
     line-height:1;padding:0 4px}
   .sf-btn:hover{color:var(--text)}
-  .spectrum-float canvas{display:block;width:100%;flex:1 1 auto;min-height:0;background:#080c11}
+  .spectrum-float canvas{display:block;width:100%;flex:1 1 auto;min-height:0;background:transparent}
   .sf-resize{position:absolute;right:0;bottom:0;width:24px;height:24px;z-index:2;
     cursor:nwse-resize;touch-action:none;
     background:linear-gradient(135deg,transparent 50%,rgba(148,163,184,.55) 50%)}

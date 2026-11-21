@@ -36,7 +36,7 @@ function createPlayPanel() {
 
   const MODE_LABEL = {order: '顺序', all: '列表循环', one: '单曲循环', shuffle: '随机'};
   let timer = 0, seeking = false;
-  let coverPath = '', coverSrc = '', coverFailed = '';
+  let coverPath = '', coverSrc = '', coverFailed = '', coverFolderTried = false;
   let queueCollapsed = Store.get('ac3_play_queue_collapsed', false) === true;
   let sfCollapsed = Store.get('ac3_play_sf_collapsed', false) === true;
   let favHold = null, favHoldEl = null, favHoldStart = null, suppressFavClickUntil = 0;
@@ -139,6 +139,7 @@ function createPlayPanel() {
       if (p !== coverPath && p !== coverFailed) {
         coverPath = p;
         coverFailed = '';
+        coverFolderTried = false;
         coverSrc = Api.coverUrl(p);
         coverBox.classList.remove('on');
         coverImg.src = coverSrc;
@@ -317,6 +318,18 @@ function createPlayPanel() {
     if (coverSrc) win.classList.add('has-cover');
   });
   coverImg.addEventListener('error', () => {
+    /* 单曲没有内嵌封面时，退一步用所在文件夹的封面（目录里的 cover.jpg
+       或同目录第一首带封面的音频）。这样播放管理背景不会直接掉成黑色。 */
+    if (coverPath && !coverFolderTried) {
+      const dir = Utils.dirname(coverPath);
+      if (dir && dir !== '/' && dir !== coverPath) {
+        coverFolderTried = true;
+        coverSrc = Api.folderCoverUrl(dir);
+        coverImg.src = coverSrc;
+        setCoverBackground(coverSrc);
+        return;
+      }
+    }
     coverFailed = coverPath;
     coverImg.removeAttribute('src');
     coverBox.classList.remove('on');
