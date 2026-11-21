@@ -123,3 +123,22 @@ SHA256 `ae6ef03d49c601d4c52000fdc5281ff1799d9ab918eaa2df822618260d613a07`，
 构建（run `44904530044`）：`Audio-CPM-0.5.8-88-dev-float.apk`，22,614,777 字节，
 SHA256 `710484d3f9dc344b8e4b3459e06f89e6a11c8055ad3f594a8781c6cef5e58bb5`，
 下载 https://aka.doubaocdn.com/s/FipTtDV9uK 。
+
+## 第 22 轮：浮窗拖动抖动 + 队列选择 + 声谱空白（0.5.9/89）
+
+真机反馈三个问题，逐条处理：
+
+1. **拖动时整窗抖动**：页面原来按 `clientX/clientY` 增量调 `moveBy`。窗口跟着手指移动后，`clientX`
+   会相对视口反向变化，形成“移动→坐标变化→再移动”的反馈环。改为 `screenX/screenY` 绝对坐标：
+   pointerdown 取 `AudioCpmFloat.pos()` 的原生窗口几何，pointermove 用绝对位移算出目标 x/y，
+   走 `moveTo(x,y)`，并且每帧最多发一次（rAF 合并）。缩放同样改成绝对宽高 + `resizeTo`。
+2. **浮窗没有播放列表**：去掉浮窗里隐藏 `#pf-qhead/#pf-queue` 的规则；浮窗默认“队列常驻 + 声谱常驻”，
+   队列最多占 36% 高度，声谱占剩余空间。新增原生队列接口 `/api/playback/queue/list` 与
+   `/api/playback/queue/play`，`Player.hydrateNative()` 拉取队列，浮窗里点行按原生下标跳播，
+   不再用默认目录凑队列。没有原生队列时回退到当前目录浏览列表。
+3. **声谱/频谱空白**：根因是主页面切到后台时 `Spectrum.onHidden()` 调 `playbackSpectrum(false)`，
+   而原生 FFT 是进程级开关，把浮窗的声谱一起关掉了。后端加 6 秒“浮窗租约”：浮窗每次取数带
+   `lease=1` 续约，租约期间忽略其它页面的关闭请求；浮窗关闭时 `pagehide` 发 `release=1` 立刻释放。
+   前端 `Api.playbackSpectrum()` 在浮窗模式下自动带 lease。
+
+回归：API 50/50 + UI 38/38 = **88/88**；浮窗用例新增“队列高度 ≥40px、声谱 ≥80px、队列在声谱上方”。

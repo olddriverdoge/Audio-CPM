@@ -6,7 +6,7 @@
 
 Audio-CPM 是一个面向 Android 本地与 WebDAV 音乐库的音频管理、播放和整理工作台。它把目录浏览、播放、标签/封面查看、批量转换、元数据整理和文件移动放进同一套可自定义的浮窗界面，适合管理手机、SD 卡或 NAS 上的音乐收藏。
 
-当前版本：**0.5.8**（`versionCode 88`，`minSdk 24`，`arm64-v8a`）。
+当前版本：**0.5.9**（`versionCode 89`，`minSdk 24`，`arm64-v8a`）。
 
 ## 为什么是 Audio-CPM
 

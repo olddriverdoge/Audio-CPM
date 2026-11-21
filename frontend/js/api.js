@@ -57,8 +57,17 @@ const Api = (() => {
       album: tags && tags.album || ''
     }),
     playbackState: () => jfetch('/api/playback/state'),
+    playbackQueueList: () => jfetch('/api/playback/queue/list'),
+    playbackQueuePlay: index => jpost('/api/playback/queue/play', {index: Number(index) || 0}),
   playbackQueue: (paths, index, startMs) => jpost('/api/playback/queue', {paths, index, startMs}),
-    playbackSpectrum: enabled => jfetch('/api/playback/spectrum' + (enabled === undefined ? '' : ('?enabled=' + (enabled ? '1' : '0')))),
+    playbackSpectrum: (enabled, opts) => {
+      const o = opts || {};
+      const q = [];
+      if (enabled !== undefined) q.push('enabled=' + (enabled ? '1' : '0'));
+      if (o.lease || (window.__AC2_FLOAT_MODE && enabled !== false)) q.push('lease=1');
+      if (o.release) q.push('release=1');
+      return jfetch('/api/playback/spectrum' + (q.length ? ('?' + q.join('&')) : ''));
+    },
     playbackPause: () => jpost('/api/playback/pause', {}),
     playbackResume: () => jpost('/api/playback/resume', {}),
     playbackStop: () => jpost('/api/playback/stop', {}),

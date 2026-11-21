@@ -1226,8 +1226,19 @@ try { return await Defaults.apply(true); } finally { window.fetch = realFetch; }
                          f"float play window does not fill overlay: {box}")
             self.require(box["head"], "play header missing in float mode")
             self.require(box["workbench"] == "none", f"workbench still visible in float mode: {box}")
-            self.require(page.evaluate("getComputedStyle(document.querySelector('#pf-queue')).display") == "none",
-                         "queue list should be hidden in float mode")
+            q = page.evaluate("""() => {
+              const q = document.querySelector('#pf-queue');
+              const s = document.querySelector('#pf-sf-sec');
+              if (!q || !s) return null;
+              const qr = q.getBoundingClientRect(), sr = s.getBoundingClientRect();
+              return {qdisp: getComputedStyle(q).display, sdisp: getComputedStyle(s).display,
+                      qh: qr.height, sh: sr.height, qtop: qr.top, stop: sr.top};
+            }""")
+            self.require(q and q["qdisp"] != "none" and q["qh"] >= 40,
+                         f"queue list missing in float mode: {q}")
+            self.require(q["sdisp"] != "none" and q["sh"] >= 80,
+                         f"embedded spectrum missing in float mode: {q}")
+            self.require(q["qtop"] < q["stop"], f"queue should sit above spectrum: {q}")
             b = page.evaluate("""() => {
               const h = document.querySelector('#pf-head').getBoundingClientRect();
               const m = document.querySelector('#pf-min').getBoundingClientRect();

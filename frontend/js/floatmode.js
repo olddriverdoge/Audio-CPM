@@ -71,45 +71,93 @@ const FloatMode = (() => {
     if (btn) btn.textContent = s.running ? t('关闭全局浮窗') : t('开启全局浮窗');
   }
 
-  /* 浮窗内的标题栏拖动 / 右下角缩放，交给原生窗口 */
+  /* 浮窗内拖动/缩放：用 screenX/screenY 的绝对位移 + 原生窗口起始几何。
+     不能用 clientX 累计：窗口跟着手指移动时 clientX 会反向变化，形成
+     反馈环，真机上表现为整窗高频抖动。 */
   function bindWindowGestures() {
     if (!FLOAT_QUERY) return;
     const head = document.getElementById('pf-head');
     const resize = document.getElementById('pf-resize');
-    if (head) {
-      let last = null;
-      head.addEventListener('pointerdown', e => {
+    const b0 = () => bridge();
+    const p0 = () => {
+      const b = b0();
+      if (!b || typeof b.pos !== 'function') return null;
+      const p = parse(b.pos());
+      return p.ok ? p : null;
+    };
+    const screenPt = e => ({x: e.screenX, y: e.screenY});
+    const sameScreen = e => Number.isFinite(e.screenX) && Number.isFinite(e.screenY);
+
+    function bindDrag(el, onStart) {
+      if (!el) return;
+      let st = null, pending = null, raf = 0;
+      const flush = () => {
+        raf = 0;
+        if (!pending) return;
+        const b = b0();
+        if (b && typeof b.moveTo === 'function') b.moveTo(pending.x, pending.y);
+        pending = null;
+      };
+      el.addEventListener('pointerdown', e => {
         if (e.target.closest('button')) return;
-        last = {x: e.clientX, y: e.clientY};
-        try { head.setPointerCapture(e.pointerId); } catch (_) {}
+        const geo = p0();
+        if (!geo) return;
+        const pt = sameScreen(e) ? screenPt(e) : {x: e.clientX, y: e.clientY};
+        st = onStart(geo, pt, e);
+        try { el.setPointerCapture(e.pointerId); } catch (_) {}
         e.preventDefault();
       }, true);
-      head.addEventListener('pointermove', e => {
-        if (!last) return;
-        const dx = e.clientX - last.x, dy = e.clientY - last.y;
-        last = {x: e.clientX, y: e.clientY};
-        const b = bridge();
-        if (b && typeof b.moveBy === 'function') b.moveBy(dx, dy);
+      el.addEventListener('pointermove', e => {
+        if (!st) return;
+        const pt = sameScreen(e) ? screenPt(e) : {x: e.clientX, y: e.clientY};
+        pending = st(pt);
+        if (!raf) raf = requestAnimationFrame(flush);
         e.preventDefault();
       }, true);
-      ['pointerup', 'pointercancel'].forEach(t => head.addEventListener(t, () => { last = null; }, true));
+      ['pointerup', 'pointercancel'].forEach(t => el.addEventListener(t, () => {
+        if (!st) return;
+        if (raf) { cancelAnimationFrame(raf); raf = 0; }
+        flush();
+        st = null;
+      }, true));
     }
-    if (resize) {
-      let last = null;
-      resize.addEventListener('pointerdown', e => {
-        last = {x: e.clientX, y: e.clientY, w: window.innerWidth, h: window.innerHeight};
-        try { resize.setPointerCapture(e.pointerId); } catch (_) {}
+
+    bindDrag(head, (geo, pt) => {
+      const sx = pt.x, sy = pt.y;
+      return p => ({x: geo.x + (p.x - sx), y: geo.y + (p.y - sy)});
+    });
+    // 缩放用 moveTo 改不了大小，单独走 resizeTo：
+    const rz = document.getElementById('pf-resize');
+    if (rz) {
+      let st = null, pending = null, raf = 0;
+      const flush = () => {
+        raf = 0;
+        if (!pending) return;
+        const b = b0();
+        if (b && typeof b.resizeTo === 'function') b.resizeTo(pending.w, pending.h);
+        pending = null;
+      };
+      rz.addEventListener('pointerdown', e => {
+        const geo = p0();
+        if (!geo) return;
+        const pt = sameScreen(e) ? screenPt(e) : {x: e.clientX, y: e.clientY};
+        st = {sx: pt.x, sy: pt.y, w: geo.w, h: geo.h};
+        try { rz.setPointerCapture(e.pointerId); } catch (_) {}
         e.preventDefault();
       }, true);
-      resize.addEventListener('pointermove', e => {
-        if (!last) return;
-        const b = bridge();
-        if (b && typeof b.resizeTo === 'function') {
-          b.resizeTo(last.w + (e.clientX - last.x), last.h + (e.clientY - last.y));
-        }
+      rz.addEventListener('pointermove', e => {
+        if (!st) return;
+        const pt = sameScreen(e) ? screenPt(e) : {x: e.clientX, y: e.clientY};
+        pending = {w: st.w + (pt.x - st.sx), h: st.h + (pt.y - st.sy)};
+        if (!raf) raf = requestAnimationFrame(flush);
         e.preventDefault();
       }, true);
-      ['pointerup', 'pointercancel'].forEach(t => resize.addEventListener(t, () => { last = null; }, true));
+      ['pointerup', 'pointercancel'].forEach(t => rz.addEventListener(t, () => {
+        if (!st) return;
+        if (raf) { cancelAnimationFrame(raf); raf = 0; }
+        flush();
+        st = null;
+      }, true));
     }
   }
 
@@ -177,6 +225,12 @@ const FloatMode = (() => {
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refreshSettings(); });
   }
 
+  if (FLOAT_QUERY) {
+    // 关浮窗/WebView 销毁时尽快释放声谱租约，别让 FFT 白跑
+    window.addEventListener('pagehide', () => {
+      try { Api.playbackSpectrum(false, {release: true}); } catch (_) {}
+    });
+  }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initSettings);
   } else {

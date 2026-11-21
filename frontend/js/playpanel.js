@@ -78,7 +78,10 @@ function createPlayPanel() {
     if (caret) caret.style.transform = sfCollapsed ? 'rotate(180deg)' : '';
     // 频谱只在播放列表收起后有空间显示；这里同步把真实频谱模块挂进来/放回去。
     try {
-      const active = queueCollapsed && !sfCollapsed && !win.classList.contains('hidden');
+      // 浮窗里没有工作台画布，播放列表和声谱要同时可见；普通模式仍然
+      // 只在列表收起时给声谱腾空间。
+      const active = (queueCollapsed || window.__AC2_FLOAT_MODE) && !sfCollapsed
+        && !win.classList.contains('hidden');
       win.classList.toggle('pf-sf-live', active);
       if (active && typeof Spectrum !== 'undefined' && Spectrum.setEmbedded) {
         Spectrum.setEmbedded(true, sfHost);
@@ -204,10 +207,15 @@ function createPlayPanel() {
       qEl.dataset.view = 'queue';
       return;
     }
-    const cur = Player.current;
+    // 原生队列的当前曲目是 local:/...，比较时去掉前缀
+    const cur = String(Player.current || '').replace(/^local:/, '');
+    // 浮窗里点列表 = 跳原生队列下标，不重建队列
+    const nativeQueue = !!(window.__AC2_FLOAT_MODE && Player.queueList && Player.queueList().length);
     qEl.innerHTML = list.map((f, i) => {
       const p = f.path || '';
-      return '<div class="pf-q' + (p === cur ? ' on' : '') + '" data-i="' + i + '" data-path="' + Utils.escapeHtml(p) + '" title="' + Utils.escapeHtml(p) + '">' +
+      return '<div class="pf-q' + (p === cur ? ' on' : '') + '" data-i="' + i + '"'
+        + (nativeQueue ? ' data-qi="' + i + '"' : '')
+        + ' data-path="' + Utils.escapeHtml(p) + '" title="' + Utils.escapeHtml(p) + '">' +
         '<span class="pf-q-ico">' + (p === cur ? '▶' : '♪') + '</span>' +
         '<span class="pf-q-name">' + Utils.escapeHtml(Utils.basename(p)) + '</span></div>';
     }).join('');
@@ -514,6 +522,7 @@ function createPlayPanel() {
     pressRow = null;
     if (!row) return;
     if (row.dataset.dir) { openDir(row.dataset.dir); return; }
+    if (row.dataset.qi) { Player.playQueueIndex(Number(row.dataset.qi)); return; }
     if (row.dataset.path) PlayMgr.play(row.dataset.path, 0, {quiet: true});
   }, true);
 
@@ -610,10 +619,21 @@ function createPlayPanel() {
     }
   });
 
-  /* 悬浮窗里默认展开内嵌声谱，窗口就是整块播放管理 */
-  if (window.__AC2_FLOAT_MODE) {
-    setTimeout(() => { try { if (typeof Spectrum !== 'undefined') showSpectrum('waterfall'); } catch (_) {} }, 300);
+  /* 浮窗版布局：播放列表常驻（可点选切歌）+ 内嵌声谱，
+     不再走 showSpectrum()（那会把列表收起、只剩声谱）。 */
+  function showFloatLayout() {
+    queueCollapsed = false;
+    sfCollapsed = false;
+    Store.set('ac3_play_queue_collapsed', false);
+    Store.set('ac3_play_sf_collapsed', false);
+    paintQueueState();
+    paintSfState();
+    if (typeof Spectrum !== 'undefined' && Spectrum.setMode) {
+      try { Spectrum.setMode('waterfall'); } catch (_) {}
+    }
+    setModeButtonState();
   }
+  if (window.__AC2_FLOAT_MODE) setTimeout(showFloatLayout, 300);
 
   document.addEventListener('ac2:fav-changed', renderFavorites);
   document.addEventListener('ac2:browse-changed', () => { renderQueue(); renderFavorites(); });
@@ -628,6 +648,7 @@ function createPlayPanel() {
   renderState();
   return Object.assign(fw, {
     showSpectrum,
+    showFloatLayout,
     refresh: () => { renderMeta(); paintQueueView(); renderQueue(); renderFavorites(); renderState(); paintQueueState(); paintSfState(); setModeButtonState(); }
   });
 }

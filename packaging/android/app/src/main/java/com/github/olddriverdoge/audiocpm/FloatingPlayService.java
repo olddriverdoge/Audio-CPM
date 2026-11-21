@@ -103,7 +103,7 @@ public class FloatingPlayService extends Service {
 
         android.content.SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         int defW = Math.round(screenW * 0.92f);
-        int defH = Math.round(screenH * 0.60f);
+        int defH = Math.round(screenH * 0.70f);
         int w = prefs.getInt("w", defW);
         int h = prefs.getInt("h", defH);
         int x = prefs.getInt("x", screenW - w - Math.round(8 * density));
@@ -148,6 +148,27 @@ public class FloatingPlayService extends Service {
     }
 
     private class FloatBridge {
+        /** 当前窗口几何（CSS/dp 像素），页面用绝对坐标拖动，避免移动中的
+         *  相对坐标反馈造成整窗抖动。 */
+        @JavascriptInterface
+        public String pos() {
+            if (lp == null) return "{\"ok\":false}";
+            return "{\"ok\":true,\"x\":" + (lp.x / density) + ",\"y\":" + (lp.y / density)
+                    + ",\"w\":" + (lp.width / density) + ",\"h\":" + (lp.height / density) + "}";
+        }
+
+        @JavascriptInterface
+        public void moveTo(float x, float y) {
+            main.post(() -> {
+                if (lp == null) return;
+                lp.x = Math.round(x * density);
+                lp.y = Math.round(y * density);
+                clamp();
+                try { if (rootView != null) wm.updateViewLayout(rootView, lp); } catch (Throwable ignored) {}
+                saveGeo();
+            });
+        }
+
         @JavascriptInterface
         public void moveBy(float dx, float dy) {
             main.post(() -> {

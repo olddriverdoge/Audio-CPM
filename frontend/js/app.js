@@ -1207,7 +1207,17 @@ const App = (() => {
     openModule, openModules, closeAllModules, openMod: openModule, openMeta,
     openCoverEditor: path => { if (typeof TaskRunner !== 'undefined') TaskRunner.openCoverEditor(path); },
     setUiScale, previewUiScale, commitUiScale, currentUiScale, setCanvasPan, applyCanvasPan, canvasPan, addTargetCurrent, addFavCurrent,
-    playbackQueueList: () => playbackList().slice(), hifiQueue, toggleModule,
+    playbackQueueList: () => {
+      // 系统浮窗里没有工作台的目录上下文；有原生队列时以原生队列为准，
+      // 这样播放列表可以点选切歌，而不是拿默认目录凑一份假队列。
+      try {
+        if (window.__AC2_FLOAT_MODE && typeof Player !== 'undefined'
+            && Player.queueList && Player.queueList().length) {
+          return Player.queueList().map(p => ({path: p, name: Utils.basename(p)}));
+        }
+      } catch (_) {}
+      return playbackList().slice();
+    }, hifiQueue, toggleModule,
     get path() { return currentPath; },
     selection: () => (bv ? bv.selected() : []),
     currentParent: () => currentParent,

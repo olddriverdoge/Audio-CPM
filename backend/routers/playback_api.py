@@ -132,8 +132,21 @@ async def playback_queue(request):
 
 async def playback_spectrum(request):
     enabled = request.query_params.get('enabled')
-    r = await run_in_threadpool(native_bridge.playback_spectrum,
-                                None if enabled is None else enabled == '1')
+    lease = request.query_params.get('lease') == '1'
+    release = request.query_params.get('release') == '1'
+    r = await run_in_threadpool(
+        native_bridge.playback_spectrum,
+        None if enabled is None else enabled == '1', lease, release)
+    return JSONResponse(r)
+
+
+async def playback_queue_list(request):
+    return JSONResponse(await run_in_threadpool(native_bridge.playback_queue_list))
+
+
+async def playback_queue_play(request):
+    d = await _body(request)
+    r = await run_in_threadpool(native_bridge.playback_queue_play, int(d.get('index') or 0))
     return JSONResponse(r)
 
 
@@ -165,6 +178,8 @@ routes = [
     Route('/api/playback/meta', playback_meta, methods=['POST']),
     Route('/api/playback/state', playback_state, methods=['GET']),
     Route('/api/playback/spectrum', playback_spectrum, methods=['GET']),
+    Route('/api/playback/queue/list', playback_queue_list, methods=['GET']),
+    Route('/api/playback/queue/play', playback_queue_play, methods=['POST']),
     Route('/api/playback/queue', playback_queue, methods=['POST']),
     Route('/api/playback/volume', playback_volume, methods=['POST']),
     Route('/api/playback/mode', playback_mode, methods=['POST']),

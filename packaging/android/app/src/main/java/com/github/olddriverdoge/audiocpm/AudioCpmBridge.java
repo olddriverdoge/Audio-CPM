@@ -447,6 +447,48 @@ public class AudioCpmBridge {
         return ok ? "{\"ok\":true}" : "{\"ok\":false,\"error\":\"playback unavailable\"}";
     }
 
+    public static String queueList() {
+        try {
+            ExoPlayer p = PlaybackService.getPlayer();
+            if (p == null) return "{\"ok\":false,\"error\":\"not playing\"}";
+            Object[] snap = onMain(() -> {
+                int n = p.getMediaItemCount();
+                String[] paths = new String[n];
+                for (int i = 0; i < n; i++) {
+                    try {
+                        MediaItem mi = p.getMediaItemAt(i);
+                        paths[i] = (mi != null && mi.localConfiguration != null
+                                && mi.localConfiguration.uri != null)
+                                ? String.valueOf(mi.localConfiguration.uri.getPath()) : "";
+                    } catch (Throwable ignored) { paths[i] = ""; }
+                }
+                return new Object[]{p.getCurrentMediaItemIndex(), paths};
+            }, null);
+            if (snap == null) return "{\"ok\":false,\"error\":\"queue timeout\"}";
+            int idx = (Integer) snap[0];
+            String[] paths = (String[]) snap[1];
+            StringBuilder sb = new StringBuilder(256 + paths.length * 64);
+            sb.append("{\"ok\":true,\"index\":").append(idx).append(",\"paths\":[");
+            for (int i = 0; i < paths.length; i++) {
+                if (i > 0) sb.append(',');
+                sb.append('"').append(esc(paths[i])).append('"');
+            }
+            sb.append("]}");
+            return sb.toString();
+        } catch (Throwable t) {
+            return "{\"ok\":false,\"error\":\"" + esc(String.valueOf(t)) + "\"}";
+        }
+    }
+
+    public static String queuePlay(int index) {
+        return simpleVoid(() -> {
+            ExoPlayer p = PlaybackService.getPlayer();
+            if (p == null) throw new IllegalStateException("not playing");
+            p.seekToMediaItem(Math.max(0, index));
+            p.play();
+        });
+    }
+
     public static String state() {
         try {
             ExoPlayer p = PlaybackService.getPlayer();

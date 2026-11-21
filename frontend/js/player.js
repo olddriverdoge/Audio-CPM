@@ -27,6 +27,8 @@ const Player = (() => {
   let seeking = false;
   let hifi = false, hifiPlaying = false, hifiPos = 0, hifiDur = 0, hifiTimer = 0;
   let hifiEndedPath = '';
+  /* 原生 ExoPlayer 队列（浮窗里选曲用；主页面仍以当前目录为队列） */
+  let remoteQueue = [], remoteIndex = 0, remoteQueueTimer = 0;
   /* 点击文件行时带了比例但时长未知：等原生返回 durationMs 后补一次 seek */
   let pendingRatio = 0;
   let reportedError = '';
@@ -53,7 +55,10 @@ const Player = (() => {
       return !!(r && r.caps && r.caps.indexOf('hifi_play') >= 0);
     } catch (_) { return false; }
   }
-  function stopHifiPoll() { if (hifiTimer) { clearInterval(hifiTimer); hifiTimer = 0; } }
+  function stopHifiPoll() {
+    if (hifiTimer) { clearInterval(hifiTimer); hifiTimer = 0; }
+    if (remoteQueueTimer) { clearInterval(remoteQueueTimer); remoteQueueTimer = 0; }
+  }
   /** 原生播放器切歌后，把界面同步到新曲目（不重新发起播放）。 */
   function adoptNative(p) {
     if (!p || p === cur) return;
@@ -69,11 +74,25 @@ const Player = (() => {
     setCover(p);
     setWave(p);
     paintRows();
-    try { if (typeof App !== 'undefined' && App.onPlayed) App.onPlayed(p); } catch (_) {}
+    try { if (typeof App !== 'undefined' && App.onPlayed) App.onPlayed(p, {quiet: !!window.__AC2_FLOAT_MODE}); } catch (_) {}
+  }
+
+  async function refreshRemoteQueue() {
+    try {
+      const q = await Api.playbackQueueList();
+      if (q && q.ok && Array.isArray(q.paths)) {
+        remoteQueue = q.paths.slice();
+        remoteIndex = Number(q.index) || 0;
+      }
+    } catch (_) {}
   }
 
   function startHifiPoll() {
     stopHifiPoll();
+    if (!remoteQueueTimer) {
+      refreshRemoteQueue();
+      remoteQueueTimer = setInterval(refreshRemoteQueue, 4000);
+    }
     hifiTimer = setInterval(async () => {
       if (!hifi) return;
       try {
@@ -477,12 +496,26 @@ const Player = (() => {
       hifiDur = Number(s.durationMs) || 0;
       if (cur !== ref) { cur = null; adoptNative(ref); }
       startHifiPoll();
+      await refreshRemoteQueue();
       setToggle(hifiPlaying);
       if (hifiDur > 0) { seek.max = String(hifiDur / 1000); durEl.textContent = fmt(hifiDur / 1000); }
       seek.value = String(hifiPos / 1000);
       curEl.textContent = fmt(hifiPos / 1000);
       return true;
     } catch (_) { return false; }
+  }
+
+  async function playQueueIndex(i) {
+    const idx = Number(i);
+    if (!isFinite(idx) || idx < 0) return;
+    try {
+      await Api.playbackQueuePlay(idx);
+      remoteIndex = idx;
+      const path = remoteQueue[idx];
+      if (path) { cur = null; adoptNative('local:' + path); }
+      hifiPlaying = true;
+      setToggle(true);
+    } catch (_) {}
   }
 
   function toggle() {
@@ -600,6 +633,8 @@ const Player = (() => {
   }, 2000);
 
   return {open, toggle, pause, close, external, syncBar, paintRows, pct, seekRatio, onMeta, hydrateNative,
+          refreshRemoteQueue, playQueueIndex,
+          queueList: () => remoteQueue.slice(), get remoteIndex() { return remoteIndex; },
           position: positionSec, duration: durationSec, isPlaying, getVolume, setVolume, seekSec, replay,
           hifiActive: () => hifi, hifiPlaying: () => hifiPlaying,
           get current() { return cur; },

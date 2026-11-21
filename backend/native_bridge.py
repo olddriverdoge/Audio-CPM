@@ -8,6 +8,7 @@ Java: com.github.olddriverdoge.audiocpm.AudioCpmBridge
 import json
 import logging
 import os
+import time
 
 logger = logging.getLogger('ac2.native')
 
@@ -65,6 +66,8 @@ def register() -> bool:
             'state': lambda: _call('state'),
             'spectrum': lambda: _call('spectrum'),
             'queue': lambda paths, idx, ms: _call('setQueue', list(paths), int(idx or 0), int(ms or 0)),
+            'queue_list': lambda: _call('queueList'),
+            'queue_play': lambda idx: _call('queuePlay', int(idx or 0)),
             'spectrum_enabled': lambda b: Bridge.setSpectrumEnabled(bool(b)),
             'volume': lambda v: _call('setVolume', float(v)),
             'mode': lambda rep, sh: _call('setMode', int(rep), bool(sh)),
@@ -231,12 +234,57 @@ def playback_state():
         return {'ok': False, 'error': str(e)[:300]}
 
 
-def playback_spectrum(enabled=None):
-    if not _playback:
+# 原生 FFT 是进程级开关：主页面切后台会 setEnabled(False)，会把浮窗里的声谱
+# 一起关掉。浮窗每次取数带 lease=1 续约，租约期间忽略其它页面的关闭请求；
+# 租约过期后自动关掉 FFT，避免浮窗关掉后还一直占用 CPU。
+_spectrum_lease_until = 0.0
+_spectrum_lease_on = False
+
+
+def playback_queue_list():
+    if not _playback or 'queue_list' not in _playback:
         return {'ok': False, 'error': 'not_supported'}
     try:
+        return _playback['queue_list']()
+    except Exception as e:
+        return {'ok': False, 'error': str(e)[:300]}
+
+
+def playback_queue_play(index):
+    if not _playback or 'queue_play' not in _playback:
+        return {'ok': False, 'error': 'not_supported'}
+    try:
+        return _playback['queue_play'](index)
+    except Exception as e:
+        return {'ok': False, 'error': str(e)[:300]}
+
+
+def playback_spectrum(enabled=None, lease=False, release=False):
+    if not _playback:
+        return {'ok': False, 'error': 'not_supported'}
+    global _spectrum_lease_until, _spectrum_lease_on
+    try:
+        now = time.time()
+        if release:
+            _spectrum_lease_until = 0.0
+            _spectrum_lease_on = False
+            _playback['spectrum_enabled'](False)
+            return _playback['spectrum']()
+        if lease:
+            _spectrum_lease_until = now + 6.0
+            if not _spectrum_lease_on:
+                _playback['spectrum_enabled'](True)
+                _spectrum_lease_on = True
+            return _playback['spectrum']()
+        if _spectrum_lease_on and now >= _spectrum_lease_until:
+            _spectrum_lease_on = False
+            _playback['spectrum_enabled'](False)
         if enabled is not None:
-            _playback['spectrum_enabled'](enabled)
+            # 浮窗还在取数时，不接受主页面“切后台就关 FFT”的请求。
+            if enabled is False and now < _spectrum_lease_until:
+                pass
+            else:
+                _playback['spectrum_enabled'](enabled)
         return _playback['spectrum']()
     except Exception as e:
         return {'ok': False, 'error': str(e)[:300]}
