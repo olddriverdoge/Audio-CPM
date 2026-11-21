@@ -408,8 +408,26 @@ const WinMgr = (() => {
   function reclampAll(force) {
     regs.forEach(r => { try { (force && r.fit) ? r.fit() : r.refresh(); } catch (_) {} });
   }
-  /* 转屏：立即 + 120ms + 350ms 三次，避开 WebView 视口尺寸滞后的窗口期 */
-  function onRotate() { reclampAll(true); setTimeout(() => reclampAll(true), 120); setTimeout(() => reclampAll(true), 350); }
+  /* 转屏：立即 + 120ms + 350ms 三次，避开 WebView 视口尺寸滞后的窗口期。
+     但 Android 后台切回/地址栏收起时 WebView 会先报一个明显偏小的视口，
+     这时如果按它 fit() 就会把用户调好的窗口压小并写回存储，回来后就
+     像是“尺寸被改回默认”。所以只接受稳定、非瞬时的视口尺寸。 */
+  let stableVP = {w: window.innerWidth, h: window.innerHeight, at: 0};
+  function vpTrusted() {
+    const w = window.innerWidth, h = window.innerHeight;
+    if (!stableVP.w || !stableVP.h) { stableVP = {w: w, h: h, at: Date.now()}; return true; }
+    // 同一方向下的骤然缩小（< 72% 宽或 < 60% 高）判为瞬时抖动，不重算。
+    const sameOrient = (w > h) === (stableVP.w > stableVP.h);
+    if (sameOrient && (w < stableVP.w * 0.72 || h < stableVP.h * 0.6)) return false;
+    if (Math.abs(w - stableVP.w) > 2 || Math.abs(h - stableVP.h) > 2) {
+      stableVP = {w: w, h: h, at: Date.now()};
+    }
+    return true;
+  }
+  function onRotate() {
+    const run = () => { if (vpTrusted()) reclampAll(true); };
+    run(); setTimeout(run, 120); setTimeout(run, 350);
+  }
   window.addEventListener('resize', onRotate);
   window.addEventListener('orientationchange', onRotate);
   if (window.visualViewport) window.visualViewport.addEventListener('resize', onRotate);

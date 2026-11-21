@@ -803,20 +803,57 @@ class UiRegression:
             size1 = self.page.evaluate("() => { const r = document.querySelector('#play-float').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }")
             self.require(size1 == size0, f"play window size changed after idle dim: {size0} -> {size1}")
             self.require(self.page.locator("#pf-idle-guard").is_visible(), "idle guard not visible")
-            # 淡出时控件整块隐藏，只剩谱面：第一次点击落在画布上只唤醒，不触发任何按钮。
-            cur_before = self.page.evaluate("Player.current")
-            box = self.page.locator("#play-float").bounding_box()
-            self.require(box and box["width"] > 0, f"play window box: {box}")
-            self.page.mouse.click(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+            # 其它模块交互不打断淡出：往浏览窗口派发 pointerdown，播放管理必须
+            # 仍然处于淡化锁定；只有打进播放管理内部才唤醒。
+            self.page.evaluate("() => App.openModule('browse')")
+            self.page.wait_for_timeout(300)
+            self.require(self.page.evaluate("""() => {
+              const b = document.querySelector('#fw-browse');
+              const ev = new PointerEvent('pointerdown', {bubbles: true, cancelable: true});
+              b.dispatchEvent(ev);
+              return document.querySelector('#play-float').classList.contains('pf-idle-dim');
+            }"""), "interacting with another module woke the play manager")
+            self.require(self.page.evaluate("""() => {
+              const w = document.querySelector('#play-float');
+              w.dispatchEvent(new PointerEvent('pointerdown', {bubbles: true, cancelable: true}));
+              return !w.classList.contains('pf-idle-dim');
+            }"""), "pointerdown inside the play manager did not wake it")
+            # 淡出时控件整块隐藏，只剩谱面；唤醒后不触发任何按钮。
             self.page.wait_for_timeout(450)
             self.require(not self.page.evaluate("document.querySelector('#play-float').classList.contains('pf-idle-dim')"),
-                         "click did not restore play manager")
-            self.require(self.page.evaluate("Player.current") == cur_before, "first click activated a locked control")
+                         "wake did not restore play manager")
             self.require(self.page.locator("#pf-idle-guard").is_visible() is False, "idle guard stayed visible")
             self.require(self.page.evaluate("Spectrum.bare") is False, "spectrum axes were not restored on wake")
             op = self.page.evaluate("getComputedStyle(document.querySelector('#pf-head')).opacity")
             self.require(float(op) >= 0.9, f"play manager did not restore opacity: {op}")
-            return "10s idle: only spectrum data, no axes/grid; click wake restores chrome"
+
+            # 顶部不再展示曲目文件名
+            self.require(self.page.evaluate("document.querySelectorAll('#pf-track').length") == 0,
+                         "play manager header still shows the track name")
+
+            # 尺寸不被自适应改回默认：转屏抖动 / fitCurrent 都不应覆盖用户尺寸；
+            # 关掉再打开也应保持。
+            self.page.evaluate("""() => {
+              const c = WinMgr.find(document.querySelector('#play-float'));
+              c.place({x: 24, y: 110, w: 340, h: 520}, true);
+            }""")
+            self.page.wait_for_timeout(200)
+            keep = [340, 520]
+            cur = self.page.evaluate("() => { const r = document.querySelector('#play-float').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }")
+            self.require(cur == keep, f"place did not stick: {cur}")
+            self.page.evaluate("() => window.dispatchEvent(new Event('resize'))")
+            self.page.wait_for_timeout(700)
+            self.page.evaluate("() => SceneStore.fitCurrent()")
+            self.page.wait_for_timeout(300)
+            cur = self.page.evaluate("() => { const r = document.querySelector('#play-float').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }")
+            self.require(cur == keep, f"adaptive layout reset the window size: {keep} -> {cur}")
+            self.page.evaluate("() => App.openModule('play')")   # 关闭
+            self.page.wait_for_timeout(300)
+            self.page.evaluate("() => App.openModule('play')")   # 重新打开
+            self.page.wait_for_timeout(400)
+            cur = self.page.evaluate("() => { const r = document.querySelector('#play-float').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }")
+            self.require(cur == keep, f"reopening the window lost the user size: {keep} -> {cur}")
+            return "10s idle: only spectrum data, no axes/grid; outside clicks keep dim; size survives reopen"
         self.check("play manager 10s idle dim and lock", idle_dim)
 
         def gain_panel():

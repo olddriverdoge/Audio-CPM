@@ -211,9 +211,19 @@ const SceneStore = (() => {
     }
     modulesOf(s).forEach(m => setTimeout(() => App.openModule(m), 0));
     setTimeout(render, 80);
-    // 窗口刚打开时 WinMgr 会按模块 minH 夹一次；自适应布局允许更矮的
-    // 窗口，所以再落一次位，确保小屏/横屏的窗口不会互相压住或跑出视口。
-    if (fitted !== s) setTimeout(() => { try { fitCurrent(); } catch (_) {} }, 180);
+    // 只有用户自己的场景（或已覆盖过的内置场景）才落它保存的几何。
+    // 内置场景的默认定义永远不能覆盖用户历史尺寸，也不再调用 fitCurrent
+    // 去“重排所有窗口”，否则刚打开就会把用户调好的大小改回默认。
+    if (userGeometry && fitted !== s) {
+      setTimeout(() => {
+        Object.keys(fitted.geo || {}).forEach(id => {
+          const g = fitted.geo[id];
+          const el = document.getElementById(id);
+          const ctl = el && WinMgr.find(el);
+          if (ctl && ctl.place) ctl.place({x: g.x, y: g.y, w: g.w * (fitted.uiScale || 1), h: g.h * (fitted.uiScale || 1)}, true);
+        });
+      }, 180);
+    }
   }
 
   function closeSave() {
@@ -315,53 +325,87 @@ const SceneStore = (() => {
   /* 转屏/窗口宽高比例变化：把当前已打开场景按新方向重排，避免横屏时
      只在纵向等比缩小。用户手动拖动后的自由布局仍然保留，直到下一次转屏。 */
   let lastLandscape = null;
-  function fitCurrent() {
+  /* 以“当前实际窗口几何”为源做自适应，而不是拿回场景里保存的旧几何：
+     视口变化只允许把跑出屏幕的窗口收回、或真正转屏时重排，
+     绝不把用户调过的尺寸/位置覆盖成场景默认值。 */
+  function fitCurrent(opts) {
+    const force = !!(opts && opts.force);
     if (typeof Adaptive === 'undefined' || typeof WinMgr === 'undefined') return false;
     const mods = (App.openModules ? App.openModules() : []);
     if (!mods.length) return false;
-    let s = all().filter(x => {
-      const m = modulesOf(x);
-      return m.length === mods.length && m.every(k => mods.indexOf(k) >= 0);
-    })[0];
-    if (!s) {
-      // 用户额外开了模块（当前布局不属于任何已保存场景）时，也要按当前
-      // 所有浮窗重排，不能让多出来的窗口留在旧方向的坐标里。
-      s = {
-        modules: mods,
-        geo: snapshotGeo(mods),
-        uiScale: (App.currentUiScale ? App.currentUiScale() : 1),
-        viewport: Adaptive.inferViewport(snapshotGeo(mods))
-      };
+    const vp = Adaptive.currentViewport();
+    /* 真正转屏且横屏时才按左右分列重排；其余情况只把跑出可视区的窗口
+       收回来，绝不因为窗口之间正常重叠/顺序而重排成默认尺寸。 */
+    if (force && Adaptive.isLandscape(vp)) {
+      const live = snapshotGeo(mods);
+      if (!Object.keys(live).length) return false;
+      const fitted = Adaptive.fitScene({modules: mods, geo: live,
+        uiScale: (App.currentUiScale ? App.currentUiScale() : 1)}, vp, {force: true});
+      const z = Number(fitted.uiScale) || 1;
+      if (App.commitUiScale) { try { App.commitUiScale(z); } catch (_) {} }
+      Object.keys(fitted.geo || {}).forEach(id => {
+        const g = fitted.geo[id];
+        const el = document.getElementById(id);
+        const ctl = el && WinMgr.find(el);
+        if (ctl && ctl.place) ctl.place({x: g.x, y: g.y, w: g.w * z, h: g.h * z}, true);
+      });
+      return true;
     }
-    const fitted = Adaptive.fitScene(s, s.viewport || null, {force: true});
-    if (!fitted || !fitted.geo) return false;
-    const z = Number(fitted.uiScale) || 1;
-    if (App.commitUiScale) { try { App.commitUiScale(z); } catch (_) {} }
-    if (fitted.canvas && App.setCanvasPan) { try { App.setCanvasPan(fitted.canvas.x, fitted.canvas.y, true); } catch (_) {} }
-    Object.keys(fitted.geo).forEach(id => {
-      const g = fitted.geo[id];
-      const el = document.getElementById(id);
-      const ctl = el && WinMgr.find(el);
-      if (ctl && ctl.place) {
-        ctl.place({x: g.x, y: g.y, w: g.w * z, h: g.h * z}, true);
+    let changed = false;
+    mods.forEach(m => {
+      const id = WIN[m];
+      const el = id && document.getElementById(id);
+      if (!el || el.classList.contains('hidden')) return;
+      const ctl = WinMgr.find(el);
+      if (!ctl || !ctl.rect) return;
+      const cur = Object.assign({}, ctl.rect);
+      const maxW = Math.max(120, vp.right - vp.left);
+      const maxH = Math.max(120, vp.bottom - vp.top);
+      let w = cur.w, h = cur.h;
+      // 只在明显超出可用区（>110%）时才压缩，避免普通抖动把尺寸改小。
+      if (w > maxW * 1.1) w = maxW;
+      if (h > maxH * 1.1) h = maxH;
+      w = Math.min(w, maxW); h = Math.min(h, maxH);
+      const x = Math.max(vp.left, Math.min(cur.x, vp.right - w));
+      const y = Math.max(vp.top, Math.min(cur.y, vp.bottom - h));
+      if (Math.abs(w - cur.w) > 2 || Math.abs(h - cur.h) > 2
+          || Math.abs(x - cur.x) > 2 || Math.abs(y - cur.y) > 2) {
+        ctl.place({x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h)}, true);
+        changed = true;
       }
     });
-    return true;
+    return changed;
   }
   function watchOrientation() {
     if (typeof Adaptive === 'undefined') return;
     lastLandscape = Adaptive.isLandscape();
+    let w0 = window.innerWidth, h0 = window.innerHeight, pending = 0;
+    /* 只有窗口的宽高真的发生了方向性变化（长边/短边互换）才重排；
+       Android 上状态栏/地址栏/播放条出现带来的几十像素抖动不算转屏，
+       否则会把用户调好的窗口尺寸一遍遍改回场景默认值。 */
+    const realFlip = () => {
+      const w = window.innerWidth, h = window.innerHeight;
+      const crossed = (w > h) !== (w0 > h0);
+      const swapped = Math.abs(w - h0) < 120 && Math.abs(h - w0) < 120;
+      const delta = Math.abs(w - w0) > 80 || Math.abs(h - h0) > 80;
+      return (crossed || swapped) && delta;
+    };
     const check = () => {
-      const now = Adaptive.isLandscape();
-      if (now === lastLandscape) return;
-      lastLandscape = now;
-      setTimeout(fitCurrent, 180);
-      setTimeout(fitCurrent, 500);
+      if (pending) { clearTimeout(pending); pending = 0; }
+      pending = setTimeout(() => {
+        pending = 0;
+        const now = Adaptive.isLandscape();
+        if (!realFlip() || now === lastLandscape) return;
+        lastLandscape = now;
+        w0 = window.innerWidth; h0 = window.innerHeight;
+        setTimeout(() => fitCurrent({force: true}), 180);
+        setTimeout(() => fitCurrent({force: true}), 500);
+      }, 150);
     };
     window.addEventListener('resize', check);
     window.addEventListener('orientationchange', () => {
-      lastLandscape = !Adaptive.isLandscape();
-      setTimeout(check, 120);
+      setTimeout(() => { w0 = window.innerWidth; h0 = window.innerHeight; }, 120);
+      setTimeout(check, 150);
     });
   }
 

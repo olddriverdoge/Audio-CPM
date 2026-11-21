@@ -8,7 +8,7 @@ function createPlayPanel() {
   const win = document.getElementById('play-float');
   const titleEl = document.getElementById('pf-title');
   const subEl = document.getElementById('pf-sub');
-  const trackEl = document.getElementById('pf-track');
+  const trackEl = document.getElementById('pf-track');   // 顶部不再展示文件名（可为空）
   const coverBox = document.getElementById('pf-cover');
   const coverImg = document.getElementById('pf-cover-img');
   const bgEl = document.getElementById('pf-bg');
@@ -148,7 +148,7 @@ function createPlayPanel() {
     titleEl.textContent = (rawTitle === '未在播放') ? tr('未在播放') : rawTitle;
     const sub = [m.artist, m.composer, m.album].filter(Boolean).join(' · ');
     subEl.textContent = sub || (Player.current ? '' : tr('从文件浏览里点一首开始'));
-    trackEl.textContent = Player.current ? Utils.basename(Player.current) : tr('未在播放');
+    if (trackEl) trackEl.textContent = Player.current ? Utils.basename(Player.current) : tr('未在播放');
     const p = Player.current || '';
     if (p && p.indexOf('dav:') !== 0) {
       if (p !== coverPath && p !== coverFailed) {
@@ -564,26 +564,30 @@ function createPlayPanel() {
 
   /* 只有播放管理内部的第一次操作会重置 10 秒倒计时；如果是淡化锁定状态，
      任意一次点击/滑动都只负责唤醒，并吞掉本次 click，避免误触按钮。 */
+  /* 只有播放管理内部的交互才唤醒/重置倒计时；其它模块的操作完全放行，
+     不会打断淡出，也不会被吞事件。 */
   document.addEventListener('pointerdown', e => {
+    if (!win.contains(e.target)) return;
     if (idleDimmed) {
       e.preventDefault();
       e.stopPropagation();
       wakeFromIdle();
       return;
     }
-    if (win.contains(e.target)) armIdleTimer();
+    armIdleTimer();
   }, true);
   document.addEventListener('keydown', e => {
+    if (!win.contains(e.target)) return;
     if (idleDimmed) {
       e.preventDefault();
       e.stopPropagation();
       wakeFromIdle();
       return;
     }
-    if (win.contains(e.target)) armIdleTimer();
+    armIdleTimer();
   }, true);
   document.addEventListener('click', e => {
-    if (Date.now() < wakeSuppressUntil) {
+    if (Date.now() < wakeSuppressUntil && win.contains(e.target)) {
       e.preventDefault();
       e.stopPropagation();
     }
