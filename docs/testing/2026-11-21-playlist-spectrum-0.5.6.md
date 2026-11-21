@@ -100,3 +100,7 @@ SHA256 `2698be8622f07ab8d8ad3cd4b6276749b20e0cdaa06fb79da962eb048e76ac74`，
 
 - 去掉 `#pf-track` 后 `.mf-head` 里没有可伸缩元素，`—` 按钮贴左：给 `.play-float .mf-title` 加 `flex:1 1 auto`、`#pf-min` 加 `margin-left:auto`，并加 UI 断言（按钮右边缘距头部右边缘 ≤10px、宽度 ≥18px）。
 - 版本号按 `0.0.1` 递增：`versionName 0.5.7` / `versionCode 87`（`packaging/android/app/build.gradle.kts`、README 同步）。后续每次出包都递增 0.0.1。
+
+构建（run `44903169121`，提交 `3897fd1`）：`Audio-CPM-0.5.7-87-dev.apk`，22,605,168 字节，
+SHA256 `ae6ef03d49c601d4c52000fdc5281ff1799d9ab918eaa2df822618260d613a07`，
+下载 https://aka.doubaocdn.com/s/zZMxOFAS9n 。
