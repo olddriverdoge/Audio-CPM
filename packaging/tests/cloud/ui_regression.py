@@ -513,6 +513,15 @@ class UiRegression:
             }""")
             self.page.wait_for_timeout(200)
             size0 = self.page.evaluate("() => { const r = document.querySelector('#play-float').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }")
+            # 顶部不再有曲目名，收起按钮必须贴右
+            boxes = self.page.evaluate("""() => {
+              const h = document.querySelector('#pf-head').getBoundingClientRect();
+              const b = document.querySelector('#pf-min').getBoundingClientRect();
+              return {headRight: h.right, btnRight: b.right, btnLeft: b.left, headLeft: h.left};
+            }""")
+            self.require(boxes["headRight"] - boxes["btnRight"] <= 10
+                         and boxes["btnRight"] - boxes["btnLeft"] >= 18,
+                         f"minimize button is not right-aligned: {boxes}")
             sp_before = self.page.evaluate("document.querySelector('#spectrum-float').classList.contains('hidden')")
             self.page.locator(f'#pf-queue .pf-q[data-path="{self.fx["ui_track1"]}"]').click()
             self.page.wait_for_timeout(500)

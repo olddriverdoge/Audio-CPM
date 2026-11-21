@@ -95,3 +95,8 @@ A/B 验证（同一条用例，只回退上面两条落盘改动）：缩放后�
 构建（run `44874288259`，提交 `11c7c23`）：`Audio-CPM-0.5.6-86-dev-zoomsize.apk`，22,604,964 字节，
 SHA256 `2698be8622f07ab8d8ad3cd4b6276749b20e0cdaa06fb79da962eb048e76ac74`，
 下载 https://aka.doubaocdn.com/s/weEn7Batgt 。
+
+## 第 20 轮：顶部按钮靠右 + 版本号 0.5.7（提交 `b1096ee`）
+
+- 去掉 `#pf-track` 后 `.mf-head` 里没有可伸缩元素，`—` 按钮贴左：给 `.play-float .mf-title` 加 `flex:1 1 auto`、`#pf-min` 加 `margin-left:auto`，并加 UI 断言（按钮右边缘距头部右边缘 ≤10px、宽度 ≥18px）。
+- 版本号按 `0.0.1` 递增：`versionName 0.5.7` / `versionCode 87`（`packaging/android/app/build.gradle.kts`、README 同步）。后续每次出包都递增 0.0.1。

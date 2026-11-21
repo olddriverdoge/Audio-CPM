@@ -112,6 +112,9 @@
       rgba(8,13,19,.16) 100%)}
   .pf-body{flex:1 1 auto;display:flex;flex-direction:column;gap:8px;padding:8px 10px;overflow:hidden;position:relative}
   .pf-now{display:flex;gap:10px;align-items:center;min-height:56px}
+  /* 顶部曲目名已移除：标题占满剩余宽度，收起按钮才能靠右 */
+  .play-float .mf-title{flex:1 1 auto;min-width:0}
+  .play-float #pf-min{margin-left:auto;flex:0 0 auto}
   /* 播放管理左上角不再显示封面缩略图；封面只作为背景使用 */
   .pf-now .pf-cover{display:none}
   .pf-cover{width:56px;height:56px;border-radius:8px;flex:0 0 auto;overflow:hidden;
