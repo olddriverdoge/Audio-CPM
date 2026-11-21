@@ -48,51 +48,11 @@ GitHub Actions 使用默认 `main_package=false`；构建产物包名应为
 
 ## 构建结果
 
-- 提交：`1602625`（`fix: remove embedded spectrum veil (blur + full-window scrim) (0.5.6)`）
-- GitHub Actions：run `44858355181`，`main_package=false`、`build_release=false`，success
-- 产物：`Audio-CPM-0.5.6-86-dev-nofog.apk`（测试包，包名 `com.github.olddriverdoge.audiocpm.dev`）
+- 提交：`2bbc1a3`（`feat: drop standalone spectrum module, bare idle visuals, hide meta cover (0.5.6)`）
+- GitHub Actions：run `44860030917`，`main_package=false`、`build_release=false`，success
+- 产物：`Audio-CPM-0.5.6-86-dev-bare.apk`（测试包 `com.github.olddriverdoge.audiocpm.dev`）
   - 0.5.6 / versionCode 86
-  - 大小 22,602,544 字节
-  - SHA256 `8c8416cc8841d782adaedf75ccae73eaf4e3545dacf54a738876af4743bdde7b`
-  - 下载：https://aka.doubaocdn.com/s/NjdImL77I7
+  - 大小 22,602,844 字节
+  - SHA256 `5de422cef2e51ee11ff99abe57677ee7aa2c70e27b807d77034ac09ba94450f1`
+  - 下载：https://aka.doubaocdn.com/s/SUy8kGCU8N
 - 回归：API 50/50 + UI 37/37 = 87/87
-
-## 10 秒淡出后仍有"遮罩"的修正
-
-现象：播放管理 10 秒无操作降到 10% 后，控件淡了，画面上仍留着整片暗色，标题区封面清晰、内部发灰。
-
-原因：淡出只作用于控件元素（`#pf-head`、`.pf-now`、`.pf-transport` 等）的 `opacity`，而**铺底层不在淡出名单里**：`.pf-body` 的控件底色、`.mf-head` 的底色、`.play-float::after` 的全窗渐变都还是满强度。控件变淡后剩下的就是那几层颜色，看起来就是一层灰。
-
-改动：`.pf-idle-dim` 状态下把 `.pf-body` 与 `.mf-head` 的背景置 none，`::after` 设 `display:none`，只剩封面。
-
-量化（内嵌声谱 + 条纹封面，控件区 350×200 采样）：
-
-| 状态 | 均值 RGB | 水平梯度 |
-| --- | --- | --- |
-| 修正前淡出 | 77.8 / 71.9 / 75.6 | 40.7 |
-| 修正后淡出 | 158.7 / 139.6 / 140.6 | 88.0 |
-| 声谱区（参照） | 160.9 / 141.2 / 142.2 | 91.2 |
-
-修正后控件区与声谱区亮度、梯度基本一致，说明画面上只剩封面、没有任何附加层。
-
-回归：API 50/50 + UI 37/37 = 87/87（`/tmp/ac2_round13.json`），新增三条断言：淡出后 `.pf-body`、`.mf-head` 不得有背景，`::after` 不得绘制。
-
-## 独立频谱/声谱模块下线 + 淡出只留谱面
-
-需求来源：内嵌形态已经足够，独立浮窗成为冗余入口；10 秒淡出后又凹"控件全透明、只留数据"。
-
-改动：
-
-1. 独立模块下线
-   - 删除 `#sf-fab` 入口按钮、`#sf-head`（模式 tab / 曲目名 / 收起）、`#sf-resize` 缩放角；`#spectrum-float` 只剩宿主容器与 canvas。
-   - 去掉 `MODULE_REGISTRY.spectrum`、`WinMgr.register({'spectrum-float'})`、`openModule('spectrum')`；`Spectrum.toggle()`、`applyPos/applySize`、位置/尺寸记忆一并删除。
-   - 起播自动展示改为：`openModule('play')` + `playPanel.showSpectrum('waterfall')`（收起列表、展开声谱区、指定模式）。
-   - 前端↔后端：`/api/playback/spectrum` 保留——它是内嵌声谱的取数口，不是独立模块专属；独立模块专属的接线（位置/尺寸状态、fab 停靠、窗口注册）已全部移除。
-2. 淡出后只留数据
-   - 新增 `Spectrum.setBare(on)`：`bare` 时不画坐标轴、刻度文字、时间网格、边框，绘图区留白归零。
-   - 淡出时 `--bare` 与布局联动：标题栏、`.pf-now`、进度行、按钮行、列表行、声谱标题行全部 `display:none`，画布满铺整个窗口（实测画布 372×482 / 窗口 374×484）。
-   - 淡出时谱面本身降到 50%：`#spectrum-float.is-embedded canvas{opacity:.5}`。
-3. 元数据不再重复展示封面
-   - 播放管理可见时 `body.play-open`，`#meta3` 里的封面标题、封面图、封面操作一并隐藏。
-
-回归：API 50/50 + UI 37/37 = 87/87（`/tmp/ac2_round15.json`），`console_errors=[]`、`page_errors=[]`。
