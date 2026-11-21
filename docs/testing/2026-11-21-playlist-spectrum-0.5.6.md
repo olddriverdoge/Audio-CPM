@@ -68,3 +68,5 @@ GitHub Actions 使用默认 `main_package=false`；构建产物包名应为
 | 尺寸会被自动改回默认（首次起播、后台切回） | ① `SceneStore.apply` 打开内置场景后再跑一次 `fitCurrent()`，用**场景保存的旧几何**覆盖刚恢复的窗口；② `fitCurrent()` 以场景 geo 为源 + `force:true`，只要窗口间有点重叠就 `arrangePortrait/Landscape` 重排成默认尺寸；③ 转屏监听只看 `isLandscape()`，播放条/地址栏造成的几十像素抖动也会被当成转屏；④ WinMgr 的 `onRotate` 直接按 WebView 瞬时缩小的视口 `fit()`，把窗口压小并写回存储 | ① 内置场景默认定义不再触发重排；只有用户自己的场景才按保存几何落位；② `fitCurrent()` 改为**以当前实际几何为源**，非真转屏时只把跑出可视区的窗口收回（超出 >110% 才压缩），不再按重叠重排；③ 转屏判断要求宽高真正换向（长短边互换且差值 >80px）并 150ms 防抖；④ `onRotate` 增加稳定视口守卫，同方向骤然缩小（<72% 宽 / <60% 高）视为瞬时抖动不重算 |
 
 回归新增断言：`#pf-track` 不存在；淡出期间向 `#fw-browse` 派发 pointerdown 仍保持 `pf-idle-dim`，派发到 `#play-float` 才唤醒；窗口落到 340×520 后触发 `resize` + `SceneStore.fitCurrent()` 尺寸不变，关闭再打开仍为 340×520。结果 API 50/50 + UI 37/37 = 87/87。
+
+构建（run `44862875716`，提交 `947ef85`，`main_package=false` / `build_release=false`）：`Audio-CPM-0.5.6-86-dev-sizefix.apk`，22,604,448 字节，SHA256 `a9bb3a35bc071725d202bedcd474310fb075d8aeaac8bde3561a0e300687df62`，下载 https://aka.doubaocdn.com/s/DfVzJRbcmX 。
