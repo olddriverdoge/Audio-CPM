@@ -48,12 +48,12 @@ GitHub Actions 使用默认 `main_package=false`；构建产物包名应为
 
 ## 构建结果
 
-- 推送提交：`c3fb910`（`fix: scene row update and transparent spectrum backdrop (0.5.6)`）
-- GitHub Actions：run `44854853487`，`main_package=false`、`build_release=false`，结论 success
-- 产物：`Audio-CPM-0.5.6-86-dev-scene-spectrum.apk`（测试包）
+- 推送提交：`e2c8b0c`（`fix: transparent waterfall silence pixels (0.5.6)`）
+- GitHub Actions：run `44856253625`，`main_package=false`、`build_release=false`，结论 success
+- 产物：`Audio-CPM-0.5.6-86-dev-alpha.apk`（测试包）
   - 包名 `com.github.olddriverdoge.audiocpm.dev`（分支构建自动加 `.dev`）
   - versionName 0.5.6 / versionCode 86
-  - 大小 22,602,148 字节
-  - SHA256 `9d9f86a4c83d8be65ee093d686c282b7fe8c666d2135d683bebf69ce52ee623d`
-  - 下载：https://aka.doubaocdn.com/s/0eHV2vFSnq
-- 包内确认：`playpanel.js`、`spectrum.js`、`scene_store.js`、`workbench.css`、`overlays.css` 均包含本轮场景行更新、文件夹封面回退、透明声谱与轻遮罩改动。
+  - 大小 22,602,100 字节
+  - SHA256 `9fa74042535a3b22b464b1afb5b5743fca6ec2ba4cc7bd7b1f7d31e94f03a0ef`
+  - 下载：https://aka.doubaocdn.com/s/JSfHN6vudN
+- 包内确认：`spectrum.js` 含逐像素 alpha 渐变，静音行不再写 alpha=255 的纯黑；测试含全零原生帧的绘图区 alpha 断言。
