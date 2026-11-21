@@ -168,3 +168,7 @@ SHA256 `0599cc624028bd80254e190f97b94e09916618fab993d0d2053fae542f6e1ab7`，
    避免浮窗把主页面设置改掉、回 App 时自动弹出声谱。
 
 回归：API 50/50 + UI 40/40 = **90/90**（新增浮窗进度条用例）。
+
+构建（run `44910965594`，提交 `da19067`）：`Audio-CPM-0.5.10-90-dev-floatfix.apk`，22,620,785 字节，
+SHA256 `dcd8a3eb936ff060890c3c169b9cabc1387d6be3dfff000abb2830b678505648`，
+下载 https://aka.doubaocdn.com/s/6tU02a2EIL 。
