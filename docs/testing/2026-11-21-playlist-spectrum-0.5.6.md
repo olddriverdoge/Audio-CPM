@@ -46,12 +46,12 @@ GitHub Actions 使用默认 `main_package=false`；构建产物包名应为
 
 ## 构建结果
 
-- 推送提交：`e25ad99`（`fix: decouple playlist view and keep play window geometry (0.5.6)`）
-- GitHub Actions：run `44802036809`，`main_package=false`、`build_release=false`，结论 success
-- 产物：`Audio-CPM-0.5.6-86-dev-playlist-tabs.apk`（测试包）
+- 推送提交：`c3fb910`（`fix: scene row update and transparent spectrum backdrop (0.5.6)`）
+- GitHub Actions：run `44854853487`，`main_package=false`、`build_release=false`，结论 success
+- 产物：`Audio-CPM-0.5.6-86-dev-scene-spectrum.apk`（测试包）
   - 包名 `com.github.olddriverdoge.audiocpm.dev`（分支构建自动加 `.dev`）
   - versionName 0.5.6 / versionCode 86
-  - 大小 22,608,244 字节
-  - SHA256 `c5cc84ab2967def416e0c3d5febbfd1c176699f040ce0cb3b3bd74dddab37468`
-  - 下载：https://aka.doubaocdn.com/s/NNqPvteECX
-- 包内确认：`playpanel.js` 25103B、`spectrum.js` 53792B、`index.html` 31353B、`workbench.css` 28914B，均包含本轮目录/队列、10 秒淡化、透明声谱和几何修复。
+  - 大小 22,602,148 字节
+  - SHA256 `9d9f86a4c83d8be65ee093d686c282b7fe8c666d2135d683bebf69ce52ee623d`
+  - 下载：https://aka.doubaocdn.com/s/0eHV2vFSnq
+- 包内确认：`playpanel.js`、`spectrum.js`、`scene_store.js`、`workbench.css`、`overlays.css` 均包含本轮场景行更新、文件夹封面回退、透明声谱与轻遮罩改动。
