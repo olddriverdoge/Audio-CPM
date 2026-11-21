@@ -1239,6 +1239,11 @@ try { return await Defaults.apply(true); } finally { window.fetch = realFetch; }
             self.require(q["sdisp"] != "none" and q["sh"] >= 80,
                          f"embedded spectrum missing in float mode: {q}")
             self.require(q["qtop"] < q["stop"], f"queue should sit above spectrum: {q}")
+            cv = page.evaluate("""() => { const c = document.querySelector('#sf-canvas');
+              const r = c.getBoundingClientRect(); const b = document.querySelector('#spectrum-float');
+              return {cw: r.width, ch: r.height, display: getComputedStyle(b).display}; }""")
+            self.require(cv["display"] != "none" and cv["cw"] >= 100 and cv["ch"] >= 100,
+                         f"embedded spectrum canvas collapsed in float mode: {cv}")
             b = page.evaluate("""() => {
               const h = document.querySelector('#pf-head').getBoundingClientRect();
               const m = document.querySelector('#pf-min').getBoundingClientRect();

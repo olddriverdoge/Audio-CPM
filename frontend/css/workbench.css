@@ -502,7 +502,7 @@ body.float-mode .fw-win,
 body.float-mode .audio-float,
 body.float-mode .meta-float,
 body.float-mode .log-float,
-body.float-mode .spectrum-float{display:none !important}
+body.float-mode .spectrum-float:not(.is-embedded){display:none !important}
 body.float-mode #play-float{
   left:0 !important;top:0 !important;right:auto !important;bottom:auto !important;
   width:100vw !important;height:100vh !important;max-width:none !important;max-height:none !important;

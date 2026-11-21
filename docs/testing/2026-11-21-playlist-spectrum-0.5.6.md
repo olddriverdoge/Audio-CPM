@@ -172,3 +172,17 @@ SHA256 `0599cc624028bd80254e190f97b94e09916618fab993d0d2053fae542f6e1ab7`，
 构建（run `44910965594`，提交 `da19067`）：`Audio-CPM-0.5.10-90-dev-floatfix.apk`，22,620,785 字节，
 SHA256 `dcd8a3eb936ff060890c3c169b9cabc1387d6be3dfff000abb2830b678505648`，
 下载 https://aka.doubaocdn.com/s/6tU02a2EIL 。
+
+## 第 24 轮：浮窗频谱真正空白根因（0.5.11/91）
+
+0.5.10 真机验收：进度条已正常，频谱/声谱仍然空白。用 `?float=1` + 模拟原生频谱帧在浏览器里量 DOM，
+发现 `#spectrum-float` 已经是 `is-embedded`，但它的 `getBoundingClientRect()` 是 **0×0**：
+
+- `workbench.css` 里有 `body.float-mode .spectrum-float{display:none!important}`，本意是隐藏“独立频谱浮窗”，
+  但 `setEmbedded(true)` 会把同一个节点挂进播放管理的 `#pf-sf-host`，这条规则把内嵌声谱也一起
+  `display:none` 了。canvas 位图还在 300×120、每帧也在画（像素非黑），只是布局为 0 高，真机看起来就是空白。
+- 改为 `body.float-mode .spectrum-float:not(.is-embedded){display:none!important}`。
+  修后同一探针：canvas 368×501，3 秒内绘制像素从 12k 增加到 80k，进度 0.7→3.1s 同步前进。
+- UI 回归补断言：浮窗里 `#sf-canvas` 必须 ≥100×100 且父节点不能 `display:none`，防止再次被外层规则压塌。
+
+回归：API 50/50 + UI 40/40 = **90/90**。
