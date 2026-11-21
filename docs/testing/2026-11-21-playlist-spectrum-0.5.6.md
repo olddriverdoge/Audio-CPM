@@ -91,3 +91,7 @@ GitHub Actions 使用默认 `main_package=false`；构建产物包名应为
 
 A/B 验证（同一条用例，只回退上面两条落盘改动）：缩放后停止再播 → `416×636` 回退 `340×520`，用例失败；
 带修正 → `416×636` / `--win-scale≈1.32` 保持不变，用例通过。全套 API 50/50 + UI 37/37 = 87/87。
+
+构建（run `44874288259`，提交 `11c7c23`）：`Audio-CPM-0.5.6-86-dev-zoomsize.apk`，22,604,964 字节，
+SHA256 `2698be8622f07ab8d8ad3cd4b6276749b20e0cdaa06fb79da962eb048e76ac74`，
+下载 https://aka.doubaocdn.com/s/weEn7Batgt 。
