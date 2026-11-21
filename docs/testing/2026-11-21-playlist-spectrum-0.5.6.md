@@ -71,7 +71,7 @@ GitHub Actions 使用默认 `main_package=false`；构建产物包名应为
 
 构建（run `44862875716`，提交 `947ef85`，`main_package=false` / `build_release=false`）：`Audio-CPM-0.5.6-86-dev-sizefix.apk`，22,604,448 字节，SHA256 `a9bb3a35bc071725d202bedcd474310fb075d8aeaac8bde3561a0e300687df62`，下载 https://aka.doubaocdn.com/s/DfVzJRbcmX 。
 
-## 第 19 轮：真机仍“改回默认”——抓到真因（提交 `9a7d731`）
+## 第 19 轮：真机仍“改回默认”——抓到真因（提交 `11c7c23`）
 
 用前端真实交互复现（Playwright 移动视口 390×844）：
 
