@@ -261,10 +261,23 @@ const Spectrum = (() => {
   }
 
   let pcmTickId = 0;
+  let floatLeaseTimer = 0;
+  /* 浮窗里走的是 AudioCpmNative.spectrum() 直连，不再有 HTTP 取数请求，
+     所以原生 FFT 租约必须单独心跳；否则主页面切后台时一次 enabled=0
+     就能把浮窗的声谱关成空白。 */
+  function floatLeaseBeat() {
+    try { Api.playbackSpectrum(true); } catch (_) {}
+    if (!floatLeaseTimer && window.__AC2_FLOAT_MODE) {
+      floatLeaseTimer = setInterval(() => {
+        try { Api.playbackSpectrum(true); } catch (_) {}
+      }, 2000);
+    }
+  }
   function startPcmPoll() {
     if (pcmTimer) return;
     if (!core || !core.native) return;   // WebDAV 用 WebAudio 分析，不启动原生桥轮询
-    try { Api.playbackSpectrum(true); } catch (_) {}
+    if (window.__AC2_FLOAT_MODE) floatLeaseBeat();
+    else { try { Api.playbackSpectrum(true); } catch (_) {} }
     // 高刷路径：直接同步调用 Java（WebView JS 桥），跟 requestAnimationFrame 走，
     // 帧率由屏幕刷新率决定（60/90/120Hz），绕开 HTTP 轮询的延迟。
     const nat = (typeof window.AudioCpmNative === 'object' && window.AudioCpmNative
@@ -327,6 +340,10 @@ const Spectrum = (() => {
   function stopPcmPoll() {
     pcmTickId++;
     if (pcmTimer) { clearInterval(pcmTimer); pcmTimer = 0; }
+    if (floatLeaseTimer) { clearInterval(floatLeaseTimer); floatLeaseTimer = 0; }
+    if (window.__AC2_FLOAT_MODE) {
+      try { Api.playbackSpectrum(false, {release: true}); } catch (_) {}
+    }
   }
 
   function layoutCanvas() {

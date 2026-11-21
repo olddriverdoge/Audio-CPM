@@ -638,6 +638,8 @@ const Player = (() => {
 
   return {open, toggle, pause, close, external, syncBar, paintRows, pct, seekRatio, onMeta, hydrateNative,
           refreshRemoteQueue, playQueueIndex,
+          pausePolling: stopHifiPoll,
+          resumePolling: () => { if (hifi) startHifiPoll(); },
           queueList: () => remoteQueue.slice(), get remoteIndex() { return remoteIndex; },
           position: positionSec, duration: durationSec, isPlaying, getVolume, setVolume, seekSec, replay,
           hifiActive: () => hifi, hifiPlaying: () => hifiPlaying,

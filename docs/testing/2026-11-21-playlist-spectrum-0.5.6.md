@@ -146,3 +146,25 @@ SHA256 `710484d3f9dc344b8e4b3459e06f89e6a11c8055ad3f594a8781c6cef5e58bb5`，
 构建（run `44909286542`，提交 `b4724fc`）：`Audio-CPM-0.5.9-89-dev-floatfix.apk`，22,619,089 字节，
 SHA256 `0599cc624028bd80254e190f97b94e09916618fab993d0d2053fae542f6e1ab7`，
 下载 https://aka.doubaocdn.com/s/fpxt4Xj3Y9 。
+
+## 第 23 轮：浮窗接管主 App / 进度条 / 声谱直连（0.5.10/90）
+
+真机反馈 0.5.9 仍有三个问题，本轮按“浮窗独占播放会话”处理：
+
+1. **进度条不动**：`FloatMode.boot()` 先把 `#play-float` 的 `hidden` 去掉，再调 `App.openModule('play')`；
+   `openModule` 看到窗口已显示就直接返回（它本身是 toggle），导致播放管理的 500ms tick 根本没启动，
+   `#pf-seek` 永远停在初始值。改为保留 `hidden` 状态交给 `openModule`，并兜底调用
+   `App.playPanel().startLive()`。新增 UI 回归用例 `float overlay progress advances`，用 mock
+   `/api/playback/state` 断言进度条从 1s 走到 3s。
+2. **浮窗期间主 App 继续干活**：新增 `App.freezeForFloat()`：停 `Player` 状态轮询、停频谱取数、
+   收掉内嵌声谱、关闭播放管理窗口并给 `body` 加 `float-handoff`；`onPlayed` 在 handoff 期间直接返回，
+   不再自动拉起播放管理和声谱。浮窗启动成功后立即冻结；浮窗关闭或切回 App 时 `thawAfterFloat()`
+   恢复轮询（不自动重开播放管理）。
+3. **强制后台 / 回前台关浮窗**：`MainActivity.startFloatingPlay()` 启动服务 450ms 后 `moveTaskToBack(true)`；
+   `onResume()` 若浮窗仍在运行且距启动超过 2 秒，直接 `stopService` 并执行 `thawAfterFloat()`。
+   浮窗 WebView 补注入 `AudioCpmNative.spectrum/setParams`，声谱走 90Hz 直连而不是 30 次/秒 HTTP；
+   直连路径 2 秒一次 `lease=1` 心跳续租，关闭时 `release=1`。
+4. **浮窗不再改主页面偏好**：`showFloatLayout()` 不再写 `localStorage` 的“队列收起/声谱展开”，
+   避免浮窗把主页面设置改掉、回 App 时自动弹出声谱。
+
+回归：API 50/50 + UI 40/40 = **90/90**（新增浮窗进度条用例）。

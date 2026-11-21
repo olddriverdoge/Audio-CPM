@@ -625,8 +625,8 @@ function createPlayPanel() {
     queueCollapsed = false;
     sfCollapsed = false;
     if (Player.queueList && Player.queueList().length) queueView = 'queue';
-    Store.set('ac3_play_queue_collapsed', false);
-    Store.set('ac3_play_sf_collapsed', false);
+    // 不写 Store：浮窗和主页面共用同一个 localStorage，写这里会把主页面
+    // 的“列表收起/声谱展开”偏好改掉，回到 App 就会自动弹出声谱。
     paintQueueState();
     paintSfState();
     if (typeof Spectrum !== 'undefined' && Spectrum.setMode) {
@@ -657,6 +657,11 @@ function createPlayPanel() {
   return Object.assign(fw, {
     showSpectrum,
     showFloatLayout,
+    startLive: () => {
+      renderMeta(); paintQueueView(); renderQueue(); renderFavorites(); renderState(); paintSfState();
+      clearInterval(timer);
+      timer = setInterval(tick, 500);
+    },
     refresh: () => { renderMeta(); paintQueueView(); renderQueue(); renderFavorites(); renderState(); paintQueueState(); paintSfState(); setModeButtonState(); }
   });
 }

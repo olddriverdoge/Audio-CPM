@@ -1249,6 +1249,71 @@ try { return await Defaults.apply(true); } finally { window.fetch = realFetch; }
             return "float page: only play manager, fills overlay"
         self.check("float page runs play manager only", run)
 
+    def test_float_handoff(self):
+        def run():
+            ctx = self.browser.new_context(locale="zh-CN", viewport={"width": 390, "height": 844}, device_scale_factor=1)
+            ctx.add_init_script("""window.AudioCpmNative = {
+              floatPlayStatus: () => JSON.stringify({ok:true, permission:true, running:false}),
+              floatPlayStart: () => JSON.stringify({ok:true}),
+              floatPlayStop: () => JSON.stringify({ok:true})
+            };""")
+            page = ctx.new_page()
+            page.set_default_timeout(9000)
+            page.on("console", self._on_console)
+            page.on("pageerror", self._on_pageerror)
+            page.goto(self.base + "/?defaults=0", wait_until="load", timeout=20000)
+            page.wait_for_function("typeof App !== 'undefined'", timeout=15000)
+            page.wait_for_timeout(700)
+            page.evaluate("App.openModule('play')")
+            page.wait_for_timeout(500)
+            page.evaluate("document.getElementById('pf-float').click()")
+            page.wait_for_timeout(400)
+            state = page.evaluate("""() => ({
+              handoff: document.body.classList.contains('float-handoff'),
+              playHidden: document.getElementById('play-float').classList.contains('hidden'),
+              spectrumHidden: document.getElementById('spectrum-float').classList.contains('hidden'),
+              freezeApi: typeof App.freezeForFloat
+            })""")
+            self.require(state["freezeApi"] == "function", "freeze API missing")
+            self.require(state["handoff"], f"float handoff did not freeze main app: {state}")
+            self.require(state["playHidden"], f"play manager not closed on float start: {state}")
+            self.require(state["spectrumHidden"], f"embedded spectrum not closed on float start: {state}")
+            page.evaluate("document.dispatchEvent(new Event('visibilitychange'))")
+            page.wait_for_timeout(250)
+            thawed = page.evaluate("document.body.classList.contains('float-handoff')")
+            self.require(not thawed, "main app did not thaw after returning")
+            ctx.close()
+            return "float start freezes main app; return thaws it"
+        self.check("float start freezes main app and return thaws", run)
+
+    def test_float_progress(self):
+        def run():
+            import json, time
+            ctx = self.browser.new_context(locale="zh-CN", viewport={"width": 390, "height": 844}, device_scale_factor=1)
+            ctx.add_init_script("""window.AudioCpmNative = { spectrum: () => JSON.stringify({ok:true,seq:1,bands:new Array(96).fill(8),levels:new Array(96).fill(20),bars:new Array(48).fill(30),linbars:new Array(48).fill(30),spec:[]}) };""")
+            page = ctx.new_page()
+            page.set_default_timeout(9000)
+            page.on("console", self._on_console)
+            page.on("pageerror", self._on_pageerror)
+            t0 = time.time()
+            page.route("**/api/playback/state", lambda r: r.fulfill(
+                status=200, content_type="application/json",
+                body=json.dumps({"ok": True, "path": "/sdcard/a.flac", "playing": True,
+                                 "positionMs": int((time.time() - t0) * 1000), "durationMs": 20000})))
+            page.route("**/api/playback/queue/list", lambda r: r.fulfill(
+                status=200, content_type="application/json",
+                body='{"ok":true,"index":0,"paths":["/sdcard/a.flac"]}'))
+            page.goto(self.base + "/?float=1&defaults=0", wait_until="load", timeout=20000)
+            page.wait_for_function("typeof App !== 'undefined'", timeout=15000)
+            page.wait_for_timeout(900)
+            first = float(page.evaluate("document.querySelector('#pf-seek').value"))
+            page.wait_for_timeout(1200)
+            second = float(page.evaluate("document.querySelector('#pf-seek').value"))
+            self.require(second > first, f"float progress bar did not advance: {first} -> {second}")
+            ctx.close()
+            return f"float progress {first:.1f}s -> {second:.1f}s"
+        self.check("float overlay progress advances", run)
+
     def run(self):
         with sync_playwright() as p:
             launch_kwargs = {"headless": True}
@@ -1284,6 +1349,10 @@ try { return await Defaults.apply(true); } finally { window.fetch = realFetch; }
                 self.test_mobile_layout()
                 self.fresh_page()
                 self.test_float_page()
+                self.fresh_page()
+                self.test_float_handoff()
+                self.fresh_page()
+                self.test_float_progress()
             finally:
                 try:
                     self.context.close()

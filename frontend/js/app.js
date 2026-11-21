@@ -480,6 +480,8 @@ const App = (() => {
     // 或进程被系统回收时不能依赖“上次已经设过”。
     try { if (window.__ac2ReapplyAudioFx) window.__ac2ReapplyAudioFx(); } catch (_) {}
     updateSelInfo();
+    // 浮窗接管期间主页面已冻结，不能再自动拉起播放管理/声谱
+    if (floatHandoff) return;
     /* 内置播放器起播：从文件浏览/网格起播时才自动展开声谱。
        从播放管理内部选曲走 quiet，不再二次弹窗。 */
     const quiet = !!(opts && opts.quiet);
@@ -491,6 +493,29 @@ const App = (() => {
         try { panel.showSpectrum('waterfall'); } catch (_) {}
       }
     }
+  }
+
+  /* ---- 全局浮窗接管：主页面先冻结，避免两个 WebView 同时抢
+     播放状态/频谱一条数据通道 ---- */
+  let floatHandoff = false;
+  function freezeForFloat() {
+    if (floatHandoff) return;
+    floatHandoff = true;
+    try { if (Player.pausePolling) Player.pausePolling(); } catch (_) {}
+    try { if (typeof Spectrum !== 'undefined' && Spectrum.onHidden) Spectrum.onHidden(); } catch (_) {}
+    try {
+      if (typeof Spectrum !== 'undefined' && Spectrum.setEmbedded) Spectrum.setEmbedded(false);
+      const sf = document.getElementById('spectrum-float');
+      if (sf) sf.classList.add('hidden');
+    } catch (_) {}
+    try { if (openModules().indexOf('play') >= 0) toggleModule('play'); } catch (_) {}
+    try { document.body.classList.add('float-handoff'); } catch (_) {}
+  }
+  function thawAfterFloat() {
+    if (!floatHandoff) return;
+    floatHandoff = false;
+    try { document.body.classList.remove('float-handoff'); } catch (_) {}
+    try { if (Player.resumePolling) Player.resumePolling(); } catch (_) {}
   }
 
   /* ---- 播放模式（顺序 / 列表循环 / 单曲循环 / 随机） ---- */
@@ -1204,6 +1229,8 @@ const App = (() => {
   return {
     init, browse, onPlayed, updateMoveBar: () => MoveMgr.update(), isGridView, refreshColumns,
     playNext, playPrev, autoplayNext, autoplayOn, applyPlayMode, playMode, cyclePlayMode, playNextFolder,
+    freezeForFloat, thawAfterFloat, get floatHandoff() { return floatHandoff; },
+    playPanel: () => playPanel,
     openModule, openModules, closeAllModules, openMod: openModule, openMeta,
     openCoverEditor: path => { if (typeof TaskRunner !== 'undefined') TaskRunner.openCoverEditor(path); },
     setUiScale, previewUiScale, commitUiScale, currentUiScale, setCanvasPan, applyCanvasPan, canvasPan, addTargetCurrent, addFavCurrent,

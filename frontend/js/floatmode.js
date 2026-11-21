@@ -22,6 +22,7 @@ const FloatMode = (() => {
     return parse(n.floatPlayStatus());
   }
 
+  let handoff = false;
   function start() {
     const n = native();
     if (!n || typeof n.floatPlayStart !== 'function') {
@@ -37,6 +38,8 @@ const FloatMode = (() => {
       Utils.toast(r.error ? String(r.error) : t('浮窗启动失败'), 'err');
       return;
     }
+    handoff = true;
+    try { if (typeof App !== 'undefined' && App.freezeForFloat) App.freezeForFloat(); } catch (_) {}
     Utils.toast(t('播放管理已作为全局浮窗启动'));
     refreshSettings();
   }
@@ -201,8 +204,14 @@ const FloatMode = (() => {
       if (w && w.parentElement !== document.body) document.body.appendChild(w);
       if (w) {
         ['left', 'top', 'right', 'bottom', 'width', 'height', 'transform'].forEach(k => w.style.removeProperty(k));
-        w.classList.remove('hidden');
       }
+      // 不能先手动去掉 hidden：openModule 看到已显示就不会走 fw.open()，
+      // 播放管理的 500ms tick 不会启动 —— 表现就是浮窗进度条一直不动。
+      if (w && w.classList.contains('hidden')) App.openModule('play');
+      try {
+        const p = (typeof App !== 'undefined' && App.playPanel) ? App.playPanel() : null;
+        if (p && p.startLive) p.startLive();
+      } catch (_) {}
     } catch (_) {}
     try { App.openModule('play'); } catch (_) {}
     try {
@@ -229,6 +238,16 @@ const FloatMode = (() => {
     // 关浮窗/WebView 销毁时尽快释放声谱租约，别让 FFT 白跑
     window.addEventListener('pagehide', () => {
       try { Api.playbackSpectrum(false, {release: true}); } catch (_) {}
+    });
+  } else {
+    // 从浮窗切回 App（原生 onResume 会关掉浮窗）：主页面解冻，恢复状态轮询
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') return;
+      if (handoff || (typeof App !== 'undefined' && App.floatHandoff)) {
+        handoff = false;
+        try { if (typeof App !== 'undefined' && App.thawAfterFloat) App.thawAfterFloat(); } catch (_) {}
+        refreshSettings();
+      }
     });
   }
   if (document.readyState === 'loading') {

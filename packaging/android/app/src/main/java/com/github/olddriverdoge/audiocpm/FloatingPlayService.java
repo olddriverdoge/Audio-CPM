@@ -98,6 +98,19 @@ public class FloatingPlayService extends Service {
         s.setAllowFileAccess(false);
         webView.setWebViewClient(new WebViewClient());
         webView.addJavascriptInterface(new FloatBridge(), "AudioCpmFloat");
+        // 频谱高刷通道：浮窗 WebView 自己也会跑 Spectrum，必须能直连原生桥。
+        // 没有它就只能 30 次/秒的 HTTP 轮询，主进程切后台后很容易被节流成空白。
+        webView.addJavascriptInterface(new Object() {
+            @android.webkit.JavascriptInterface
+            public String spectrum() {
+                try { return AudioCpmBridge.spectrum(); } catch (Throwable t) { return "{}"; }
+            }
+
+            @android.webkit.JavascriptInterface
+            public String setParams(String json) {
+                try { return AudioCpmBridge.setParams(json); } catch (Throwable t) { return "{}"; }
+            }
+        }, "AudioCpmNative");
         root.addView(webView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 

@@ -67,6 +67,8 @@ public class MainActivity extends Activity {
     private boolean pickerActive = false;
     /** 用户去系统设置授予“显示在其他应用上层”，回来后自动开浮窗。 */
     private boolean pendingFloatPlay = false;
+    /** 刚刚拉起浮窗的时间戳：避免 onResume 立刻把刚启动的浮窗关掉。 */
+    private long floatStartedAt = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -502,16 +504,38 @@ public class MainActivity extends Activity {
             pendingFloatPlay = false;
             startFloatingPlay();
         }
+        // 用户切回 App：按约定自动关掉系统浮窗，并把主页面解冻。
+        // 刚拉起浮窗的那次 onResume（授权返回路径）要跳过，否则会秒关。
+        if (FloatingPlayService.running
+                && System.currentTimeMillis() - floatStartedAt > 2000) {
+            try {
+                stopService(new Intent(this, FloatingPlayService.class));
+            } catch (Throwable ignored) {}
+            if (webView != null) {
+                webView.post(() -> {
+                    try { webView.evaluateJavascript("try{App.thawAfterFloat()}catch(e){}", null); }
+                    catch (Throwable ignored) {}
+                });
+            }
+        }
     }
 
     /** 启动系统悬浮窗（播放管理）。服务自己负责前台通知与窗口。 */
     private void startFloatingPlay() {
         try {
+            floatStartedAt = System.currentTimeMillis();
             Intent i = new Intent(this, FloatingPlayService.class);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 ContextCompat.startForegroundService(this, i);
             } else {
                 startService(i);
+            }
+            // 浮窗起来后强制把 App 切到后台：主 WebView 的计时器随 Activity
+            // 暂停而冻结，不再和浮窗抢播放状态/频谱这一条数据通道。
+            if (webView != null) {
+                webView.postDelayed(() -> {
+                    try { moveTaskToBack(true); } catch (Throwable ignored) {}
+                }, 450);
             }
         } catch (Throwable t) {
             Log.e(TAG, "start floating play failed", t);
