@@ -207,7 +207,12 @@ const SceneStore = (() => {
     if (userGeometry) {
       if (fitted.uiScale && App.commitUiScale) { try { App.commitUiScale(fitted.uiScale); } catch (_) {} }
       if (fitted.canvas && App.setCanvasPan) { try { App.setCanvasPan(fitted.canvas.x, fitted.canvas.y, true); } catch (_) {} }
-      Object.keys(fitted.geo || {}).forEach(id => Store.set('ac3_geo_' + id, fitted.geo[id]));
+      Object.keys(fitted.geo || {}).forEach(id => {
+        // 播放管理有自己的 ac3_geo_play-float：用户最近拖过的大小必须优先于
+        // 场景里的旧快照，否则走“听歌”快捷入口就会跳回默认尺寸。
+        if (id === 'play-float') return;
+        Store.set('ac3_geo_' + id, fitted.geo[id]);
+      });
     }
     modulesOf(s).forEach(m => setTimeout(() => App.openModule(m), 0));
     setTimeout(render, 80);
@@ -217,6 +222,7 @@ const SceneStore = (() => {
     if (userGeometry && fitted !== s) {
       setTimeout(() => {
         Object.keys(fitted.geo || {}).forEach(id => {
+          if (id === 'play-float') return;   // 始终使用窗口自己保存的最新几何
           const g = fitted.geo[id];
           const el = document.getElementById(id);
           const ctl = el && WinMgr.find(el);

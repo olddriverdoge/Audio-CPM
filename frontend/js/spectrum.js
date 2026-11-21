@@ -379,9 +379,14 @@ const Spectrum = (() => {
     g.font = '9px ui-monospace, Menlo, monospace';
     g.textAlign = 'right';
     g.textBaseline = 'middle';
-    // dB 刻度与柱高同尺：0dB 在顶、-80dB 在底（柱高 v=(db+80)/80）。
-    [0, -20, -40, -60, -80].forEach(db => {
-      const y = y0 + gh * (-db / 80);
+    // dB 刻度必须跟随“下限”设置（-60/-80/-100）。柱图由原生按同一个 floor
+    // 归一化，轴写死 -80 就会出现“柱图变了、刻度没变”。
+    const floor = Math.abs(Number(cfg.db) || 80);
+    const step = floor / 4;
+    const ticks = [];
+    for (let db = 0; db >= -floor + 0.1; db -= step) ticks.push(Math.round(db));
+    ticks.forEach(db => {
+      const y = y0 + gh * (-db / floor);
       g.beginPath();
       g.moveTo(x0, Math.round(y) + .5);
       g.lineTo(x0 + gw, Math.round(y) + .5);

@@ -1040,6 +1040,29 @@ class UiRegression:
             return "scene persisted + row click updates geometry"
         self.check("save current layout and update via scene row", save, "scene-save")
 
+    def test_scene_keeps_play_geometry(self):
+        def run():
+            self.click_scene("builtin-listen")
+            self.page.wait_for_timeout(500)
+            orig = self.page.evaluate("() => localStorage.getItem('ac3_geo_play-float')")
+            self.page.evaluate("""() => {
+              WinMgr.find(document.querySelector('#play-float')).place({x: 24, y: 96, w: 300, h: 480}, true);
+            }""")
+            self.page.wait_for_timeout(300)
+            self.page.evaluate("() => { App.playPanel().close(); App.closeAllModules(); }")
+            self.page.wait_for_timeout(300)
+            self.click_scene("builtin-listen")
+            self.page.wait_for_timeout(700)
+            g = self.page.evaluate("""() => {
+              const r = document.querySelector('#play-float').getBoundingClientRect();
+              return {w: r.width, h: r.height};
+            }""")
+            self.page.evaluate("(g) => { if (g) localStorage.setItem('ac3_geo_play-float', g); else localStorage.removeItem('ac3_geo_play-float'); }", orig)
+            self.require(abs(g["w"] - 300) <= 6 and abs(g["h"] - 480) <= 6,
+                         f"scene shortcut reset play window geometry: {g}")
+            return f"play window kept {g['w']:.0f}x{g['h']:.0f} across scene shortcut"
+        self.check("scene shortcut keeps saved play window size", run, "scene-play-geo")
+
     def test_defaults_import(self):
         def run():
             bundle = {
@@ -1346,6 +1369,8 @@ try { return await Defaults.apply(true); } finally { window.fetch = realFetch; }
                 self.test_audio_panel()
                 self.fresh_page()
                 self.test_scene_save()
+                self.fresh_page()
+                self.test_scene_keeps_play_geometry()
                 self.fresh_page()
                 self.test_defaults_import()
                 self.fresh_page()

@@ -628,13 +628,17 @@ const Player = (() => {
 
   // 即使当前不是 HiFi（例如已回退网页、或用户在别的模块），也持续检查原生错误。
   // 这样 ExoPlayer 的 Source error 不会只落在 player_error.txt 里。
+  // 错误巡检：页面不可见 / 已交给系统浮窗时不要继续每 2 秒打一次后端。
+  // 固定高频 HTTP 会在后台周期性唤醒进程，是“隔几秒卡一下”的一个来源。
   setInterval(async () => {
+    if (document.hidden) return;
+    if (document.body && document.body.classList.contains('float-handoff')) return;
     try {
       const s = await Api.playbackState();
       if (!s || !s.ok || !s.error) return;
       reportPlaybackError(s.error);
     } catch (_) {}
-  }, 2000);
+  }, 10000);
 
   return {open, toggle, pause, close, external, syncBar, paintRows, pct, seekRatio, onMeta, hydrateNative,
           refreshRemoteQueue, playQueueIndex,
