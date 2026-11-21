@@ -624,6 +624,7 @@ function createPlayPanel() {
   function showFloatLayout() {
     queueCollapsed = false;
     sfCollapsed = false;
+    if (Player.queueList && Player.queueList().length) queueView = 'queue';
     Store.set('ac3_play_queue_collapsed', false);
     Store.set('ac3_play_sf_collapsed', false);
     paintQueueState();
@@ -635,6 +636,13 @@ function createPlayPanel() {
   }
   if (window.__AC2_FLOAT_MODE) setTimeout(showFloatLayout, 300);
 
+  document.addEventListener('ac2:queue-changed', () => {
+    if (window.__AC2_FLOAT_MODE && Player.queueList && Player.queueList().length) {
+      queueView = 'queue';
+      paintQueueView();
+    }
+    renderQueue();
+  });
   document.addEventListener('ac2:fav-changed', renderFavorites);
   document.addEventListener('ac2:browse-changed', () => { renderQueue(); renderFavorites(); });
 

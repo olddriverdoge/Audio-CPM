@@ -81,8 +81,12 @@ const Player = (() => {
     try {
       const q = await Api.playbackQueueList();
       if (q && q.ok && Array.isArray(q.paths)) {
+        const sig = remoteQueue.join('|') + '#' + remoteIndex;
         remoteQueue = q.paths.slice();
         remoteIndex = Number(q.index) || 0;
+        if (sig !== remoteQueue.join('|') + '#' + remoteIndex) {
+          document.dispatchEvent(new CustomEvent('ac2:queue-changed'));
+        }
       }
     } catch (_) {}
   }
