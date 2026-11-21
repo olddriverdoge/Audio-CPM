@@ -484,7 +484,7 @@ public class AudioCpmBridge {
         return simpleVoid(() -> {
             ExoPlayer p = PlaybackService.getPlayer();
             if (p == null) throw new IllegalStateException("not playing");
-            p.seekToMediaItem(Math.max(0, index));
+            p.seekTo(Math.max(0, index), 0L);
             p.play();
         });
     }
