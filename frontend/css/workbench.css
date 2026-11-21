@@ -101,6 +101,15 @@
   .play-float::after{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;
     background:linear-gradient(180deg,rgba(8,13,19,.52) 0%,rgba(8,13,19,.22) 24%,
       rgba(8,13,19,.10) 55%,rgba(8,13,19,.30) 100%)}
+  /* 声谱展开时不再整窗压暗：全窗渐变那 10%~30% 就是一层灰雾。
+     改为只给上方控件区铺底色，边界由元素自身决定，不会漫到声谱上，
+     所以不同窗口高度下声谱区都是零叠加。 */
+  .play-float.queue-collapsed::after{display:none}
+  .play-float.queue-collapsed .mf-head{
+    background:linear-gradient(180deg,rgba(8,13,19,.80) 0,rgba(8,13,19,.46) 100%)}
+  .play-float.queue-collapsed .pf-body{
+    background:linear-gradient(180deg,rgba(8,13,19,.58) 0,rgba(8,13,19,.46) 70%,
+      rgba(8,13,19,.16) 100%)}
   .pf-body{flex:1 1 auto;display:flex;flex-direction:column;gap:8px;padding:8px 10px;overflow:hidden;position:relative}
   .pf-now{display:flex;gap:10px;align-items:center;min-height:56px}
   /* 播放管理左上角不再显示封面缩略图；封面只作为背景使用 */
@@ -413,14 +422,19 @@
     width:100% !important; height:100% !important; min-width:0 !important; min-height:0 !important;
     max-width:none !important; max-height:none !important;
     background:transparent !important; border:0 !important; border-radius:0 !important;
-    box-shadow:none !important; overflow:hidden !important; transform:none !important
+    box-shadow:none !important; overflow:hidden !important; transform:none !important;
+    /* 独立浮窗的 blur(16px) 必须清掉：否则整块嵌入区是在"糊过的封面"上画的，
+       画布再透明也会看到一片均匀的雾。 */
+    -webkit-backdrop-filter:none !important; backdrop-filter:none !important;
+    filter:none !important
   }
   #spectrum-float.is-embedded .sf-head,
   #spectrum-float.is-embedded .sf-resize{display:none !important}
   #spectrum-float.is-embedded canvas{
     display:block;width:100%;height:100%;min-height:0;background:transparent !important;
-    /* 频谱柱、声谱画面整体 50% 透明，露出播放管理封面 */
-    opacity:.5 !important
+    /* 透明改由画布自己的 alpha 通道负责（逐像素 alpha 已实现），
+       不再整块乘 0.5 —— 半透明彩色叠在封面上正是"薄雾"的来源之一。 */
+    opacity:1 !important
   }
   #spectrum-float.is-embedded .sf-sub{
     left:0;top:0;bottom:0;width:min(142px,62%);

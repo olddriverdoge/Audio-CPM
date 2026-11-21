@@ -599,8 +599,15 @@ class UiRegression:
                         "spectrum not embedded in play manager")
             self.require(self.page.locator("#pf-sf-sec").is_visible(), "spectrum section hidden")
             self.require(self.page.locator("#sf-canvas").is_visible(), "embedded spectrum canvas hidden")
-            self.require(self.page.evaluate("getComputedStyle(document.querySelector('#sf-canvas')).opacity") == "0.5",
-                        "embedded canvas is not 50% transparent")
+            # 内嵌声谱的透明必须由画布自身 alpha 承担；整块再乘 0.5 会让彩色像素
+            # 变成一层薄雾盖在封面上。同时整块 backdrop 滤镜必须被清掉，
+            # 否则等于在"糊过的封面"上作画，静音区也会看到均匀的灰。
+            self.require(self.page.evaluate("getComputedStyle(document.querySelector('#sf-canvas')).opacity") == "1",
+                        "embedded canvas should use its own alpha instead of a global opacity")
+            self.require(self.page.evaluate("getComputedStyle(document.querySelector('#spectrum-float')).backdropFilter") == "none",
+                        "embedded spectrum still applies backdrop blur to the cover")
+            self.require(self.page.evaluate("getComputedStyle(document.querySelector('#play-float'), '::after').display") == "none",
+                        "play window still paints a full-window scrim over the spectrum")
             bg = self.page.evaluate("getComputedStyle(document.querySelector('#pf-bg')).opacity")
             self.require(float(bg) >= 0.95, f"cover background lost behind spectrum: {bg}")
             bg_img = self.page.evaluate("getComputedStyle(document.querySelector('#pf-bg')).backgroundImage")
@@ -665,8 +672,8 @@ class UiRegression:
             self.require(pixels["n"] > 100, f"spectrum bars did not draw pixels: {pixels}")
             self.page.locator('#pf-sf-sec .pf-sf-mode[data-sf-mode="waterfall"]').click()
             self.page.wait_for_timeout(700)
-            self.require(self.page.evaluate("getComputedStyle(document.querySelector('#sf-canvas')).opacity") == "0.5",
-                        "waterfall canvas is not 50% transparent")
+            self.require(self.page.evaluate("getComputedStyle(document.querySelector('#sf-canvas')).opacity") == "1",
+                        "waterfall canvas should not be globally dimmed")
             # 声谱空背景必须透明，不能再在 canvas 里铺黑色底。
             bg_alpha = self.page.evaluate("""() => {
               const c = document.querySelector('#sf-canvas');
@@ -750,7 +757,7 @@ class UiRegression:
             for sel in ("#pf-head", ".pf-now", ".pf-transport", "#pf-qhead", ".pf-sf-head"):
                 op = self.page.evaluate("(s) => getComputedStyle(document.querySelector(s)).opacity", sel)
                 self.require(float(op) <= 0.11, f"{sel} not at 10% opacity: {op}")
-            self.require(self.page.evaluate("getComputedStyle(document.querySelector('#sf-canvas')).opacity") == "0.5",
+            self.require(self.page.evaluate("getComputedStyle(document.querySelector('#sf-canvas')).opacity") == "1",
                          "spectrum canvas was dimmed with the chrome")
             bg1 = self.page.evaluate("() => getComputedStyle(document.querySelector('#pf-bg')).opacity")
             self.require(bg1 == bg0 and float(bg1) >= 0.9,

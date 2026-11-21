@@ -57,3 +57,26 @@ GitHub Actions 使用默认 `main_package=false`；构建产物包名应为
   - SHA256 `9fa74042535a3b22b464b1afb5b5743fca6ec2ba4cc7bd7b1f7d31e94f03a0ef`
   - 下载：https://aka.doubaocdn.com/s/JSfHN6vudN
 - 包内确认：`spectrum.js` 含逐像素 alpha 渐变，静音行不再写 alpha=255 的纯黑；测试含全零原生帧的绘图区 alpha 断言。
+
+## 内嵌声谱"薄雾"归因（不改参数，先剥图层）
+
+现象：静音黑块消失后，嵌入区仍像蒙了一层均匀的雾。
+
+定位：`#spectrum-float.is-embedded` 只重置了背景和阴影，**没有重置** `.spectrum-float` 自带的 `backdrop-filter:blur(16px)`。画布透明后看到的是被糊过的封面，等于给整块区域抹了一层均匀色；再叠加 `.play-float::after` 全窗渐变（中部 .10、底部 .30）和画布全局 `opacity:.5`，三者一起就是"薄雾"。
+
+改动（纯样式，未动光谱参数）：
+
+- `is-embedded` 增加 `backdrop-filter:none`、`filter:none`；
+- 内嵌画布 `opacity` 由 .5 改为 1，透明交给画布自身 alpha；
+- `.play-float.queue-collapsed::after` 设为 `display:none`，改由 `.mf-head`、`.pf-body` 各自铺底，边界随控件走，声谱区零叠加。
+
+量化（纹理封面，取内嵌绘图区像素）：
+
+| 条件 | 水平梯度均值 | 垂直梯度均值 | 标准差 |
+| --- | --- | --- | --- |
+| 强制 blur(16px) | 3.52 | 0.49 | 12.1 |
+| 现状（无 blur） | 91.1 | 10.39 | 88.2 |
+
+梯度差 26 倍，说明此前那张"雾"就是模糊后的封面。CSS 里的 `!important` 会压过内联样式，A/B 必须用 `setProperty(..., 'important')` 才测得出来。
+
+回归：API 50/50 + UI 37/37 = 87/87（`/tmp/ac2_round12_style2.json`），新增断言：内嵌 `backdrop-filter` 必须为 none、`::after` 必须不绘制、画布 opacity 必须为 1。
