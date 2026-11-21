@@ -325,6 +325,7 @@
   <div class="pf-bg" id="pf-bg" aria-hidden="true"></div>
   <div class="mf-head" id="pf-head" title="拖动可移动 / 双指可缩放">
     <span class="mf-title">播放管理</span>
+    <button type="button" class="sf-btn" id="pf-float" title="全局浮窗">⧉</button>
     <button type="button" class="sf-btn" id="pf-min" title="收起">—</button>
   </div>
   <div class="pf-body">
@@ -480,6 +481,19 @@
     </div>
 
     <div style="border-top:1px solid var(--border);margin:12px 0 0"></div>
+    <div class="bg-section">
+      <div class="upd-head">
+        <h3>全局浮窗</h3>
+        <span id="float-badge" class="upd-badge" data-i18n-skip></span>
+      </div>
+      <div id="float-status" class="hint upd-status" data-i18n-skip>需要“显示在其他应用上层”权限；授权后点开启。</div>
+      <div class="hint bg-note">开启后，播放管理会作为系统悬浮窗盖在其他应用上，不依赖工作台页面；播放仍由本机 HiFi 服务输出。</div>
+      <div class="row upd-actions" style="justify-content:flex-start">
+        <button type="button" class="small primary" id="float-start">开启全局浮窗</button>
+      </div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);margin:12px 0 0"></div>
     <div class="cfg-section">
       <div class="upd-head">
         <h3>界面配置迁移</h3>
@@ -566,6 +580,7 @@ WebDAV 支持浏览 / 播放 / 元数据 / 下载（后续）与远端内部移�
 <script src="/js/spectrum.js"></script>
 <script src="/js/update.js"></script>
 <script src="/js/background.js"></script>
+<script src="/js/floatmode.js"></script>
 <script src="/js/app.js"></script>
 
 </body>

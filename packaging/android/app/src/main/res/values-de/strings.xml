@@ -17,4 +17,7 @@
     <string name="action_play">Wiedergeben</string>
     <string name="action_next">Weiter</string>
     <string name="cover_picker_title">Cover-Bild auswählen</string>
+    <string name="float_channel_name">Schwebender Player</string>
+    <string name="float_notif_title">Player-Overlay</string>
+    <string name="float_notif_text">Player wird über anderen Apps angezeigt</string>
 </resources>

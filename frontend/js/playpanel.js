@@ -610,6 +610,11 @@ function createPlayPanel() {
     }
   });
 
+  /* 悬浮窗里默认展开内嵌声谱，窗口就是整块播放管理 */
+  if (window.__AC2_FLOAT_MODE) {
+    setTimeout(() => { try { if (typeof Spectrum !== 'undefined') showSpectrum('waterfall'); } catch (_) {} }, 300);
+  }
+
   document.addEventListener('ac2:fav-changed', renderFavorites);
   document.addEventListener('ac2:browse-changed', () => { renderQueue(); renderFavorites(); });
 

@@ -100,6 +100,8 @@ const WinMgr = (() => {
     if (!win) return {apply() {}, raise() {}, sync() {}, get rect() { return null; }};
     const minW = opts.minW || 240, minH = opts.minH || 160;
     const contentSized = !!opts.contentSized;      // 宽度按内容（如移动条），不写死 w/h
+    // 系统悬浮窗由原生 WindowManager 负责拖动/缩放，页面内不再抢指针
+    const floatLocked = (win.id === 'play-float' && window.__AC2_FLOAT_MODE);
     const geoKey = 'ac3_geo_' + (opts.id || win.id);
     let rect = null;
 
@@ -167,6 +169,8 @@ const WinMgr = (() => {
 
     function fit() {
       if (win.classList.contains('hidden')) return;
+      // 全局浮窗由原生窗口决定尺寸，页面内不再按视口重排。
+      if (floatLocked) return;
       const b = bounds();
       const maxW = Math.max(80, b.right - b.left);
       const maxH = Math.max(80, b.bottom - b.top);
@@ -218,6 +222,7 @@ const WinMgr = (() => {
     }
 
     function onWinDown(e) {
+      if (floatLocked) return;
       if (palmLocked()) return;
       if (e.pointerType === 'mouse') return;
       // 新的一次单指手势开始时，清掉上一次可能没收到 pointerup 的残留触点。
@@ -290,6 +295,7 @@ const WinMgr = (() => {
     /* 标题栏单指拖动（与上面双指互斥） */
     if (head) {
       head.addEventListener('pointerdown', e => {
+        if (floatLocked) return;
         if (palmLocked()) return;
         if (e.target.closest('button')) return;
         if (ptrs.size >= 2) return;
@@ -313,6 +319,7 @@ const WinMgr = (() => {
     /* 右下角单指缩放 */
     if (resize) {
       resize.addEventListener('pointerdown', e => {
+        if (floatLocked) return;
         if (palmLocked()) return;
         if (!rect) apply();
         rz0 = {x: e.clientX, y: e.clientY, rx: rect.x, ry: rect.y, rw: rect.w, rh: rect.h};

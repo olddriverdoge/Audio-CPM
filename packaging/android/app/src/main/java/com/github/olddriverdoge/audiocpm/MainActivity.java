@@ -65,6 +65,8 @@ public class MainActivity extends Activity {
     private boolean lastStorageGranted = false;
     /** 系统图片选择器是否正在前台，避免连续点击开多个系统页面。 */
     private boolean pickerActive = false;
+    /** 用户去系统设置授予“显示在其他应用上层”，回来后自动开浮窗。 */
+    private boolean pendingFloatPlay = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -286,6 +288,48 @@ public class MainActivity extends Activity {
                 });
                 return "{\"ok\":true}";
             }
+
+            /* ---------- 系统级悬浮窗（播放管理） ---------- */
+
+            @android.webkit.JavascriptInterface
+            public String floatPlayStatus() {
+                try {
+                    JSONObject j = new JSONObject();
+                    j.put("ok", true);
+                    j.put("permission", Settings.canDrawOverlays(MainActivity.this));
+                    j.put("running", FloatingPlayService.running);
+                    return j.toString();
+                } catch (Throwable t) {
+                    return "{\"ok\":false,\"error\":" + JSONObject.quote(String.valueOf(t)) + "}";
+                }
+            }
+
+            @android.webkit.JavascriptInterface
+            public String floatPlayStart() {
+                try {
+                    if (!Settings.canDrawOverlays(MainActivity.this)) {
+                        pendingFloatPlay = true;
+                        Intent i = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                Uri.parse("package:" + getPackageName()));
+                        startActivity(i);
+                        return "{\"ok\":false,\"need_permission\":true}";
+                    }
+                    startFloatingPlay();
+                    return "{\"ok\":true}";
+                } catch (Throwable t) {
+                    return "{\"ok\":false,\"error\":" + JSONObject.quote(String.valueOf(t)) + "}";
+                }
+            }
+
+            @android.webkit.JavascriptInterface
+            public String floatPlayStop() {
+                try {
+                    stopService(new Intent(MainActivity.this, FloatingPlayService.class));
+                    return "{\"ok\":true}";
+                } catch (Throwable t) {
+                    return "{\"ok\":false,\"error\":" + JSONObject.quote(String.valueOf(t)) + "}";
+                }
+            }
         }, "AudioCpmNative");
         WebView.setWebContentsDebuggingEnabled(true);
         root.addView(webView, new FrameLayout.LayoutParams(
@@ -454,6 +498,24 @@ public class MainActivity extends Activity {
             Log.w(TAG, "storage access revoked");
         }
         lastStorageGranted = granted;
+        if (pendingFloatPlay && Settings.canDrawOverlays(this)) {
+            pendingFloatPlay = false;
+            startFloatingPlay();
+        }
+    }
+
+    /** 启动系统悬浮窗（播放管理）。服务自己负责前台通知与窗口。 */
+    private void startFloatingPlay() {
+        try {
+            Intent i = new Intent(this, FloatingPlayService.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                ContextCompat.startForegroundService(this, i);
+            } else {
+                startService(i);
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "start floating play failed", t);
+        }
     }
 
     @Override

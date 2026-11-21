@@ -1173,6 +1173,10 @@ const App = (() => {
     if (typeof UpdateChecker !== 'undefined') {
       setTimeout(() => { try { UpdateChecker.autoCheck(); } catch (_) {} }, 2500);
     }
+    /* 系统悬浮窗页面：只跑播放管理，接管本机 HiFi 播放状态 */
+    if (window.__AC2_FLOAT_MODE && typeof FloatMode !== 'undefined') {
+      try { FloatMode.boot(); } catch (_) {}
+    }
   }
 
   async function defaultRoot() {

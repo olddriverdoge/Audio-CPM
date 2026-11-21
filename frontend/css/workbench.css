@@ -490,3 +490,27 @@
   body.play-open #meta3 .mv-sec-cover,
   body.play-open #meta3 .cover-box,
   body.play-open #meta3 .cover-actions{display:none !important}
+
+/* ---------- 系统悬浮窗（?float=1）：整页只有播放管理 ---------- */
+body.float-mode{background:transparent !important;overflow:hidden}
+body.float-mode .app,
+body.float-mode .hdr,
+body.float-mode .modbar,
+body.float-mode #scene-bar,
+body.float-mode #canvas-zone,
+body.float-mode .fw-win,
+body.float-mode .audio-float,
+body.float-mode .meta-float,
+body.float-mode .log-float,
+body.float-mode .spectrum-float{display:none !important}
+body.float-mode #play-float{
+  left:0 !important;top:0 !important;right:auto !important;bottom:auto !important;
+  width:100vw !important;height:100vh !important;max-width:none !important;max-height:none !important;
+  border-radius:14px !important;border:1px solid rgba(255,255,255,.12) !important;
+  transform:none !important;box-shadow:0 18px 46px rgba(0,0,0,.55) !important}
+body.float-mode #play-float .mf-head{cursor:move}
+body.float-mode #pf-qhead,
+body.float-mode #pf-q-toggle,
+body.float-mode #pf-queue-tools,
+body.float-mode #pf-queue{display:none !important}
+body.float-mode #pf-resize{display:block}

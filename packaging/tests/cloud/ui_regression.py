@@ -1205,6 +1205,39 @@ try { return await Defaults.apply(true); } finally { window.fetch = realFetch; }
             return f"sheet width {rect['width']:.0f}px"
         self.check("mobile viewport settings fits", run)
 
+    def test_float_page(self):
+        def run():
+            ctx = self.browser.new_context(locale="zh-CN", viewport={"width": 390, "height": 844}, device_scale_factor=1)
+            page = ctx.new_page()
+            page.set_default_timeout(9000)
+            page.on("console", self._on_console)
+            page.on("pageerror", self._on_pageerror)
+            page.goto(self.base + "/?float=1&defaults=0", wait_until="load", timeout=20000)
+            page.wait_for_function("typeof App !== 'undefined'", timeout=15000)
+            page.wait_for_timeout(1000)
+            self.require(page.evaluate("document.body.classList.contains('float-mode')"), "float mode class missing")
+            box = page.evaluate("""() => {
+              const w = document.querySelector('#play-float').getBoundingClientRect();
+              return {w: w.width, h: w.height, iw: innerWidth, ih: innerHeight,
+                      head: !!document.querySelector('#pf-head'),
+                      workbench: getComputedStyle(document.querySelector('.app')).display};
+            }""")
+            self.require(abs(box["w"] - box["iw"]) <= 2 and abs(box["h"] - box["ih"]) <= 2,
+                         f"float play window does not fill overlay: {box}")
+            self.require(box["head"], "play header missing in float mode")
+            self.require(box["workbench"] == "none", f"workbench still visible in float mode: {box}")
+            self.require(page.evaluate("getComputedStyle(document.querySelector('#pf-queue')).display") == "none",
+                         "queue list should be hidden in float mode")
+            b = page.evaluate("""() => {
+              const h = document.querySelector('#pf-head').getBoundingClientRect();
+              const m = document.querySelector('#pf-min').getBoundingClientRect();
+              return {headRight: h.right, btnRight: m.right};
+            }""")
+            self.require(b["headRight"] - b["btnRight"] <= 10, f"min button not right aligned in float: {b}")
+            ctx.close()
+            return "float page: only play manager, fills overlay"
+        self.check("float page runs play manager only", run)
+
     def run(self):
         with sync_playwright() as p:
             launch_kwargs = {"headless": True}
@@ -1238,6 +1271,8 @@ try { return await Defaults.apply(true); } finally { window.fetch = realFetch; }
                 self.test_real_defaults_and_orientation()
                 self.fresh_page()
                 self.test_mobile_layout()
+                self.fresh_page()
+                self.test_float_page()
             finally:
                 try:
                     self.context.close()

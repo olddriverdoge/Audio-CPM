@@ -17,4 +17,7 @@
     <string name="action_play">再生</string>
     <string name="action_next">次へ</string>
     <string name="cover_picker_title">カバー画像を選択</string>
+    <string name="float_channel_name">フローティング再生</string>
+    <string name="float_notif_title">プレイヤー浮窗</string>
+    <string name="float_notif_text">プレイヤーを他のアプリの上に表示中</string>
 </resources>

@@ -20,4 +20,7 @@
     <string name="action_play">播放</string>
     <string name="action_next">下一首</string>
     <string name="cover_picker_title">选择封面图片</string>
+    <string name="float_channel_name">浮窗播放</string>
+    <string name="float_notif_title">播放管理悬浮窗</string>
+    <string name="float_notif_text">正在其他应用上层显示播放管理</string>
 </resources>

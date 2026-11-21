@@ -17,4 +17,7 @@
     <string name="action_play">Play</string>
     <string name="action_next">Next</string>
     <string name="cover_picker_title">Choose a cover image</string>
+    <string name="float_channel_name">Floating player</string>
+    <string name="float_notif_title">Play manager overlay</string>
+    <string name="float_notif_text">Play manager is showing above other apps</string>
 </resources>

@@ -463,6 +463,28 @@ const Player = (() => {
     }
     try { audio.pause(); } catch (_) {}
   }
+  /* 从本机 HiFi 服务接管当前播放状态：全局浮窗是另一个页面，
+     不能依赖主工作台页面“起播过”的内存状态。 */
+  async function hydrateNative() {
+    try {
+      if (!Api.playbackState) return false;
+      const s = await Api.playbackState();
+      if (!s || !s.ok || !s.path) return false;
+      const ref = 'local:' + s.path;
+      hifi = true;
+      hifiPlaying = !!s.playing;
+      hifiPos = Number(s.positionMs) || 0;
+      hifiDur = Number(s.durationMs) || 0;
+      if (cur !== ref) { cur = null; adoptNative(ref); }
+      startHifiPoll();
+      setToggle(hifiPlaying);
+      if (hifiDur > 0) { seek.max = String(hifiDur / 1000); durEl.textContent = fmt(hifiDur / 1000); }
+      seek.value = String(hifiPos / 1000);
+      curEl.textContent = fmt(hifiPos / 1000);
+      return true;
+    } catch (_) { return false; }
+  }
+
   function toggle() {
     if (!cur) return;
     if (hifi) {
@@ -577,7 +599,7 @@ const Player = (() => {
     } catch (_) {}
   }, 2000);
 
-  return {open, toggle, pause, close, external, syncBar, paintRows, pct, seekRatio, onMeta,
+  return {open, toggle, pause, close, external, syncBar, paintRows, pct, seekRatio, onMeta, hydrateNative,
           position: positionSec, duration: durationSec, isPlaying, getVolume, setVolume, seekSec, replay,
           hifiActive: () => hifi, hifiPlaying: () => hifiPlaying,
           get current() { return cur; },
