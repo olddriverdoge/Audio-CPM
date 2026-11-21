@@ -205,3 +205,7 @@ SHA256 `dcd8a3eb936ff060890c3c169b9cabc1387d6be3dfff000abb2830b678505648`，
    `float-handoff` 时直接跳过，避免后台周期性唤醒。
 
 回归：API 50/50 + UI 41/41 = **91/91**（新增场景快捷入口保持播放窗口尺寸用例）。
+
+构建（run `44930172896`，提交 `c68f34e`）：`Audio-CPM-0.5.14-94-dev-rebase.apk`，22,621,441 字节，
+SHA256 `d2998279f85be9c4367a604cef8bf4cbd773c2c31d814f06e4ce987b93681140`，
+下载 https://aka.doubaocdn.com/s/hajr2f9zye 。
