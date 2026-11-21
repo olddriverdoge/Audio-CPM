@@ -104,3 +104,22 @@ SHA256 `2698be8622f07ab8d8ad3cd4b6276749b20e0cdaa06fb79da962eb048e76ac74`，
 构建（run `44903169121`，提交 `3897fd1`）：`Audio-CPM-0.5.7-87-dev.apk`，22,605,168 字节，
 SHA256 `ae6ef03d49c601d4c52000fdc5281ff1799d9ab918eaa2df822618260d613a07`，
 下载 https://aka.doubaocdn.com/s/zZMxOFAS9n 。
+
+## 第 21 轮：系统级全局浮窗（播放管理）+ 0.5.8（提交 `0b00506`）
+
+做法：`SYSTEM_ALERT_WINDOW` + 前台服务 `FloatingPlayService` + `WindowManager.addView(TYPE_APPLICATION_OVERLAY)`，
+内容是一个**独立 WebView**，只加载本地服务的 `/?float=1`，不依赖工作台页面；播放状态用
+`Player.hydrateNative()` 接管本机 HiFi 正在播放的曲目，拖动/缩放/关闭通过 `AudioCpmFloat` 桥驱动原生窗口。
+
+- 原生：新增服务与五语言通知文案；`MainActivity` 增加 `floatPlayStatus/Start/Stop`，未授权时跳转
+  `ACTION_MANAGE_OVERLAY_PERMISSION`，返回后自动开窗；窗口几何存 `SharedPreferences("ac2_float_geo")`。
+- 前端：`floatmode.js`、`?float=1` 全屏样式、播放管理头部 `⧉` 按钮与设置页「全局浮窗」卡片，内含权限/运行状态。
+- 浮窗页点击 `—` 关闭浮窗（播放本身在 `PlaybackService`，不受影响）；窗口内禁用手势改尺寸，尺寸由原生窗口决定。
+
+调试中发现：`#play-float` 原本嵌在 `.app` 里，`body.float-mode` 隐藏 `.app` 会把播放窗口一起隐藏（测得 0×0）；
+`FloatMode.boot()` 已把该节点挂到 `body` 下并清掉旧几何，`WinMgr.fit()` 在浮窗模式下直接跳过。
+
+回归：API 50/50 + UI 38/38 = **88/88**（新增 `?float=1` 用例：仅播放管理、铺满视口、队列隐藏、`—` 靠右）。
+构建（run `44904530044`）：`Audio-CPM-0.5.8-88-dev-float.apk`，22,614,777 字节，
+SHA256 `710484d3f9dc344b8e4b3459e06f89e6a11c8055ad3f594a8781c6cef5e58bb5`，
+下载 https://aka.doubaocdn.com/s/FipTtDV9uK 。
