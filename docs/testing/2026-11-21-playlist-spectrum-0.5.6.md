@@ -76,3 +76,23 @@ GitHub Actions 使用默认 `main_package=false`；构建产物包名应为
 修正后控件区与声谱区亮度、梯度基本一致，说明画面上只剩封面、没有任何附加层。
 
 回归：API 50/50 + UI 37/37 = 87/87（`/tmp/ac2_round13.json`），新增三条断言：淡出后 `.pf-body`、`.mf-head` 不得有背景，`::after` 不得绘制。
+
+## 独立频谱/声谱模块下线 + 淡出只留谱面
+
+需求来源：内嵌形态已经足够，独立浮窗成为冗余入口；10 秒淡出后又凹"控件全透明、只留数据"。
+
+改动：
+
+1. 独立模块下线
+   - 删除 `#sf-fab` 入口按钮、`#sf-head`（模式 tab / 曲目名 / 收起）、`#sf-resize` 缩放角；`#spectrum-float` 只剩宿主容器与 canvas。
+   - 去掉 `MODULE_REGISTRY.spectrum`、`WinMgr.register({'spectrum-float'})`、`openModule('spectrum')`；`Spectrum.toggle()`、`applyPos/applySize`、位置/尺寸记忆一并删除。
+   - 起播自动展示改为：`openModule('play')` + `playPanel.showSpectrum('waterfall')`（收起列表、展开声谱区、指定模式）。
+   - 前端↔后端：`/api/playback/spectrum` 保留——它是内嵌声谱的取数口，不是独立模块专属；独立模块专属的接线（位置/尺寸状态、fab 停靠、窗口注册）已全部移除。
+2. 淡出后只留数据
+   - 新增 `Spectrum.setBare(on)`：`bare` 时不画坐标轴、刻度文字、时间网格、边框，绘图区留白归零。
+   - 淡出时 `--bare` 与布局联动：标题栏、`.pf-now`、进度行、按钮行、列表行、声谱标题行全部 `display:none`，画布满铺整个窗口（实测画布 372×482 / 窗口 374×484）。
+   - 淡出时谱面本身降到 50%：`#spectrum-float.is-embedded canvas{opacity:.5}`。
+3. 元数据不再重复展示封面
+   - 播放管理可见时 `body.play-open`，`#meta3` 里的封面标题、封面图、封面操作一并隐藏。
+
+回归：API 50/50 + UI 37/37 = 87/87（`/tmp/ac2_round15.json`），`console_errors=[]`、`page_errors=[]`。

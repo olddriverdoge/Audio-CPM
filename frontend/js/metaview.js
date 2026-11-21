@@ -52,8 +52,8 @@ function createMetaView(container, opts) {
     const tagKeys = Object.keys(tags);
     let html = '';
 
-    // 1) 封面优先
-    html += '<h3>封面</h3>';
+    // 1) 封面优先（播放管理打开时由样式整段隐藏：封面已经在播放管理里当背景了）
+    html += '<h3 class="mv-sec-cover">封面</h3>';
     if (d.has_cover) {
       html += '<div class="cover-box"><img src="' + esc(Api.coverUrl(d.path)) +
         '" data-act="modal" loading="lazy" title="点击放大" onerror="this.style.display=\'none\'"></div>';

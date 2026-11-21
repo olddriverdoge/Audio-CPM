@@ -428,8 +428,6 @@
     -webkit-backdrop-filter:none !important; backdrop-filter:none !important;
     filter:none !important
   }
-  #spectrum-float.is-embedded .sf-head,
-  #spectrum-float.is-embedded .sf-resize{display:none !important}
   #spectrum-float.is-embedded canvas{
     display:block;width:100%;height:100%;min-height:0;background:transparent !important;
     /* 透明改由画布自己的 alpha 通道负责（逐像素 alpha 已实现），
@@ -460,11 +458,32 @@
   .play-float.pf-idle-dim #pf-queue-tools,
   .play-float.pf-idle-dim #pf-queue,
   .play-float.pf-idle-dim .pf-sf-head,
-  .play-float.pf-idle-dim #pf-resize{opacity:.1;transition:opacity .35s ease}
+  .play-float.pf-idle-dim #pf-resize{opacity:0;transition:opacity .35s ease}
+  /* 淡出＝整块界面透明，只留谱面数据：谱面里的轴和网格由 Spectrum.setBare 关掉 */
   /* 背景封面不参与降透明：只淡出控件、列表、频谱头部和标题栏 */
   .play-float.pf-idle-dim{border-color:transparent;box-shadow:none}
   /* 淡出后只留封面：控件淡了但铺底层还在，就会看着像蒙了一层灰。
      所以控件区和标题栏的底色、以及整窗渐变遮罩一起撤掉。 */
   .play-float.pf-idle-dim .pf-body,
   .play-float.pf-idle-dim .mf-head{background:none}
+  /* 淡出时谱面本身降到 50%：底图更清楚，数据仍可读 */
+  .play-float.pf-idle-dim #spectrum-float.is-embedded canvas{opacity:.5 !important}
+  /* 淡出时画布铺满整个窗口：控件、列表行、声谱标题行都退出布局，
+     只留 .pf-sf-body 占满，数据直接顶到四条边。 */
+  .play-float.pf-idle-dim > #pf-head{display:none}
+  .play-float.pf-idle-dim .pf-now,
+  .play-float.pf-idle-dim .pf-seekrow,
+  .play-float.pf-idle-dim .pf-transport,
+  .play-float.pf-idle-dim #pf-qhead,
+  .play-float.pf-idle-dim #pf-queue-tools,
+  .play-float.pf-idle-dim #pf-queue,
+  .play-float.pf-idle-dim .pf-sf-head{display:none}
+  .play-float.pf-idle-dim .pf-body{padding:0;min-height:0;flex:1 1 auto}
+  .play-float.pf-idle-dim .pf-sf-sec{flex:1 1 auto;min-height:0;margin-top:0}
+  .play-float.pf-idle-dim .pf-sf-body{min-height:0}
   .play-float.pf-idle-dim::after{display:none}
+
+  /* ---------- 播放管理打开时，元数据浮窗不再重复展示封面 ---------- */
+  body.play-open #meta3 .mv-sec-cover,
+  body.play-open #meta3 .cover-box,
+  body.play-open #meta3 .cover-actions{display:none !important}

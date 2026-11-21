@@ -270,7 +270,6 @@
 
 <!-- 全局悬浮频谱：默认贴边按钮，点开浮窗，右下角可拖动调整大小 -->
 <button type="button" class="sf-fab meta-fab" id="meta-fab" title="元数据（独立浮窗）">🎵<span>元数据</span></button>
-<button type="button" class="sf-fab" id="sf-fab" title="频谱 / 声谱">▤<span>频谱/声谱</span></button>
 <div class="audio-float hidden" id="audio-float">
   <div class="mf-head" id="af-head" title="拖动可移动 / 双指可缩放">
     <span class="mf-title">音频输出</span>
@@ -398,18 +397,8 @@
   <b class="mf-resize" id="mf-resize" title="拖动调整大小"></b>
 </div>
 <div class="spectrum-float hidden" id="spectrum-float">
-  <div class="sf-head" id="sf-head" title="拖动可移动 / 吸附到左右边缘">
-    <span class="sf-tabs">
-      <button type="button" class="sf-tab active" id="sf-tab-spectrum" data-mode="spectrum">频谱</button>
-      <button type="button" class="sf-tab" id="sf-tab-waterfall" data-mode="waterfall">声谱</button>
-    </span>
-    <span class="sf-track" id="sf-track">未在播放</span>
-    <span class="sf-state" id="sf-state"></span>
-    <button type="button" class="sf-btn" id="sf-min" title="收起">—</button>
-  </div>
   <div class="sf-sub" id="sf-sub"></div>
   <canvas id="sf-canvas"></canvas>
-  <b class="sf-resize" id="sf-resize" title="拖动调整大小"></b>
 </div>
 
 <button type="button" class="sf-fab log-fab" id="log-fab" title="日志（全局）">📋<span>日志</span></button>

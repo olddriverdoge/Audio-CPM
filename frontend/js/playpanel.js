@@ -88,6 +88,18 @@ function createPlayPanel() {
     } catch (_) {}
   }
 
+  /* 外部入口（起播自动展开）用：收起列表、展开声谱区，并指定模式 */
+  function showSpectrum(mode) {
+    if (sfCollapsed) { sfCollapsed = false; Store.set('ac3_play_sf_collapsed', false); }
+    if (!queueCollapsed) { queueCollapsed = true; Store.set('ac3_play_queue_collapsed', true); }
+    paintQueueState();
+    paintSfState();
+    if (mode && typeof Spectrum !== 'undefined' && Spectrum.setMode) {
+      try { Spectrum.setMode(mode); } catch (_) {}
+    }
+    setModeButtonState();
+  }
+
   /* 播放开始后 10 秒无操作：整个播放管理降到 10% 并锁住；
      点一下/滑一下只负责唤醒，不触发下面的按钮。频谱声谱展开时
      内部的 canvas 不受影响（仍是默认 50% 透明度）。 */
@@ -103,12 +115,15 @@ function createPlayPanel() {
       if (!Player.isPlaying() || win.classList.contains('hidden')) return;
       idleDimmed = true;
       win.classList.add('pf-idle-dim');
+      /* 淡出后整块界面透明，只留谱面数据：连坐标轴和网格一起收掉 */
+      try { if (typeof Spectrum !== 'undefined' && Spectrum.setBare) Spectrum.setBare(true); } catch (_) {}
     }, IDLE_MS);
   }
   function wakeFromIdle() {
     if (!idleDimmed) return;
     idleDimmed = false;
     win.classList.remove('pf-idle-dim');
+    try { if (typeof Spectrum !== 'undefined' && Spectrum.setBare) Spectrum.setBare(false); } catch (_) {}
     wakeSuppressUntil = Date.now() + 400;
     armIdleTimer();
   }
@@ -575,6 +590,8 @@ function createPlayPanel() {
   }, true);
 
   fw.onToggle(open => {
+    /* 播放管理打开时，元数据浮窗不再重复展示封面（样式 body.play-open 负责） */
+    try { document.body.classList.toggle('play-open', !!open); } catch (_) {}
     if (open) {
       renderMeta(); paintQueueView(); renderQueue(); renderFavorites(); renderState(); paintSfState();
       clearInterval(timer);
@@ -601,6 +618,7 @@ function createPlayPanel() {
   renderFavorites();
   renderState();
   return Object.assign(fw, {
+    showSpectrum,
     refresh: () => { renderMeta(); paintQueueView(); renderQueue(); renderFavorites(); renderState(); paintQueueState(); paintSfState(); setModeButtonState(); }
   });
 }

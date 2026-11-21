@@ -1,12 +1,9 @@
 /* ---------------- Spectrum（全局悬浮：频谱 / 声谱，可拖动 / 吸附 / 缩放） ---------------- */
 const Spectrum = (() => {
   const box = document.getElementById('spectrum-float');
-  const fab = document.getElementById('sf-fab');
-  const head = document.getElementById('sf-head');
   const trackEl = document.getElementById('sf-track');
   const canvas = document.getElementById('sf-canvas');
   const stateEl = document.getElementById('sf-state');
-  const minBtn = document.getElementById('sf-min');
   let delayEl = null;
   let delayVal = null;
   let delayLab = null;
@@ -21,14 +18,15 @@ const Spectrum = (() => {
   const DPR = Math.min(3, Math.max(1, window.devicePixelRatio || 1));
   let cssW = 0, cssH = 0;
   let peakVals = [], peakAt = [];       // 峰值保持
-  const resize = document.getElementById('sf-resize');
   const g = canvas ? canvas.getContext('2d') : null;
   let open = false, core = null, raf = 0;
   /* 延迟显示：蓝牙耳机有 100~300ms 传输延迟，画面会超前声音。
      这里缓存最近若干帧，按 delayMs 回放历史帧来对齐。 */
   let hist = [], delayMs = 0;
   let mode = 'spectrum';                 // spectrum | spectrogram（内部值仍用 waterfall，兼容旧配置）
-  const pos = {side: 'right', top: null};
+  /* bare：只画数据本身，不画坐标轴、刻度文字和网格。
+     播放管理 10 秒淡出后整块界面透明，只留谱面数据，所以这个状态下连轴也不要。 */
+  let bare = false;
   let winCtl = null;
   let embedded = false, embeddedPrevOpen = false;
   let embedRO = null, embedTick = 0;
@@ -540,6 +538,8 @@ const Spectrum = (() => {
 
     if (typeof g.drawImage === 'function') g.drawImage(wf, area.x0, area.y0, W, H);
 
+    if (bare) return;   // 只留数据：不画时间网格、频率刻度、边框
+
     // 时间网格：右端=现在，每格约 1 秒
     if (cfg.grid) {
       const secPx = Math.max(18, Math.round(1000 / 16.7));
@@ -621,8 +621,9 @@ const Spectrum = (() => {
     g.setTransform(canvas.width / w, 0, 0, canvas.height / h, 0, 0);
     g.clearRect(0, 0, w, h);
     // 两种模式坐标系隔离：频谱 X=频率 / Y=dB；声谱 X=时间 / Y=频率
-    const area = computeArea(w, h, 30, 14);
-    if (mode !== 'waterfall') drawAxes(w, h, 30, 14);
+    const padL = bare ? 0 : 30, padB = bare ? 0 : 14;
+    const area = computeArea(w, h, padL, padB);
+    if (mode !== 'waterfall' && !bare) drawAxes(w, h, 30, 14);
     const paused = !core || (core.native ? !(Player.hifiPlaying && Player.hifiPlaying()) : Player.audio.paused);
     if (paused) {
       if (!pausedAt) pausedAt = performance.now();
@@ -1100,31 +1101,6 @@ const Spectrum = (() => {
   buildSub();
   hideSub();
 
-  function applySize() {
-    if (embedded) return;
-    const s = Store.get(K.spectrumSize, null);
-    if (s && Number(s.w) > 0 && Number(s.h) > 0) {
-      box.style.width = Math.round(s.w) + 'px';
-      box.style.height = Math.round(s.h) + 'px';
-    }
-  }
-
-  function applyPos() {
-    if (embedded) return;
-    const st = Store.get(K.winSpectrum, null);
-    if (st && Number.isFinite(Number(st.x)) && Number.isFinite(Number(st.y))) {
-      box.style.left = Math.max(2, Math.min(window.innerWidth - 60, Number(st.x))) + 'px';
-      box.style.top = Math.max(2, Math.min(window.innerHeight - 40, Number(st.y))) + 'px';
-      box.style.right = 'auto'; box.style.bottom = 'auto';
-      return;
-    }
-    // 旧版只记了停靠边 + 顶部高度：沿用
-    if (pos.side === 'left') { box.style.left = '10px'; box.style.right = 'auto'; }
-    else { box.style.right = '10px'; box.style.left = 'auto'; }
-    if (pos.top != null) { box.style.top = Math.round(pos.top) + 'px'; box.style.bottom = 'auto'; }
-    else { box.style.top = 'auto'; box.style.bottom = '96px'; }
-  }
-
   function paintTabs() {
     document.querySelectorAll('.sf-tab').forEach(b => {
       b.classList.toggle('active', b.dataset.mode === mode);
@@ -1146,7 +1122,6 @@ const Spectrum = (() => {
     if (!box) return;
     const active = embedded || open;
     box.classList.toggle('hidden', !active);
-    if (fab) fab.style.display = active ? 'none' : '';
     if (active) {
       if (winCtl && !embedded) winCtl.apply(); layoutCanvas(); paintTrack(); paintTabs(); paintScene();
       stopped = false; pausedAt = 0;
@@ -1241,37 +1216,18 @@ const Spectrum = (() => {
       box.classList.remove('is-embedded');
       if (box.parentNode && box.parentNode !== document.body) document.body.appendChild(box);
       open = embeddedPrevOpen;
-      applyPos(); applySize();
       apply();
     }
   }
 
-  function toggle() {
-    if (embedded) return;
-    open = !open;
-    apply();
-    try { if (navigator.vibrate) navigator.vibrate(8); } catch (_) {}
-  }
-
-  /* 缩放/拖动/置顶统一交给 WinMgr（见 app.js 注册） */
 
   function init() {
     if (!box || !canvas) return;
-    const saved = Store.get(K.spectrumPos, null);
-    if (saved && (saved.side === 'left' || saved.side === 'right')) {
-      pos.side = saved.side;
-      pos.top = Number.isFinite(Number(saved.top)) ? Number(saved.top) : null;
-    }
     const savedMode = Store.get(K.spectrumMode, 'spectrum');
     mode = (savedMode === 'waterfall') ? 'waterfall' : 'spectrum';
-    if (fab) fab.addEventListener('click', toggle);
-    if (minBtn) minBtn.addEventListener('click', toggle);
     document.querySelectorAll('.sf-tab').forEach(b => {
       b.addEventListener('click', e => { e.stopPropagation(); setMode(b.dataset.mode); });
     });
-    if (typeof Dock !== 'undefined') {
-      Dock.bindFab(fab, K.fabSpectrum, 'right');
-    }
     paintTabs();
     apply();
     paintTrack();
@@ -1288,7 +1244,13 @@ const Spectrum = (() => {
     });
   }
 
-  return {init, toggle, setEmbedded, setMode, onTrackChange, onSeek, resumeStream, onHidden, onVisible,
+  function setBare(on) {
+    const v = !!on;
+    if (bare === v) return;
+    bare = v;   // 区域留白由 drawFrame 每帧按 bare 现算，无需重建缓冲
+  }
+
+  return {init, setEmbedded, setMode, setBare, onTrackChange, onSeek, resumeStream, onHidden, onVisible,
           isWaitingResume: () => waitResume,
-          get open() { return open; }, get mode() { return mode; }};
+          get open() { return open; }, get mode() { return mode; }, get bare() { return bare; }};
 })();

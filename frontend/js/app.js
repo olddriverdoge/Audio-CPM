@@ -484,11 +484,11 @@ const App = (() => {
        从播放管理内部选曲走 quiet，不再二次弹窗。 */
     const quiet = !!(opts && opts.quiet);
     if (!quiet && Player.current && Player.current === path) {
-      const spWin = document.getElementById('spectrum-float');
-      const wasClosed = spWin ? spWin.classList.contains('hidden') : false;
-      openModule('spectrum');
-      if (wasClosed && typeof Spectrum !== 'undefined' && Spectrum.setMode) {
-        try { Spectrum.setMode('waterfall'); } catch (_) {}
+      /* 独立频谱/声谱浮窗已移除：起播时展开播放管理的内嵌声谱即可 */
+      openModule('play');
+      const panel = MODULE_REGISTRY.play && MODULE_REGISTRY.play.fw;
+      if (panel && panel.showSpectrum) {
+        try { panel.showSpectrum('waterfall'); } catch (_) {}
       }
     }
   }
@@ -888,13 +888,12 @@ const App = (() => {
     if (typeof createAudioPanel === 'function') audioPanel = createAudioPanel();
     MODULE_REGISTRY.audio = {win: 'audio-float', fw: audioPanel};
     MODULE_REGISTRY.meta = {win: 'meta-float', fab: 'meta-fab', min: 'mf-min'};
-    MODULE_REGISTRY.spectrum = {win: 'spectrum-float', fab: 'sf-fab', min: 'sf-min'};
     MODULE_REGISTRY.log = {win: 'log-float', fab: 'log-fab', min: 'lf-min'};
 
     /* 右下角模块坞：＋ 展开纵向按钮，10 秒无操作收回 */
     const MODULE_LABEL = {
       browse: '文件浏览', task: '批处理', tree: '目标目录', play: '播放管理',
-      audio: '音频输出', meta: '元数据', spectrum: '频谱/声谱', log: '日志'
+      audio: '音频输出', meta: '元数据', log: '日志'
     };
     const fab = document.getElementById('module-fab');
     const menu = document.getElementById('module-menu');
@@ -1045,7 +1044,6 @@ const App = (() => {
     metaFloat = createMetaFloat();
     /* 元数据 / 频谱 / 日志：同样交给 WinMgr，标题拖动、双指缩放、点击置顶一致 */
     WinMgr.register({id: 'meta-float', win: 'meta-float', head: 'mf-head', resize: 'mf-resize', minW: 240, minH: 160});
-    WinMgr.register({id: 'spectrum-float', win: 'spectrum-float', head: 'sf-head', resize: 'sf-resize', minW: 240, minH: 140});
     WinMgr.register({id: 'log-float', win: 'log-float', head: 'lf-head', resize: 'lf-resize', minW: 240, minH: 160});
 
     document.addEventListener('keydown', e => {

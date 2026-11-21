@@ -374,18 +374,23 @@ class UiRegression:
         self.check("metadata float opens for played track", meta, "metadata")
 
         def spectrum():
-            # Playing a row auto-opens the spectrum/waterfall module; the old
-            # edge fab is intentionally hidden by the workbench CSS.
-            self.page.locator("#spectrum-float").wait_for(state="visible", timeout=5000)
+            # 独立频谱/声谱浮窗已移除：起播改为展开播放管理里的内嵌声谱。
+            self.require(self.page.locator("#sf-fab").count() == 0, "standalone spectrum fab still exists")
+            self.require(self.page.locator("#sf-head").count() == 0, "standalone spectrum head still exists")
+            self.require(self.page.locator("#sf-resize").count() == 0, "standalone spectrum resize handle still exists")
+            self.require(self.page.locator("#spectrum-float .sf-tab").count() == 0,
+                         "standalone mode tabs still exist")
+            self.page.locator("#pf-sf-host #spectrum-float").wait_for(state="visible", timeout=5000)
             self.page.wait_for_timeout(500)
-            self.require(self.page.locator("#sf-canvas").is_visible(), "spectrum canvas hidden")
+            self.require(self.page.locator("#pf-sf-host #sf-canvas").is_visible(), "embedded spectrum canvas hidden")
+            cls = self.page.evaluate("document.querySelector('#play-float').className")
+            self.require("queue-collapsed" in cls and "pf-sf-live" in cls,
+                         f"playing did not expand the embedded spectrum: {cls}")
             canvas_bg = self.page.evaluate("getComputedStyle(document.querySelector('#sf-canvas')).backgroundColor")
             self.require(canvas_bg in ("rgba(0, 0, 0, 0)", "transparent"),
-                         f"standalone spectrum canvas still has a black fill: {canvas_bg}")
-            tabs = self.page.locator("#spectrum-float .sf-tab").count()
-            self.require(tabs == 2, f"expected spectrum/waterfall tabs, got {tabs}")
-            return "2 tabs + transparent canvas"
-        self.check("spectrum float opens", spectrum, "spectrum")
+                         f"embedded spectrum canvas still has a black fill: {canvas_bg}")
+            return "embedded only + no standalone module"
+        self.check("playing opens embedded spectrum, standalone module removed", spectrum, "spectrum")
 
         def play_style():
             # 切到 Album B 的带内嵌封面文件，确保背景图不是依赖目录 cover.jpg。
@@ -411,6 +416,10 @@ class UiRegression:
             self.require(float(pf["opacity"]) >= 0.95, f"cover backdrop too transparent: {pf}")
             self.require("blur(24px)" not in (pf["filter"] or ""), f"cover backdrop still heavily blurred: {pf}")
             toggle = self.page.locator("#pf-q-toggle")
+            # 起播会自动展开声谱（列表收起），这条用例要先回到"列表展开"的基线
+            if toggle.get_attribute("aria-expanded") == "false":
+                toggle.click()
+                self.page.wait_for_timeout(400)
             self.require(toggle.get_attribute("aria-expanded") == "true", "queue should start expanded")
             toggle.click()
             self.page.wait_for_function(
@@ -579,6 +588,17 @@ class UiRegression:
             favs = self.page.evaluate("App.favoriteList()")
             self.require(self.fx["ui_album_b"] in favs, f"favorite not added: {favs}")
             self.require(self.page.locator("#pf-fav-bar .pf-fav-chip").count() >= 1, "favorite chip missing")
+            # 播放管理可见时，元数据浮窗不再重复展示封面（封面已经是播放管理背景）
+            self.page.evaluate("() => App.openModule('meta')")
+            self.page.wait_for_timeout(400)
+            self.require(self.page.evaluate("document.body.classList.contains('play-open')"),
+                         "play-open marker missing while play manager is visible")
+            disp = self.page.evaluate(
+                "() => ['#meta3 .mv-sec-cover', '#meta3 .cover-box', '#meta3 .cover-actions']"
+                ".map(s => { const el = document.querySelector(s); return el ? getComputedStyle(el).display : 'absent'; })"
+            )
+            self.require(all(v in ("none", "absent") for v in disp),
+                         f"metadata still shows the cover while play manager is open: {disp}")
             return "favorite still synced from direct folder view"
         self.check("playlist favorite sync", favorite_sync)
 
@@ -593,8 +613,9 @@ class UiRegression:
                 "() => document.querySelector('#play-float').classList.contains('has-cover')",
                 timeout=8000,
             )
-            self.page.locator("#pf-q-toggle").click()
-            self.page.wait_for_timeout(650)
+            if self.page.evaluate("!document.querySelector('#play-float').classList.contains('queue-collapsed')"):
+                self.page.locator("#pf-q-toggle").click()
+                self.page.wait_for_timeout(650)
             self.require(self.page.evaluate("document.querySelector('#spectrum-float').parentElement.id") == "pf-sf-host",
                         "spectrum not embedded in play manager")
             self.require(self.page.locator("#pf-sf-sec").is_visible(), "spectrum section hidden")
@@ -757,8 +778,8 @@ class UiRegression:
             for sel in ("#pf-head", ".pf-now", ".pf-transport", "#pf-qhead", ".pf-sf-head"):
                 op = self.page.evaluate("(s) => getComputedStyle(document.querySelector(s)).opacity", sel)
                 self.require(float(op) <= 0.11, f"{sel} not at 10% opacity: {op}")
-            self.require(self.page.evaluate("getComputedStyle(document.querySelector('#sf-canvas')).opacity") == "1",
-                         "spectrum canvas was dimmed with the chrome")
+            self.require(self.page.evaluate("getComputedStyle(document.querySelector('#sf-canvas')).opacity") == "0.5",
+                         "idle spectrum data should sit at 50% opacity")
             # 淡出后必须只剩封面：任何铺底层都不能留在画面上，否则就是"控件淡了但还蒙层灰"。
             self.require(self.page.evaluate("(getComputedStyle(document.querySelector('.pf-body')).backgroundImage)") == "none",
                          "control scrim survived the idle dim")
@@ -766,25 +787,36 @@ class UiRegression:
                          "header scrim survived the idle dim")
             self.require(self.page.evaluate("getComputedStyle(document.querySelector('#play-float'), '::after').display") == "none",
                          "full-window scrim survived the idle dim")
+            # 淡出＝只剩谱面数据：坐标轴/网格关掉，画布铺满整个窗口
+            self.require(self.page.evaluate("Spectrum.bare") is True, "spectrum axes were not disabled on idle")
+            geom = self.page.evaluate("""() => {
+              const c = document.querySelector('#sf-canvas').getBoundingClientRect();
+              const w = document.querySelector('#play-float').getBoundingClientRect();
+              return {cw: c.width, ch: c.height, ww: w.width, wh: w.height, dx: Math.abs(c.x - w.x), dy: Math.abs(c.y - w.y)};
+            }""")
+            self.require(geom["cw"] >= geom["ww"] - 8 and geom["ch"] >= geom["wh"] - 8
+                         and geom["dx"] <= 4 and geom["dy"] <= 4,
+                         f"idle spectrum does not fill the window: {geom}")
             bg1 = self.page.evaluate("() => getComputedStyle(document.querySelector('#pf-bg')).opacity")
             self.require(bg1 == bg0 and float(bg1) >= 0.9,
                          f"cover background was dimmed with the chrome: {bg0} -> {bg1}")
             size1 = self.page.evaluate("() => { const r = document.querySelector('#play-float').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; }")
             self.require(size1 == size0, f"play window size changed after idle dim: {size0} -> {size1}")
             self.require(self.page.locator("#pf-idle-guard").is_visible(), "idle guard not visible")
-            # 第一次点击只唤醒，不触发下面的停止按钮。
-            stop = self.page.locator("#pf-stop").bounding_box()
-            self.require(stop and stop["width"] > 0, f"stop button box: {stop}")
+            # 淡出时控件整块隐藏，只剩谱面：第一次点击落在画布上只唤醒，不触发任何按钮。
             cur_before = self.page.evaluate("Player.current")
-            self.page.mouse.click(stop["x"] + stop["width"] / 2, stop["y"] + stop["height"] / 2)
+            box = self.page.locator("#play-float").bounding_box()
+            self.require(box and box["width"] > 0, f"play window box: {box}")
+            self.page.mouse.click(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
             self.page.wait_for_timeout(450)
             self.require(not self.page.evaluate("document.querySelector('#play-float').classList.contains('pf-idle-dim')"),
                          "click did not restore play manager")
             self.require(self.page.evaluate("Player.current") == cur_before, "first click activated a locked control")
             self.require(self.page.locator("#pf-idle-guard").is_visible() is False, "idle guard stayed visible")
+            self.require(self.page.evaluate("Spectrum.bare") is False, "spectrum axes were not restored on wake")
             op = self.page.evaluate("getComputedStyle(document.querySelector('#pf-head')).opacity")
             self.require(float(op) >= 0.9, f"play manager did not restore opacity: {op}")
-            return "10s idle dim + lock + click wake + size/background kept"
+            return "10s idle: only spectrum data, no axes/grid; click wake restores chrome"
         self.check("play manager 10s idle dim and lock", idle_dim)
 
         def gain_panel():
