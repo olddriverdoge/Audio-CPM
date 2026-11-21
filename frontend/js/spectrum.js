@@ -509,12 +509,16 @@ const Spectrum = (() => {
       for (let y = 0; y < BH; y++) {
         const v = srcBins[wfRowBin[y]] || 0;
         const ci = Math.max(0, Math.min(255, Math.round((v - br[0]) * 255 / (br[1] - br[0]))));
+        // 静音/低于亮度阈值的行不画不透明黑色。palette[0] 是纯黑，
+        // 过去固定 alpha=255 会把无声区铺成一块黑；现在按电平给 alpha，
+        // 没有颜色的像素直接透明，只有真正有信号的行才逐渐不透明。
+        const alpha = ci <= 1 ? 0 : Math.min(255, Math.round(ci * 3.4));
         if (px) {
           const o = (y * colW) * 4;
           const r = pal[ci * 3], gg = pal[ci * 3 + 1], bb = pal[ci * 3 + 2];
           for (let k = 0; k < colW; k++) {
             const q = o + k * 4;
-            px[q] = r; px[q + 1] = gg; px[q + 2] = bb; px[q + 3] = 255;
+            px[q] = r; px[q + 1] = gg; px[q + 2] = bb; px[q + 3] = alpha;
           }
         }
       }

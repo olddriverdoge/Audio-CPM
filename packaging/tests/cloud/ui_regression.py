@@ -674,7 +674,33 @@ class UiRegression:
               const y = Math.max(20, Math.round(c.height * 0.12));
               return c.getContext('2d').getImageData(x, y, 1, 1).data[3];
             }""")
-            self.require(bg_alpha <= 4, f"waterfall background is not transparent: alpha={bg_alpha}")
+            self.require(bg_alpha <= 4, f"waterfall top margin is not transparent: alpha={bg_alpha}")
+            # 静音帧：瀑布绘图区内部也必须是透明，而不是 palette[0] 的纯黑
+            # 加 alpha=255。这里直接换一帧全零原生数据，再重建声谱缓冲。
+            self.page.evaluate("""() => {
+              window.AudioCpmNative = {spectrum: () => JSON.stringify({
+                ok: true, sampleRate: 48000,
+                bands: new Array(96).fill(0), levels: new Array(96).fill(0),
+                bars: new Array(48).fill(0), linbars: new Array(48).fill(0),
+                spec: new Array(128).fill(0)
+              })};
+              Spectrum.setMode('waterfall');
+              Spectrum.resumeStream();
+            }""")
+            self.page.wait_for_timeout(900)
+            silence = self.page.evaluate("""() => {
+              const c = document.querySelector('#sf-canvas');
+              const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+              const out = [];
+              for (const fx of [0.38, 0.5, 0.62, 0.74, 0.86]) {
+                for (const fy of [0.28, 0.5, 0.72]) {
+                  out.push(d[(Math.round(c.height * fy) * c.width + Math.round(c.width * fx)) * 4 + 3]);
+                }
+              }
+              return out;
+            }""")
+            self.require(sum(1 for a in silence if a == 0) >= 12,
+                         f"silent waterfall still paints opaque black pixels: {silence}")
             # 收尾：还原本用例伪造的 HiFi 状态，避免影响后续面板。
             self.page.evaluate("""() => {
               Player.hifiActive = window.__ac2OrigHifiActive;
