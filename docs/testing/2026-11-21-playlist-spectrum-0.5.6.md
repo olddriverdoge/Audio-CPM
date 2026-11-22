@@ -262,5 +262,5 @@ tag release 必须是 `com.github.olddriverdoge.audiocpm`，包名错了直接�
 
 回归：API 50/50 + UI 43/43 = **93/93**。
 
-构建（run `__RUN_ID__`，提交 `__COMMIT__`）：`Audio-CPM-0.5.17-97-release.apk`，
-SHA256 `__SHA__`，下载 `__CDN__`。
+构建（run `45029672721`，提交 `96e4021`）：`Audio-CPM-0.5.17-97-release.apk`，
+SHA256 `9751b35c51edb3de67a3da5c1c82c64f5ff27a361e87ea3a7fe90fec8cf965e0`，下载 `https://github.com/olddriverdoge/Audio-CPM/releases/download/v0.5.17/Audio-CPM-0.5.17.apk`。
