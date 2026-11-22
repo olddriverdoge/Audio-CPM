@@ -247,5 +247,5 @@ SHA256 `dca499a1b0029bd17bffa3ad89cfd0fa7500503744baee9e002243f98b9b3d3e`，
 回归：API 50/50 + UI 43/43 = **93/93**（新增“浮窗上下首走原生队列 + 停止后回退完整目录”、
 “普通重排不重置播放窗口尺寸”两项 UI 断言）。
 
-构建（run `__RUN_ID__`，提交 `__COMMIT__`）：`Audio-CPM-0.5.16-96-dev-floatqueue.apk`，
-文件大小 `__SIZE__`，SHA256 `__SHA__`，下载 `__CDN__`。
+构建（run `45010185540`，提交 `76282ff`）：`Audio-CPM-0.5.16-96-dev-floatqueue.apk`，
+文件大小 `22,623,293 字节`，SHA256 `98f569c1879f1ec23b2bd6559139d75ea7b4514226565009faee8b13d08d30ad`，下载 `https://aka.doubaocdn.com/s/fTngVlHEHo`。
