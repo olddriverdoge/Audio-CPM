@@ -105,7 +105,7 @@ Audio-CPM 不只是“再做一个播放器”。它把日常音乐文件处理�
 从 GitHub Releases 下载最新 APK：
 
 - 发布页：<https://github.com/olddriverdoge/Audio-CPM/releases/latest>
-- 当前发布：<https://github.com/olddriverdoge/Audio-CPM/releases/tag/v0.5.5>
+- 当前发布：<https://github.com/olddriverdoge/Audio-CPM/releases/tag/v0.5.16>
 
 发布 APK 使用固定调试签名，适合侧载安装，**不是应用商店发布签名**。当前只提供 `arm64-v8a`。
 
@@ -202,7 +202,7 @@ requirements.txt           Python 依赖
 ## 当前限制
 
 - 仅 Android，当前 APK 为 `arm64-v8a`。
-- GitHub 上的 `0.5.5` Release 仍是固定调试签名；商店发布必须使用独立 release key 重新构建，不能直接复用该 APK。
+- GitHub 上的 `0.5.16` Release 仍是固定调试签名；商店发布必须使用独立 release key 重新构建，不能直接复用该 APK。
 - `MANAGE_EXTERNAL_STORAGE` 与 Play All files access 政策存在审核风险，SAF 合规路径尚未完成。
 - AAudio 独占是否真正生效取决于 ROM、设备和音频通路；被拒绝时会回退共享混音，输出面板会显示实际状态。
 - 网页内播放由 WebView/系统解码，无法保证与原生 AAudio 路径相同的采样率和位深。
