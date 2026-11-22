@@ -8,7 +8,6 @@ import android.content.Intent;
 import android.content.ActivityNotFoundException;
 import android.database.Cursor;
 import android.content.SharedPreferences;
-import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
@@ -383,9 +382,10 @@ public class MainActivity extends Activity {
         } catch (Throwable t) {
             Log.w(TAG, "read app version failed", t);
         }
-        boolean debuggable = (getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
-        // 只有真正的稳定 release 包走生产通道；debug / .dev 构建都走测试通道。
-        String updateChannel = (debuggable || getPackageName().endsWith(".dev")) ? "test" : "release";
+        // 更新通道只看包名，不看 debuggable：
+        // 用主干包名构建的迁移/调试包（main_package=true）仍然必须查正式 Release，
+        // 否则会把 debug-latest 里的 .dev APK 当成“正式版更新”推下来。
+        String updateChannel = getPackageName().endsWith(".dev") ? "test" : "release";
 
         File config = new File(data, "ac2_boot.json");
         String json = "{\"AC2_DATA_DIR\":\"" + esc(data.getAbsolutePath()) + "\","

@@ -249,3 +249,18 @@ SHA256 `dca499a1b0029bd17bffa3ad89cfd0fa7500503744baee9e002243f98b9b3d3e`，
 
 构建（run `45010185540`，提交 `76282ff`）：`Audio-CPM-0.5.16-96-dev-floatqueue.apk`，
 文件大小 `22,623,293 字节`，SHA256 `98f569c1879f1ec23b2bd6559139d75ea7b4514226565009faee8b13d08d30ad`，下载 `https://aka.doubaocdn.com/s/fTngVlHEHo`。
+
+## 第 28 轮：修正稳定包名更新通道（0.5.17/97）
+
+0.5.6 曾构建过一个“主干包名 debug 迁移包”（`main_package=true`，包名稳定、debuggable）。当时
+`MainActivity` 的更新通道判定是 `debuggable || packageName.endsWith(".dev")`，于是这个稳定包名的
+debug 包也被归到测试通道，更新检查去读 `debug-latest`，下载到的是 `.dev` 测试 APK。
+
+修正：更新通道只按包名判断——`.dev` 走测试通道，其余（含主干包名 debug 包）走正式 Release。
+同时在 CI 增加 `aapt dump badging` 校验：分支 debug 必须是 `.dev`，`main_package=true` 和
+tag release 必须是 `com.github.olddriverdoge.audiocpm`，包名错了直接构建失败。
+
+回归：API 50/50 + UI 43/43 = **93/93**。
+
+构建（run `__RUN_ID__`，提交 `__COMMIT__`）：`Audio-CPM-0.5.17-97-release.apk`，
+SHA256 `__SHA__`，下载 `__CDN__`。

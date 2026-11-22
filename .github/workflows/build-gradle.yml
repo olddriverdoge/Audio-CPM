@@ -148,6 +148,21 @@ jobs:
           AC2_FORCE_STABLE_PACKAGE: ${{ github.event.inputs.main_package }}
         run: gradle assembleDebug --no-daemon --stacktrace
 
+      - name: Verify debug APK package name
+        if: ${{ github.ref_type != 'tag' && github.event.inputs.build_release != 'true' }}
+        run: |
+          set -euo pipefail
+          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          APK="packaging/android/app/build/outputs/apk/debug/Audio-CPM-debug.apk"
+          ACTUAL=$("$AAPT" dump badging "$APK" | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -1)
+          if [ "${{ github.event.inputs.main_package }}" = "true" ]; then
+            EXPECTED="com.github.olddriverdoge.audiocpm"
+          else
+            EXPECTED="com.github.olddriverdoge.audiocpm.dev"
+          fi
+          echo "debug package: $ACTUAL (expected $EXPECTED)"
+          test "$ACTUAL" = "$EXPECTED"
+
       - name: Build signed release APK + AAB
         if: ${{ github.ref_type == 'tag' || github.event.inputs.build_release == 'true' }}
         working-directory: packaging/android
@@ -159,6 +174,17 @@ jobs:
           APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
           "$APKSIGNER" verify --print-certs packaging/android/app/build/outputs/apk/release/Audio-CPM-release.apk
           jarsigner -verify packaging/android/app/build/outputs/bundle/release/Audio-CPM-release.aab | tail -3
+
+      - name: Verify release APK package name
+        if: ${{ github.ref_type == 'tag' || github.event.inputs.build_release == 'true' }}
+        run: |
+          set -euo pipefail
+          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          APK="packaging/android/app/build/outputs/apk/release/Audio-CPM-release.apk"
+          ACTUAL=$("$AAPT" dump badging "$APK" | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -1)
+          EXPECTED="com.github.olddriverdoge.audiocpm"
+          echo "release package: $ACTUAL (expected $EXPECTED)"
+          test "$ACTUAL" = "$EXPECTED"
 
       - uses: actions/upload-artifact@v4
         if: ${{ github.ref_type != 'tag' && github.event.inputs.build_release != 'true' }}
