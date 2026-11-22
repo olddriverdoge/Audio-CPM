@@ -222,3 +222,7 @@ SHA256 `d2998279f85be9c4367a604cef8bf4cbd773c2c31d814f06e4ce987b93681140`，
 新增浮窗回归：`?float=1` 下必须能列出目录、进入子目录、拿到上级路径。
 
 回归：API 50/50 + UI 41/41 = **91/91**。
+
+构建（run `44989968532`，提交 `b156406`）：`Audio-CPM-0.5.15-95-dev-floatnav.apk`，22,621,357 字节，
+SHA256 `dca499a1b0029bd17bffa3ad89cfd0fa7500503744baee9e002243f98b9b3d3e`，
+下载 https://aka.doubaocdn.com/s/3PP1hgamdI 。
