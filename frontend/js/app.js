@@ -598,7 +598,23 @@ const App = (() => {
       advancingFolder = false;
     }
   }
+  /* 浮窗里的上一首/下一首必须走原生播放队列：浮窗虽然也初始化了 BrowseView，
+     但它的当前目录不一定是起播目录，用“可见列表”会找不到当前曲、看起来没反应。 */
+  function floatQueueStep(delta) {
+    if (!window.__AC2_FLOAT_MODE) return false;
+    try {
+      if (typeof Player === 'undefined' || !Player.hifiActive || !Player.hifiActive()) return false;
+      const q = Player.queueList ? Player.queueList() : [];
+      if (q.length < 2) return false;
+      const cur = Number(Player.remoteIndex) || 0;
+      const idx = (cur + delta + q.length) % q.length;
+      Player.playQueueIndex(idx);
+      return true;
+    } catch (_) { return false; }
+  }
+
   async function playNext(wrap, opts) {
+    if (floatQueueStep(1)) return true;
     if (playMode() === 'shuffle') return playRandom(opts);
     const list = playbackList().filter(f => f && f.path);
     if (!list.length) return false;
@@ -614,6 +630,7 @@ const App = (() => {
     return false;
   }
   function playPrev(opts) {
+    if (floatQueueStep(-1)) return true;
     if (playMode() === 'shuffle') return playRandom(opts);
     const list = playbackList().filter(f => f && f.path);
     if (!list.length) return false;
@@ -1239,6 +1256,7 @@ const App = (() => {
       // 这样播放列表可以点选切歌，而不是拿默认目录凑一份假队列。
       try {
         if (window.__AC2_FLOAT_MODE && typeof Player !== 'undefined'
+            && Player.current && Player.hifiActive && Player.hifiActive()
             && Player.queueList && Player.queueList().length) {
           return Player.queueList().map(p => ({path: p, name: Utils.basename(p)}));
         }

@@ -67,6 +67,9 @@ public class MainActivity extends Activity {
     private boolean pickerActive = false;
     /** 用户去系统设置授予“显示在其他应用上层”，回来后自动开浮窗。 */
     private boolean pendingFloatPlay = false;
+    /** 通知栏“浮窗”按钮拉起：等页面加载完再开浮窗，避免服务先连 127.0.0.1 时后端还没起。 */
+    private boolean pendingFloatFromNotif = false;
+    public static final String ACTION_SHOW_FLOAT = "AUDIO_CPM_SHOW_FLOAT";
     /** 刚刚拉起浮窗的时间戳：避免 onResume 立刻把刚启动的浮窗关掉。 */
     private long floatStartedAt = 0;
 
@@ -106,6 +109,10 @@ public class MainActivity extends Activity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 pushInsetsToWeb(insetTop, insetBottom, insetLeft, insetRight);
+                if (pendingFloatFromNotif) {
+                    pendingFloatFromNotif = false;
+                    view.postDelayed(MainActivity.this::beginFloatFromNotification, 800);
+                }
             }
         });
         // 没有 WebChromeClient 时，JS 的 alert()/confirm() 会被静默吞掉：
@@ -408,6 +415,12 @@ public class MainActivity extends Activity {
 
         lastStorageGranted = hasStorageAccess();
         ensureStorageAccess();
+
+        Intent launch = getIntent();
+        if (launch != null && ACTION_SHOW_FLOAT.equals(launch.getAction())) {
+            pendingFloatFromNotif = true;
+            launch.setAction(null);   // 消费掉，避免 Activity 重建时重复拉起
+        }
     }
 
     @Override
@@ -517,6 +530,35 @@ public class MainActivity extends Activity {
                     catch (Throwable ignored) {}
                 });
             }
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (intent != null && ACTION_SHOW_FLOAT.equals(intent.getAction())) {
+            intent.setAction(null);
+            // 从通知栏点“浮窗”时，这一次 onResume 不能把（可能已在运行的）浮窗关掉。
+            floatStartedAt = System.currentTimeMillis();
+            // 已经在运行，页面和后端都就绪，稍等一点直接拉起。
+            if (webView != null) webView.postDelayed(this::beginFloatFromNotification, 300);
+            else beginFloatFromNotification();
+        }
+    }
+
+    /** 通知栏“浮窗”按钮：没有悬浮窗权限时先引导授权，授权返回走 pendingFloatPlay。 */
+    private void beginFloatFromNotification() {
+        try {
+            if (Settings.canDrawOverlays(this)) {
+                startFloatingPlay();
+            } else {
+                pendingFloatPlay = true;
+                startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:" + getPackageName())));
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "start float from notification failed", t);
         }
     }
 

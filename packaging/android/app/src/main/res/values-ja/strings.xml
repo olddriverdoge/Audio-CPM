@@ -16,6 +16,7 @@
     <string name="action_pause">一時停止</string>
     <string name="action_play">再生</string>
     <string name="action_next">次へ</string>
+    <string name="action_float">フロート</string>
     <string name="cover_picker_title">カバー画像を選択</string>
     <string name="float_channel_name">フローティング再生</string>
     <string name="float_notif_title">プレイヤー浮窗</string>

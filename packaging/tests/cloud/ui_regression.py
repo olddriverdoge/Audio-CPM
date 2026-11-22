@@ -1063,6 +1063,28 @@ class UiRegression:
             return f"play window kept {g['w']:.0f}x{g['h']:.0f} across scene shortcut"
         self.check("scene shortcut keeps saved play window size", run, "scene-play-geo")
 
+    def test_play_size_survives_reflow(self):
+        def run():
+            self.click_scene("builtin-listen")
+            self.page.wait_for_timeout(500)
+            self.page.evaluate("""() => {
+              WinMgr.find(document.querySelector('#play-float')).place({x: 24, y: 96, w: 300, h: 480}, true);
+            }""")
+            self.page.wait_for_timeout(250)
+            # 模拟一次普通操作带来的全局重排；以前 apply() 会重新读旧存档，
+            # 把刚拖好的窗口弹回默认尺寸。
+            self.page.evaluate("() => { WinMgr.reclampAll(); }")
+            self.page.wait_for_timeout(250)
+            g = self.page.evaluate("""() => {
+              const r = document.querySelector('#play-float').getBoundingClientRect();
+              return {w: r.width, h: r.height};
+            }""")
+            self.page.evaluate("() => { App.playPanel().close(); App.closeAllModules(); }")
+            self.require(abs(g["w"] - 300) <= 6 and abs(g["h"] - 480) <= 6,
+                         f"reflow reset play window geometry: {g}")
+            return f"play window kept {g['w']:.0f}x{g['h']:.0f} across reflow"
+        self.check("reflow keeps current play window size", run, "reflow-play-geo")
+
     def test_defaults_import(self):
         def run():
             bundle = {
@@ -1228,6 +1250,46 @@ try { return await Defaults.apply(true); } finally { window.fetch = realFetch; }
             return f"sheet width {rect['width']:.0f}px"
         self.check("mobile viewport settings fits", run)
 
+    def test_float_queue_controls(self):
+        def run():
+            ctx = self.browser.new_context(locale="zh-CN", viewport={"width": 390, "height": 844}, device_scale_factor=1)
+            page = ctx.new_page()
+            page.set_default_timeout(9000)
+            page.on("console", self._on_console)
+            page.on("pageerror", self._on_pageerror)
+            page.goto(self.base + "/?float=1&defaults=0", wait_until="load", timeout=20000)
+            page.wait_for_function("typeof App !== 'undefined'", timeout=15000)
+            page.wait_for_function("() => App.directories().length > 0", timeout=15000)
+            page.wait_for_timeout(500)
+            page.evaluate("""async () => {
+              const ui = App.directories().find(d => d.name === 'ui');
+              if (ui) await App.browse(ui.path);
+              const album = App.directories().find(d => d.name === 'Album A');
+              if (album) await App.browse(album.path);
+            }""")
+            page.wait_for_timeout(300)
+            calls = page.evaluate("""() => {
+              window.__idx = 0; window.__calls = [];
+              Object.defineProperty(Player, 'remoteIndex', {configurable: true, get: () => window.__idx});
+              Player.hifiActive = () => true;
+              Player.queueList = () => ['a.flac', 'b.flac', 'c.flac'];
+              Player.playQueueIndex = (i) => { window.__idx = i; window.__calls.push(i); };
+              App.playNext(false, {quiet: true});
+              App.playPrev({quiet: true});
+              return window.__calls;
+            }""")
+            self.require(calls == [1, 0], f"float prev/next did not step native queue: {calls}")
+            after_stop = page.evaluate("""() => {
+              Player.hifiActive = () => false;
+              Player.queueList = () => ['native-only.flac'];
+              return App.playbackQueueList().map(x => x.path || x);
+            }""")
+            self.require(any('native-only' not in p for p in after_stop) and any('Track One' in p for p in after_stop),
+                         f"stopped float still uses stale native queue: {after_stop}")
+            ctx.close()
+            return f"native queue steps {calls}; stopped list {len(after_stop)} items"
+        self.check("float prev/next and stopped directory list", run, "float-queue-controls")
+
     def test_float_page(self):
         def run():
             ctx = self.browser.new_context(locale="zh-CN", viewport={"width": 390, "height": 844}, device_scale_factor=1)
@@ -1383,6 +1445,8 @@ try { return await Defaults.apply(true); } finally { window.fetch = realFetch; }
                 self.fresh_page()
                 self.test_scene_keeps_play_geometry()
                 self.fresh_page()
+                self.test_play_size_survives_reflow()
+                self.fresh_page()
                 self.test_defaults_import()
                 self.fresh_page()
                 self.test_real_defaults_and_orientation()
@@ -1390,6 +1454,8 @@ try { return await Defaults.apply(true); } finally { window.fetch = realFetch; }
                 self.test_mobile_layout()
                 self.fresh_page()
                 self.test_float_page()
+                self.fresh_page()
+                self.test_float_queue_controls()
                 self.fresh_page()
                 self.test_float_handoff()
                 self.fresh_page()

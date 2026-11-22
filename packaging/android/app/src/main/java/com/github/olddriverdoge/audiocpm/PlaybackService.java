@@ -347,6 +347,11 @@ public class PlaybackService extends MediaSessionService {
         PendingIntent toggle = serviceAction("AUDIO_CPM_TOGGLE", 11);
         PendingIntent prev = serviceAction("AUDIO_CPM_PREV", 12);
         PendingIntent next = serviceAction("AUDIO_CPM_NEXT", 13);
+        PendingIntent floatPi = PendingIntent.getActivity(this, 14,
+                new Intent(this, MainActivity.class)
+                        .setAction(MainActivity.ACTION_SHOW_FLOAT)
+                        .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         NotificationCompat.Builder b = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_media_play)
                 .setContentTitle(title)
@@ -359,7 +364,8 @@ public class PlaybackService extends MediaSessionService {
                 .addAction(android.R.drawable.ic_media_previous, getString(R.string.action_prev), prev)
                 .addAction(playing ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play,
                         playing ? getString(R.string.action_pause) : getString(R.string.action_play), toggle)
-                .addAction(android.R.drawable.ic_media_next, getString(R.string.action_next), next);
+                .addAction(android.R.drawable.ic_media_next, getString(R.string.action_next), next)
+                .addAction(android.R.drawable.ic_menu_view, getString(R.string.action_float), floatPi);
         b.setStyle(new MediaStyleNotificationHelper.MediaStyle(session)
                 .setShowActionsInCompactView(0, 1, 2));
         return b.build();

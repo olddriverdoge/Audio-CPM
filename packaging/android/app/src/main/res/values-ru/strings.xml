@@ -16,6 +16,7 @@
     <string name="action_pause">Пауза</string>
     <string name="action_play">Воспроизвести</string>
     <string name="action_next">Следующий</string>
+    <string name="action_float">Плавающее окно</string>
     <string name="cover_picker_title">Выберите обложку</string>
     <string name="float_channel_name">Плавающий плеер</string>
     <string name="float_notif_title">Оверлей плеера</string>

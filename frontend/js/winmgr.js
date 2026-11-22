@@ -122,17 +122,24 @@ const WinMgr = (() => {
                          scale: Math.round(winScale(win) * 100) / 100});
     }
     function apply(remeasure) {
-      const saved = readGeo();
-      if (saved) {
-        rect = clampRect({...saved}, minW, minH);
+      // 已经量过/摆过的窗口，后续 apply() 必须沿用它当前的 rect。
+      // 以前这里每次都 readGeo()：用户刚拖完还没落盘时，任何一个操作触发的
+      // refresh 都会把窗口弹回上一次保存的尺寸（开一次浮窗后会好，就是那时已落盘）。
+      if (rect) {
+        rect = clampRect({...rect}, minW, minH);
       } else {
-        const m = measure(win);
-        const vb = viewportBounds();
-        const r = remeasure || m;
-        // 首次打开时至少落在 header 下方；已有画布坐标在 saved 分支里保持自由。
-        r.x = Math.max(vb.left, r.x || vb.left);
-        r.y = Math.max(vb.top, r.y || vb.top);
-        rect = clampRect(r, minW, minH);
+        const saved = readGeo();
+        if (saved) {
+          rect = clampRect({...saved}, minW, minH);
+        } else {
+          const m = measure(win);
+          const vb = viewportBounds();
+          const r = remeasure || m;
+          // 首次打开时至少落在 header 下方；已有画布坐标在 saved 分支里保持自由。
+          r.x = Math.max(vb.left, r.x || vb.left);
+          r.y = Math.max(vb.top, r.y || vb.top);
+          rect = clampRect(r, minW, minH);
+        }
       }
       if (contentSized) {
         win.style.left = Math.round(rect.x) + 'px';

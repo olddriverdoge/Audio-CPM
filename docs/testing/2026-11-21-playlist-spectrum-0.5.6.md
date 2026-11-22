@@ -226,3 +226,26 @@ SHA256 `d2998279f85be9c4367a604cef8bf4cbd773c2c31d814f06e4ce987b93681140`，
 构建（run `44989968532`，提交 `b156406`）：`Audio-CPM-0.5.15-95-dev-floatnav.apk`，22,621,357 字节，
 SHA256 `dca499a1b0029bd17bffa3ad89cfd0fa7500503744baee9e002243f98b9b3d3e`，
 下载 https://aka.doubaocdn.com/s/3PP1hgamdI 。
+
+## 第 27 轮：浮窗上下首/停止后目录、窗口尺寸、通知栏浮窗（0.5.16/96）
+
+这一轮仍以 0.5.11 为基线重做，只改四项已复现的问题：
+
+1. **浮窗上一首/下一首没反应**：`App.playNext/playPrev` 原先按“文件浏览当前可见列表”找下一首，
+   浮窗的当前目录不一定是起播目录，索引找不到就表现为没反应。浮窗模式（`?float=1`）
+   且原生播放活跃时，改为直接按原生队列 `Player.remoteIndex` 步进，并取模循环。
+2. **浮窗停止后目录列表不完整**：`App.playbackQueueList()` 以前只要原生队列非空就优先返回，
+   而 `Player.close()` 只停播、不清原生队列，于是目录界面拿到的是起播时那一小段残留队列。
+   条件收窄为“浮窗 + 有当前曲 + `hifiActive()` 为真 + 原生队列非空”；停止后自动回退到当前目录完整音频。
+3. **App 内每一步操作重置窗口尺寸**：根因在 `WinMgr.apply()`——每次 refresh 都 `readGeo()`
+   重新读上一次落盘的几何并覆盖刚调整的 `rect`。改为：已经量过/摆过的窗口后续 `apply()`
+   沿用自己的 `rect`，只有首次打开才读存档。开过一次浮窗后问题“消失”，正是因为那时几何已落盘。
+4. **通知栏播放器加浮窗按钮**：`PlaybackService` 通知新增 `action_float`（五种语言），
+   `PendingIntent.getActivity` 打开 `MainActivity` 并带 `AUDIO_CPM_SHOW_FLOAT`；`MainActivity`
+   增加 `onNewIntent`、`singleTop`，等页面 `onPageFinished` 后再拉起浮窗；无权限时走现有授权返回重试。
+
+回归：API 50/50 + UI 43/43 = **93/93**（新增“浮窗上下首走原生队列 + 停止后回退完整目录”、
+“普通重排不重置播放窗口尺寸”两项 UI 断言）。
+
+构建（run `__RUN_ID__`，提交 `__COMMIT__`）：`Audio-CPM-0.5.16-96-dev-floatqueue.apk`，
+文件大小 `__SIZE__`，SHA256 `__SHA__`，下载 `__CDN__`。
