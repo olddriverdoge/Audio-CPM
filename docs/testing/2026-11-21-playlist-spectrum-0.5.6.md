@@ -209,3 +209,16 @@ SHA256 `dcd8a3eb936ff060890c3c169b9cabc1387d6be3dfff000abb2830b678505648`，
 构建（run `44930172896`，提交 `c68f34e`）：`Audio-CPM-0.5.14-94-dev-rebase.apk`，22,621,441 字节，
 SHA256 `d2998279f85be9c4367a604cef8bf4cbd773c2c31d814f06e4ce987b93681140`，
 下载 https://aka.doubaocdn.com/s/hajr2f9zye 。
+
+## 第 26 轮：浮窗恢复浏览/收藏/侧滑返回（0.5.15/95）
+
+0.5.14 为了降后台负载，把浮窗页面的 `App.init()` 换成 `initFloatOnly()`，只初始化布局、频谱和播放管理。
+这等于把 `BrowseView`、数据源和 `currentPath` 一起砍了：播放管理里的目录列表、收藏入口、
+左右滑返回上级全部失效（它们分别依赖 `App.directories()`、`App.openFavorite()`、
+`App.currentParent()`，底层都是 `bv` 和 `browse()`）。
+
+处理：撤掉 `initFloatOnly()`，浮窗页面恢复和主 App 相同的完整初始化；后台减负只保留
+“错误巡检 2s→10s、页面隐藏/float-handoff 时跳过”这一项安全改动。
+新增浮窗回归：`?float=1` 下必须能列出目录、进入子目录、拿到上级路径。
+
+回归：API 50/50 + UI 41/41 = **91/91**。

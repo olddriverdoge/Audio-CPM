@@ -1267,6 +1267,17 @@ try { return await Defaults.apply(true); } finally { window.fetch = realFetch; }
               return {cw: r.width, ch: r.height, display: getComputedStyle(b).display}; }""")
             self.require(cv["display"] != "none" and cv["cw"] >= 100 and cv["ch"] >= 100,
                          f"embedded spectrum canvas collapsed in float mode: {cv}")
+            nav = page.evaluate("""async () => {
+              const start = App.path;
+              const dirs = App.directories ? App.directories() : [];
+              let opened = false;
+              if (dirs[0]) opened = await App.browse(dirs[0].path);
+              return {start, dirCount: dirs.length, opened,
+                      now: App.path, parent: App.currentParent ? App.currentParent() : ''};
+            }""")
+            self.require(nav["dirCount"] > 0 and nav["opened"] and nav["now"] != nav["start"],
+                         f"float play manager cannot browse/open folders: {nav}")
+            self.require(bool(nav["parent"]), f"float play manager cannot go to parent dir: {nav}")
             b = page.evaluate("""() => {
               const h = document.querySelector('#pf-head').getBoundingClientRect();
               const m = document.querySelector('#pf-min').getBoundingClientRect();

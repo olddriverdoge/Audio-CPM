@@ -968,17 +968,6 @@ const App = (() => {
     setTimeout(syncMods, 0);
   }
 
-  async function initFloatOnly() {
-    try { Layout.init(); } catch (_) {}
-    if (typeof Spectrum !== 'undefined') { try { Spectrum.init(); } catch (_) {} }
-    initMods();
-    applyPlayMode();
-    try { Player.paintRows(); Player.syncBar(); } catch (_) {}
-    if (typeof FloatMode !== 'undefined') {
-      try { await FloatMode.boot(); } catch (_) {}
-    }
-  }
-
   async function init() {
     if (typeof I18n !== 'undefined') await I18n.init();
     // 仓库默认配置只在缺失时补入，不能覆盖本机已调好的布局/表头/频谱参数。
@@ -986,10 +975,6 @@ const App = (() => {
       try { await Defaults.apply(); } catch (_) {}
       try { Defaults.init(); } catch (_) {}
     }
-    // 系统悬浮窗页面只承载“播放管理 + 内嵌声谱”。不要跑 Sources 扫描、
-    // 目录浏览、目标目录树、任务预设这些工作台初始化：它们在后台会持续
-    // 产生 I/O / HTTP / DOM 负载，和 AAudio 抢 CPU，听感就是一卡一卡。
-    if (window.__AC2_FLOAT_MODE) { await initFloatOnly(); return; }
     if (typeof Sources !== 'undefined') await Sources.refresh();
     await applyCapabilities();
     if (typeof Sources !== 'undefined') {
