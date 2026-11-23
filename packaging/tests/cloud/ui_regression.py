@@ -271,11 +271,21 @@ class UiRegression:
             self.page.wait_for_timeout(150)
             self.require(self.page.locator("#ui-tags").is_visible(), "tags panel not shown")
             self.require(self.page.locator("#ui-convert").is_visible() is False, "convert panel stayed visible")
+            self.page.locator('input[name="task"][value="metadata"]').check()
+            self.page.wait_for_timeout(150)
+            self.require(self.page.locator("#ui-metadata").is_visible(), "metadata panel not shown")
+            self.require(self.page.locator("#meta-fixed").is_visible(), "metadata fixed fields hidden")
+            self.page.locator("#meta-mode").select_option("filename")
+            self.page.wait_for_timeout(150)
+            self.require(self.page.locator("#meta-filename").is_visible(), "filename template panel hidden")
+            self.require(self.page.locator("#meta-template").is_disabled(), "auto template should disable raw input")
+            self.page.locator("#meta-template-preset").select_option("{artist} - {title}")
+            self.require(self.page.locator("#meta-template").is_enabled(), "custom template input stayed disabled")
             self.page.locator('input[name="task"][value="cover"]').check()
             self.page.wait_for_timeout(150)
             self.require(self.page.locator("#ui-cover").is_visible(), "cover panel not shown")
             self.page.locator('input[name="task"][value="convert"]').check()
-            return "convert/tags/cover panels toggle"
+            return "convert/tags/metadata/cover panels toggle"
         self.check("task type switches panels", task_tabs)
 
         def columns_sheet():

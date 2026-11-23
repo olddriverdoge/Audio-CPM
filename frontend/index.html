@@ -107,7 +107,7 @@
   <div class="fw-win hidden" id="fw-task">
     <div class="mf-head" id="fw-task-head" title="拖动可移动">
       <span class="mf-title">批处理</span>
-      <span class="mf-track" id="task-track">转换 / 重命名 / 替换封面</span>
+      <span class="mf-track" id="task-track">转换 / 重命名 / 替换封面 / 元数据</span>
       <button type="button" class="sf-btn" id="fw-task-min" title="收起">—</button>
     </div>
     <div class="fw-body" id="fw-task-body">
@@ -115,6 +115,7 @@
         <div class="row">
           <label class="chk"><input type="radio" name="task" value="convert" checked> 转换格式</label>
           <label class="chk"><input type="radio" name="task" value="tags"> 重命名</label>
+          <label class="chk"><input type="radio" name="task" value="metadata"> 元数据</label>
           <label class="chk"><input type="radio" name="task" value="cover"> 替换封面</label>
         </div>
 
@@ -169,6 +170,57 @@
           </div>
           <div class="row">
             <span class="status">目录内所有格式的音频文件都会参与重命名（不再限定单一格式）</span>
+          </div>
+        </div>
+
+        <div id="ui-metadata" class="hidden">
+          <div class="row">
+            <label>方式</label>
+            <select id="meta-mode" style="flex:1;max-width:260px">
+              <option value="fixed">批量写入指定值</option>
+              <option value="filename">从文件名提取</option>
+            </select>
+            <label class="chk"><input type="checkbox" id="meta-skip-existing"> 仅填写空白字段</label>
+          </div>
+
+          <div id="meta-fixed">
+            <div class="meta-grid">
+              <label>标题<input type="text" id="meta-title" data-meta-field="title" placeholder="留空=不修改"></label>
+              <label>艺术家<input type="text" id="meta-artist" data-meta-field="artist" placeholder="留空=不修改"></label>
+              <label>专辑<input type="text" id="meta-album" data-meta-field="album" placeholder="留空=不修改"></label>
+              <label>专辑艺术家<input type="text" id="meta-album-artist" data-meta-field="album_artist" placeholder="留空=不修改"></label>
+              <label>作曲家<input type="text" id="meta-composer" data-meta-field="composer" placeholder="留空=不修改"></label>
+              <label>流派<input type="text" id="meta-genre" data-meta-field="genre" placeholder="留空=不修改"></label>
+              <label>年份<input type="text" id="meta-year" data-meta-field="year" inputmode="numeric" placeholder="例如 1999"></label>
+              <label>音轨号<input type="text" id="meta-track" data-meta-field="track" inputmode="numeric" placeholder="例如 3"></label>
+              <label>碟号<input type="text" id="meta-disc" data-meta-field="disc" inputmode="numeric" placeholder="例如 1"></label>
+              <label>备注<input type="text" id="meta-comment" data-meta-field="comment" placeholder="留空=不修改"></label>
+            </div>
+            <div class="row"><span class="status">只写入填了值的字段；留空的字段保持原样。勾选“仅填写空白字段”时不会覆盖已有内容。</span></div>
+          </div>
+
+          <div id="meta-filename" class="hidden">
+            <div class="row">
+              <label>模板</label>
+              <select id="meta-template-preset" style="flex:1;max-width:300px">
+                <option value="auto">自动识别常见文件名（推荐）</option>
+                <option value="{artist} - {title}">艺术家 - 标题</option>
+                <option value="{track}. {title}">音轨号. 标题</option>
+                <option value="{track} - {title}">音轨号 - 标题</option>
+                <option value="{artist} - {album} - {track} - {title}">艺术家 - 专辑 - 音轨 - 标题</option>
+                <option value="">自定义模板</option>
+              </select>
+              <button class="small" id="btn-preview-meta" type="button" title="不修改文件，只把提取结果输出到日志">预览</button>
+            </div>
+            <div class="row">
+              <label>文件名模板</label>
+              <input type="text" id="meta-template" class="path" value="{artist} - {title}" placeholder="{artist} - {title}">
+            </div>
+            <div class="row">
+              <label style="font-size:11.5px">可用字段</label>
+              <span class="status">{title} {artist} {album} {album_artist} {composer} {genre} {year} {track} {disc} {comment}</span>
+            </div>
+            <div class="row"><span class="status">不用写正则：直接按文件名照抄文字，把想提取的部分换成 {字段}。例如 <b>01. 周杰伦 - 晴天.flac</b> 对应 <b>{track}. {artist} - {title}</b>。分隔符的空格、短横线会自动兼容。</span></div>
           </div>
         </div>
 

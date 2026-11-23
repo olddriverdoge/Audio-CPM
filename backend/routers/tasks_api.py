@@ -11,8 +11,9 @@ from starlette.responses import StreamingResponse
 from starlette.routing import Route
 
 from ..jobs import cancel_task, create_task, list_tasks, tasks, tasks_lock
-from ..jobs_core import (check_tags_v2, convert_album_v2, manage_tags_v2,
-                         modify_cover_v2, preview_rename)
+from ..jobs_core import (check_tags_v2, convert_album_v2, edit_metadata_batch,
+                         manage_tags_v2, modify_cover_v2, preview_metadata,
+                         preview_rename)
 from ..simple import J, body
 from ..storage import parse_ref
 
@@ -77,6 +78,17 @@ async def api_start(request: Request):
                                   name_pattern=data.get('name_pattern') or None,
                                   only_files=only_files, progress_cb=cb)
         return J({"task_id": create_task(fn, f"整理标签 @ {path}")})
+    if task == 'metadata':
+        mode = 'filename' if str(data.get('meta_mode') or '') == 'filename' else 'fixed'
+        tags = data.get('tags') if isinstance(data.get('tags'), dict) else {}
+
+        def fn(cb):
+            return edit_metadata_batch(
+                path, mode=mode, tags=tags,
+                template=data.get('filename_template') or None,
+                skip_existing=bool(data.get('skip_existing')),
+                only_files=only_files, progress_cb=cb)
+        return J({"task_id": create_task(fn, f"编辑元数据 @ {path}")})
     if task == 'cover':
         fmt = (data.get('format') or '').lower() or None
         cover_path = None
@@ -151,6 +163,29 @@ def api_tasks(request: Request):
     return J({'tasks': list_tasks()})
 
 
+async def api_metadata_preview(request: Request):
+    data = await body(request)
+    ref = parse_ref(str(data.get('path') or ''))
+    if ref.kind == 'dav':
+        raise HTTPException(400, "元数据预览只支持本地目录")
+    path = ref.path
+    if not os.path.isdir(path):
+        raise HTTPException(400, f"目录不存在: {path}")
+    only_files = []
+    for item in (data.get('only_files') or []):
+        r2 = parse_ref(str(item or ''))
+        if r2.kind == 'local' and r2.path:
+            only_files.append(r2.path)
+    return J(preview_metadata(
+        path,
+        mode='filename' if str(data.get('meta_mode') or '') == 'filename' else 'fixed',
+        tags=data.get('tags') if isinstance(data.get('tags'), dict) else {},
+        template=data.get('filename_template') or None,
+        skip_existing=bool(data.get('skip_existing')),
+        only_files=only_files or None,
+        limit=int(data.get('limit') or 30)))
+
+
 async def api_rename_preview(request: Request):
     data = await body(request)
     ref = parse_ref(str(data.get('path') or ''))
@@ -172,5 +207,6 @@ routes.append(Route('/api/start', api_start, methods=['POST']))
 routes.append(Route('/api/task/{task_id}/cancel', api_task_cancel, methods=['POST']))
 routes.append(Route('/api/tasks', api_tasks))
 routes.append(Route('/api/tasks/rename-preview', api_rename_preview, methods=['POST']))
+routes.append(Route('/api/tasks/metadata-preview', api_metadata_preview, methods=['POST']))
 routes.append(Route('/api/task/{task_id}/status', api_task_status))
 routes.append(Route('/api/task/{task_id}/stream', api_task_stream))

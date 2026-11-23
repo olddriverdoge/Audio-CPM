@@ -80,6 +80,7 @@ const Api = (() => {
     audioDevices: () => jfetch('/api/audio/devices'),
     setAudioDevice: id => jpost('/api/audio/device', {id: Number(id) || 0}),
     renamePreview: cfg => jpost('/api/tasks/rename-preview', cfg),
+    metadataPreview: cfg => jpost('/api/tasks/metadata-preview', cfg),
     appUpdate: force => {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 6000);

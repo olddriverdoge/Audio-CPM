@@ -15,6 +15,8 @@ const TaskRunner = (() => {
     const t = currentTask();
     document.getElementById('ui-convert').classList.toggle('hidden', t !== 'convert');
     document.getElementById('ui-tags').classList.toggle('hidden', t !== 'tags');
+    const meta = document.getElementById('ui-metadata');
+    if (meta) meta.classList.toggle('hidden', t !== 'metadata');
     document.getElementById('ui-cover').classList.toggle('hidden', t !== 'cover');
     const prow = document.getElementById('preset-row');
     if (prow) prow.classList.toggle('hidden', t !== 'convert');
@@ -47,6 +49,21 @@ const TaskRunner = (() => {
       if (p.also_tags !== undefined) document.getElementById('also-tags').checked = !!p.also_tags;
     } else if (p.task === 'tags') {
       if (p.name_pattern !== undefined) document.getElementById('name-pattern').value = p.name_pattern;
+    } else if (p.task === 'metadata') {
+      if (p.meta_mode) document.getElementById('meta-mode').value = p.meta_mode;
+      if (p.filename_template !== undefined) {
+        const tpl = document.getElementById('meta-template');
+        if (tpl) tpl.value = p.filename_template === 'auto' ? '' : p.filename_template;
+      }
+      if (p.tags && typeof p.tags === 'object') {
+        document.querySelectorAll('[data-meta-field]').forEach(inp => {
+          inp.value = p.tags[inp.dataset.metaField] || '';
+        });
+      }
+      if (p.skip_existing !== undefined) {
+        document.getElementById('meta-skip-existing').checked = !!p.skip_existing;
+      }
+      syncMetaUI();
     } else if (p.task === 'cover') {
       const cp = document.getElementById('cover-path');
       if (cp && p.cover_path) cp.value = p.cover_path;
@@ -64,6 +81,11 @@ const TaskRunner = (() => {
     } else if (task === 'tags') {
       // 目标格式已移除：重命名对所有音频格式生效
       cfg.name_pattern = document.getElementById('name-pattern').value;
+    } else if (task === 'metadata') {
+      cfg.meta_mode = document.getElementById('meta-mode').value === 'filename' ? 'filename' : 'fixed';
+      cfg.tags = collectMetaTags();
+      cfg.filename_template = getMetaTemplate();
+      cfg.skip_existing = !!document.getElementById('meta-skip-existing').checked;
     } else if (task === 'cover') {
       // 目标格式已移除：所有音频格式都会替换封面；可单独指定封面图片
       const cp = document.getElementById('cover-path');
@@ -76,6 +98,81 @@ const TaskRunner = (() => {
     const sel = App.selection();
     if (sel.length) cfg.only_files = sel;
     return cfg;
+  }
+  const META_INPUTS = {
+    title: 'meta-title', artist: 'meta-artist', album: 'meta-album',
+    album_artist: 'meta-album-artist', composer: 'meta-composer', genre: 'meta-genre',
+    year: 'meta-year', track: 'meta-track', disc: 'meta-disc', comment: 'meta-comment'
+  };
+  function collectMetaTags() {
+    const out = {};
+    for (const [field, id] of Object.entries(META_INPUTS)) {
+      const inp = document.getElementById(id);
+      const v = inp ? inp.value.trim() : '';
+      if (v) out[field] = v;
+    }
+    return out;
+  }
+  function syncMetaUI() {
+    const mode = document.getElementById('meta-mode').value;
+    document.getElementById('meta-fixed').classList.toggle('hidden', mode !== 'fixed');
+    document.getElementById('meta-filename').classList.toggle('hidden', mode !== 'filename');
+  }
+  function syncMetaTemplate() {
+    const sel = document.getElementById('meta-template-preset');
+    const inp = document.getElementById('meta-template');
+    if (!sel || !inp) return;
+    if (sel.value === 'auto') {
+      inp.value = '';
+      inp.disabled = true;
+      inp.placeholder = '自动识别常见文件名，不用填模板';
+    } else if (sel.value) {
+      inp.value = sel.value;
+      inp.disabled = false;
+      inp.placeholder = '{artist} - {title}';
+    } else {
+      inp.disabled = false;
+      inp.placeholder = '{artist} - {title}';
+      inp.focus();
+    }
+  }
+  function getMetaTemplate() {
+    const sel = document.getElementById('meta-template-preset');
+    if (sel && sel.value === 'auto') return 'auto';
+    const inp = document.getElementById('meta-template');
+    return inp ? inp.value.trim() : '';
+  }
+  async function previewMetadata() {
+    if (!App.path) { Utils.toast('请先选择目录'); return; }
+    const cfg = collectConfig();
+    if (cfg.meta_mode === 'fixed') {
+      if (!Object.keys(cfg.tags).length) { Utils.toast('至少填一个要写入的字段', 'warn'); return; }
+    } else if (!getMetaTemplate()) {
+      Utils.toast('请填写文件名模板', 'warn'); return;
+    }
+    if (typeof App.openMod === 'function') App.openModule('log');
+    lg('info', '元数据预览（不改文件）：' +
+      (cfg.meta_mode === 'filename' ? ('模板 ' + (getMetaTemplate() === 'auto' ? '自动识别' : getMetaTemplate())) : '固定值'));
+    try {
+      const r = await Api.metadataPreview({
+        path: App.path, meta_mode: cfg.meta_mode, tags: cfg.tags,
+        filename_template: cfg.filename_template, skip_existing: cfg.skip_existing,
+        only_files: App.selection(), limit: 30
+      });
+      if (!r || !r.total) { lg('warn', '当前目录没有可编辑的音频文件'); return; }
+      if (cfg.meta_mode === 'filename') {
+        lg('info', '实际使用模板：' + (r.template || '') + ' · 匹配 ' + (r.matched || 0) + ' / ' + r.total);
+        if (!r.matched) lg('warn', '没有文件名匹配这个模板；可以换成“自动识别”或按实际文件名改模板');
+      }
+      lg('info', '共 ' + r.total + ' 个，预览前 ' + r.shown + ' 个：');
+      (r.items || []).forEach(it => {
+        if (it.error) { lg('err', it.file + ' — ' + it.error); return; }
+        const tags = Object.entries(it.tags || {}).map(([k, v]) => k + '=' + v).join(' | ');
+        lg(tags ? 'ok' : 'info', it.file + (tags ? '  →  ' + tags : '（没有要改的字段）'));
+      });
+    } catch (e) {
+      lg('err', '预览失败: ' + e.message);
+    }
   }
   async function saveAsPreset() {
     const name = prompt('预设名称：', '');
@@ -333,6 +430,19 @@ const TaskRunner = (() => {
         pickCover.disabled = false;
       }
     });
+    const metaMode = document.getElementById('meta-mode');
+    if (metaMode) metaMode.addEventListener('change', syncMetaUI);
+    const metaPreset = document.getElementById('meta-template-preset');
+    if (metaPreset) metaPreset.addEventListener('change', syncMetaTemplate);
+    const metaTemplate = document.getElementById('meta-template');
+    if (metaTemplate) metaTemplate.addEventListener('input', () => {
+      const sel = document.getElementById('meta-template-preset');
+      if (sel && sel.value !== '') sel.value = '';
+    });
+    const previewMeta = document.getElementById('btn-preview-meta');
+    if (previewMeta) previewMeta.addEventListener('click', previewMetadata);
+    syncMetaUI();
+    syncMetaTemplate();
     const previewName = document.getElementById('btn-preview-name');
     if (previewName) previewName.addEventListener('click', previewNames);
     const useCur = document.getElementById('btn-use-cur-dir');
@@ -346,6 +456,6 @@ const TaskRunner = (() => {
     checkUnfinished();
   }
 
-  return {init, syncUI, loadTaskPresets, applyPreset, saveAsPreset, deletePreset, start, previewNames,
+  return {init, syncUI, loadTaskPresets, applyPreset, saveAsPreset, deletePreset, start, previewNames, previewMetadata,
           openCoverEditor, currentTask, collectConfig, checkUnfinished};
 })();

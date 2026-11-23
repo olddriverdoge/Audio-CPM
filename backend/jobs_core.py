@@ -270,6 +270,235 @@ def preview_rename(iopath, name_pattern=None, only_files=None, limit=30):
     return {'total': len(files), 'shown': len(items), 'items': items}
 
 
+
+# ============================================================
+# 批量编辑元数据：固定值写入 / 从文件名模板提取
+# ============================================================
+META_FIELDS = ('title', 'artist', 'album', 'album_artist', 'composer',
+               'genre', 'year', 'track', 'disc', 'comment')
+_META_ALIASES = {
+    'albumartist': 'album_artist', 'date': 'year', 'tracknumber': 'track',
+    'discnumber': 'disc', 'encodedby': 'encoded_by',
+}
+_META_CURRENT_KEYS = {
+    'album_artist': ('album_artist', 'albumartist'),
+    'year': ('year', 'date'),
+    'track': ('track', 'tracknumber'),
+    'disc': ('disc', 'discnumber'),
+    'comment': ('comment', 'comm'),
+}
+# 文件名里常见的写法；“自动识别”会逐条试，选匹配文件最多、字段最多的模板。
+AUTO_META_TEMPLATES = (
+    '{track}. {artist} - {title}',
+    '{track} - {artist} - {title}',
+    '{artist} - {album} - {track} - {title}',
+    '{track} - {artist} - {album} - {title}',
+    '{artist} - {album} - {title}',
+    '{track}. {title}',
+    '{track} - {title}',
+    '{artist} - {title}',
+    '[{track}] {title}',
+    '{title}',
+)
+
+
+def _meta_field(name):
+    key = str(name or '').strip().lower()
+    return _META_ALIASES.get(key, key)
+
+
+def _meta_text(value):
+    # 元数据是正文，不能用文件名清洗器 clean_text（它会拆掉 |、-、; 等分隔符）。
+    return re.sub(r'\s+', ' ', '' if value is None else str(value)).strip()
+
+
+def _meta_literal_pattern(text):
+    """模板里的普通分隔符：空格可多可少，连字符也接受全角/长横线。"""
+    out = re.escape(text)
+    out = out.replace(r'\ ', r'\s*')
+    return out.replace(r'\-', r'[-–—－]')
+
+
+def compile_meta_template(template):
+    """把用户写的 {artist} - {title} 编译成正则；不要求用户接触正则语法。"""
+    tpl = str(template or '').strip()
+    if not tpl:
+        raise ValueError('请填写文件名模板，例如 {artist} - {title}')
+    fields, parts, last = [], ['^'], 0
+    for m in re.finditer(r'\{([a-zA-Z_]+)\}', tpl):
+        field = _meta_field(m.group(1))
+        if field not in META_FIELDS:
+            raise ValueError('不支持的字段: {%s}' % m.group(1))
+        if field in fields:
+            raise ValueError('字段 {%s} 在模板里重复了' % field)
+        literal = tpl[last:m.start()]
+        if literal:
+            parts.append(_meta_literal_pattern(literal))
+        if field in ('track', 'disc'):
+            parts.append('(?P<%s>\\d{1,3})' % field)
+        elif field == 'year':
+            parts.append('(?P<%s>(?:19|20)\\d{2})' % field)
+        else:
+            parts.append('(?P<%s>.+?)' % field)
+        fields.append(field)
+        last = m.end()
+    tail = tpl[last:]
+    if tail:
+        parts.append(_meta_literal_pattern(tail))
+    if not fields:
+        raise ValueError('模板里至少要有一个 {字段}')
+    parts.append('$')
+    return re.compile(''.join(parts), re.IGNORECASE), fields
+
+
+def _meta_stem(path):
+    return os.path.splitext(os.path.basename(path))[0]
+
+
+def resolve_meta_template(template, files):
+    """auto 时从常见文件名格式里挑选最匹配的一条，返回 (regex, fields, 模板文本)。"""
+    tpl = str(template or '').strip() or 'auto'
+    if tpl.lower() != 'auto':
+        regex, fields = compile_meta_template(tpl)
+        return regex, fields, tpl
+    best = None
+    for candidate in AUTO_META_TEMPLATES:
+        try:
+            regex, fields = compile_meta_template(candidate)
+        except ValueError:
+            continue
+        match_count = sum(1 for f in files if regex.match(_meta_stem(f)))
+        score = (match_count, len(fields))
+        if best is None or score > best[0]:
+            best = (score, regex, fields, candidate)
+    if best is None:
+        raise ValueError('没有可用的文件名模板')
+    return best[1], best[2], best[3]
+
+
+def _meta_current(tags, field):
+    for key in _META_CURRENT_KEYS.get(field, (field,)):
+        value = tags.get(key)
+        if value not in (None, ''):
+            return _meta_text(value)
+    return ''
+
+
+def _meta_normalize(field, value):
+    text = _meta_text(value)
+    if not text:
+        return ''
+    if field in ('track', 'disc', 'year'):
+        m = re.search(r'\d+', text)
+        if not m:
+            raise ValueError('{%s} 需要数字，实际是“%s”' % (field, text))
+        return str(int(m.group(0))) if field != 'year' else m.group(0)
+    return text
+
+
+def _meta_edits_for(f, mode, tags_fixed, regex, fields, skip_existing):
+    detail = probe_file_detail(f)
+    if detail.get('error'):
+        raise ValueError(detail['error'])
+    current = {str(k).lower(): v for k, v in (detail.get('tags') or {}).items()}
+    edits = {}
+    if mode == 'filename':
+        matcher = regex.match(_meta_stem(f)) if regex else None
+        if not matcher:
+            raise ValueError('文件名不匹配模板')
+        for field in fields:
+            value = _meta_normalize(field, matcher.group(field))
+            if not value:
+                continue
+            if skip_existing and _meta_current(current, field):
+                continue
+            edits[field] = value
+    else:
+        for field in META_FIELDS:
+            value = _meta_normalize(field, (tags_fixed or {}).get(field, ''))
+            if not value:
+                continue
+            if skip_existing and _meta_current(current, field):
+                continue
+            edits[field] = value
+    return edits
+
+
+def preview_metadata(iopath, mode='fixed', tags=None, template=None,
+                     skip_existing=False, only_files=None, limit=30):
+    """只读预览：显示每个文件将会写入哪些字段，不改文件。"""
+    only = expand_only_files(only_files)
+    files = ([f for f in only if os.path.splitext(f)[1].lower() in MEDIA_EXTS]
+             if only is not None else collect_media_recursive(iopath, MEDIA_EXTS))
+    mode = 'filename' if mode == 'filename' else 'fixed'
+    regex, fields, resolved = (None, [], '')
+    if mode == 'filename':
+        regex, fields, resolved = resolve_meta_template(template, files)
+    items, matched = [], 0
+    for f in files[:max(1, int(limit or 30))]:
+        try:
+            edits = _meta_edits_for(f, mode, tags or {}, regex, fields, bool(skip_existing))
+            if mode == 'filename':
+                matched += 1
+            items.append({'file': os.path.basename(f), 'tags': edits,
+                          'changed': len(edits), 'status': 'ok'})
+        except Exception as e:
+            items.append({'file': os.path.basename(f), 'error': short_err(e),
+                          'changed': 0, 'status': 'error'})
+    if mode == 'filename' and files:
+        # preview 只截取前 limit 个；总量里的匹配数单独算，避免用户误判模板。
+        matched = sum(1 for f in files if regex.match(_meta_stem(f)))
+    return {'total': len(files), 'shown': len(items), 'matched': matched,
+            'mode': mode, 'template': resolved, 'items': items}
+
+
+def edit_metadata_batch(iopath, mode='fixed', tags=None, template=None,
+                        skip_existing=False, only_files=None, progress_cb=None):
+    """批量写标签，不重命名。留空字段不改；skip_existing=True 时只补空白字段。"""
+    exts = MEDIA_EXTS
+    only = expand_only_files(only_files)
+    files = ([f for f in only if os.path.splitext(f)[1].lower() in exts]
+             if only is not None else collect_media_recursive(iopath, exts))
+    mode = 'filename' if mode == 'filename' else 'fixed'
+    regex, fields, resolved = (None, [], '')
+    if mode == 'filename':
+        regex, fields, resolved = resolve_meta_template(template, files)
+    total = len(files)
+    result = {'success': 0, 'failed': 0, 'unchanged': 0, 'template': resolved,
+              'files': []}
+    if progress_cb:
+        progress_cb({'event': 'plan', 'phase': 'metadata', 'total': total,
+                     'folder': iopath, 'spec': mode, 'template': resolved})
+    for idx, f in enumerate(files):
+        cancel.check()
+        try:
+            edits = _meta_edits_for(f, mode, tags or {}, regex, fields, bool(skip_existing))
+            if not edits:
+                result['unchanged'] += 1
+                result['files'].append({'file': f, 'output': f, 'status': 'ok',
+                                        'unchanged': True})
+                if progress_cb:
+                    progress_cb({'event': 'file_done', 'index': idx + 1, 'total': total,
+                                 'file': f, 'output': f, 'status': 'ok'})
+                continue
+            r = edit_tags_file(f, edits, [])
+            if not r.get('ok'):
+                raise ValueError('写入标签失败: ' + (r.get('error') or ''))
+            result['success'] += 1
+            result['files'].append({'file': f, 'output': f, 'status': 'ok',
+                                    'tags': edits,
+                                    'warnings': r.get('warnings') or []})
+            if progress_cb:
+                progress_cb({'event': 'file_done', 'index': idx + 1, 'total': total,
+                             'file': f, 'output': f, 'status': 'ok'})
+        except Exception as e:
+            result['failed'] += 1
+            result['files'].append({'file': f, 'status': 'error', 'error': short_err(e)})
+            if progress_cb:
+                progress_cb({'event': 'file_done', 'index': idx + 1, 'total': total,
+                             'file': f, 'status': 'error', 'error': short_err(e)})
+    return result
+
 def manage_tags_v2(iopath, format=None, name_pattern=None,
                    only_files=None, progress_cb=None):
     """format 为空表示"所有音频格式"（前端已不再要求选目标格式）。"""

@@ -412,6 +412,65 @@ class ApiRegression:
             return d.get("items", [])[:3]
         self.check("rename preview", preview)
 
+        def metadata_preview():
+            d = self.jpost("/api/tasks/metadata-preview", {
+                "path": self.fx["tasks"], "meta_mode": "filename",
+                "filename_template": "auto", "limit": 10,
+            })
+            self.require(d.get("total", 0) >= 4, f"metadata preview total: {d.get('total')}")
+            self.require(d.get("matched", 0) >= 4, f"metadata preview matched: {d.get('matched')}")
+            self.require(d.get("template"), f"auto template not resolved: {d}")
+            self.require(all(x.get("status") == "ok" for x in (d.get("items") or [])),
+                         f"metadata preview errors: {d.get('items')}")
+            fixed = self.jpost("/api/tasks/metadata-preview", {
+                "path": self.fx["tasks"], "meta_mode": "fixed",
+                "tags": {"genre": "Batch Genre"}, "limit": 3,
+            })
+            self.require(all((x.get("tags") or {}).get("genre") == "Batch Genre"
+                             for x in (fixed.get("items") or [])), f"fixed preview: {fixed.get('items')}")
+            return f"auto={d.get('template')} matched={d.get('matched')}/{d.get('total')}"
+        self.check("metadata preview resolves friendly filename template", metadata_preview)
+
+        def metadata_fixed_task():
+            src = Path(self.local_path(self.fx["tasks"])) / "Track One.flac"
+            dst = Path(self.local_path(self.fx["work"])) / "Meta Batch.flac"
+            dst.write_bytes(src.read_bytes())
+            tid = self.start_task({
+                "task": "metadata", "path": self.fx["work"], "meta_mode": "fixed",
+                "tags": {"genre": "Batch Genre", "comment": "Batch Comment"},
+                "only_files": [f"local:{dst}"],
+            })
+            done = self.wait_task(tid)
+            result = done.get("result") or {}
+            self.require(done.get("status") == "done" and result.get("success") == 1,
+                         f"metadata fixed task: {done}")
+            probe = self.jget("/api/probe_file", params={"path": f"local:{dst}"})
+            self.require(probe.get("tags", {}).get("genre") == "Batch Genre"
+                         and probe.get("tags", {}).get("comment") == "Batch Comment",
+                         f"metadata tags readback: {probe.get('tags')}")
+            return "genre/comment written"
+        self.check("metadata task writes fixed values", metadata_fixed_task)
+
+        def metadata_filename_task():
+            src = Path(self.local_path(self.fx["tasks"])) / "Track One.flac"
+            dst = Path(self.local_path(self.fx["work"])) / "周杰伦 - 晴天.flac"
+            dst.write_bytes(src.read_bytes())
+            tid = self.start_task({
+                "task": "metadata", "path": self.fx["work"], "meta_mode": "filename",
+                "filename_template": "{artist} - {title}",
+                "only_files": [f"local:{dst}"],
+            })
+            done = self.wait_task(tid)
+            result = done.get("result") or {}
+            self.require(done.get("status") == "done" and result.get("success") == 1,
+                         f"metadata filename task: {done}")
+            probe = self.jget("/api/probe_file", params={"path": f"local:{dst}"})
+            tags = probe.get("tags", {})
+            self.require(tags.get("artist") == "周杰伦" and tags.get("title") == "晴天",
+                         f"metadata filename readback: {tags}")
+            return "artist=周杰伦 title=晴天"
+        self.check("metadata task extracts fields from filename template", metadata_filename_task)
+
         def convert():
             src = Path(self.local_path(self.fx["tasks"])) / "Track One.flac"
             tid = self.start_task({
