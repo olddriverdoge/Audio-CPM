@@ -29,3 +29,10 @@
 - API 回归新增 3 项：自动模板预览、固定值任务写入并读回、文件名模板提取并读回。
 - UI 回归扩展任务页签断言：元数据面板、两种模式切换、自动模板禁用原始输入。
 - 云端完整回归：API **53/53** + UI **43/43** = **96/96**。
+
+## 构建
+
+- CI run `45192258373`，提交 `557684b`，`main_package=false`。
+- 产物 `Audio-CPM-0.5.18-98-dev-metadata.apk`（测试包 `com.github.olddriverdoge.audiocpm.dev`）。
+- 22,632,325 字节；SHA256 `556529c5ca1e29b13f3963696af48997b4b39e5e6a38f3169cf09cf874559ead`。
+- 下载 https://aka.doubaocdn.com/s/AEsVvxqS1D 。

@@ -368,7 +368,8 @@ def resolve_meta_template(template, files):
         except ValueError:
             continue
         match_count = sum(1 for f in files if regex.match(_meta_stem(f)))
-        score = (match_count, len(fields))
+        # 优先“总共能提取出多少字段”：一个异常文件不应让自动识别退回只取标题。
+        score = (match_count * len(fields), match_count)
         if best is None or score > best[0]:
             best = (score, regex, fields, candidate)
     if best is None:
