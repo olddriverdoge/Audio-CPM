@@ -518,6 +518,10 @@ class UiRegression:
                          "album fixture track did not open")
             self.page.evaluate("() => App.openModule('play')")
             self.page.locator("#play-float").wait_for(state="visible", timeout=5000)
+            # 上一条起播路径可能把播放列表收起（声谱展开），页签会跟着隐藏。
+            if self.page.locator("#pf-q-toggle").get_attribute("aria-expanded") == "false":
+                self.page.locator("#pf-q-toggle").click()
+                self.page.wait_for_timeout(250)
             self.require(self.page.locator('#pf-qview [data-qview="queue"]').count() == 0,
                          "old queue tab still present")
             self.require(self.page.locator('#pf-qview [data-qview="album"]').count() == 1,
@@ -530,6 +534,76 @@ class UiRegression:
             self.require(rows >= 2, f"album tracks: {rows}")
             return f"{head.strip()} / {rows} tracks"
         self.check("play manager album page replaces queue tab", album_page, "album-page")
+
+    def test_library_multiple_dirs(self):
+        # 目录草稿不能被 1.8 秒状态轮询刷掉：选完第一个目录后等过一轮，
+        # 再加第二个目录，保存时两个都必须还在。
+        self.page.evaluate("""async () => {
+          await fetch('/api/library/config', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({dirs: []})
+          });
+        }""")
+        self.page.evaluate("(p) => App.browse(p)", self.fx["ui_album_a"])
+        self.page.wait_for_function(
+            f"() => App.path == {self.fx['ui_album_a']!r}", timeout=5000)
+        self.page.evaluate("() => App.openModule('library')")
+        self.page.locator("#fw-library").wait_for(state="visible", timeout=5000)
+        self.page.locator("#lib-setup").wait_for(state="visible", timeout=5000)
+
+        def run():
+            # 首次引导遮罩从标题栏下方开始，标题栏仍然可以拖动/收起。
+            hit = self.page.evaluate("""() => {
+              const h = document.querySelector('#fw-library-head').getBoundingClientRect();
+              const el = document.elementFromPoint(h.x + h.width / 2, h.y + h.height / 2);
+              const title = document.querySelector('#fw-library-head .mf-title');
+              return {inHead: !!(el && el.closest('#fw-library-head')), title: title && title.textContent};
+            }""")
+            self.require(hit["inHead"], f"setup overlay covers library title: {hit}")
+            self.require("曲库" in (hit.get("title") or ""), f"library title missing: {hit}")
+            self.page.locator("#lib-use-current").click()
+            self.page.wait_for_timeout(2400)
+            self.require(self.page.locator("#lib-setup-list .lib-setup-dir").count() == 1,
+                         "first directory disappeared during status polling")
+            self.page.locator("#lib-add-dir").click()
+            self.page.locator("#lib-picker").wait_for(state="visible", timeout=4000)
+            self.require(self.page.locator("#lib-picker-up").count() == 0,
+                         "old parent button still present")
+            box = self.page.locator("#lib-picker-list").bounding_box()
+            self.require(bool(box), "picker list has no box")
+            y = box["y"] + min(70, box["height"] / 2)
+            self.page.mouse.move(box["x"] + box["width"] - 26, y)
+            self.page.mouse.down()
+            self.page.mouse.move(box["x"] + 26, y, steps=8)
+            self.page.mouse.up()
+            self.page.wait_for_timeout(700)
+            expected_parent = self.fx["ui_root"].replace("local:", "", 1)
+            self.require(self.page.evaluate("() => document.querySelector('#lib-picker-path').textContent")
+                         == expected_parent,
+                         f"swipe did not go to parent: {self.page.evaluate('() => document.querySelector(\'#lib-picker-path\').textContent')}")
+            self.page.locator(f'#lib-picker-list [data-dir="{self.fx["ui_album_b"]}"]').click()
+            self.page.wait_for_timeout(250)
+            self.page.locator("#lib-picker-choose").click()
+            self.page.wait_for_timeout(250)
+            self.require(self.page.locator("#lib-setup-list .lib-setup-dir").count() == 2,
+                         "second directory not added")
+            self.page.wait_for_timeout(2400)
+            self.require(self.page.locator("#lib-setup-list .lib-setup-dir").count() == 2,
+                         "selected directories were reset by status polling")
+            self.page.locator("#lib-setup-save").click()
+            self.page.wait_for_function(
+                "() => document.querySelector('#lib-setup').classList.contains('hidden')",
+                timeout=8000)
+            self.page.wait_for_function("""async () => {
+              const s = await fetch('/api/library/state').then(r => r.json());
+              return !s.scanning && s.count >= 5;
+            }""", timeout=15000)
+            dirs = self.page.evaluate("() => fetch('/api/library/state').then(r => r.json()).then(s => s.dirs)")
+            self.require(len(dirs) == 2, f"saved dirs: {dirs}")
+            self.require(any('Album A' in d for d in dirs) and any('Album B' in d for d in dirs),
+                         f"saved dirs missing albums: {dirs}")
+            return f"2 dirs / {self.page.locator('#lib-setup-list .lib-setup-dir').count()} kept"
+        self.check("library keeps multiple selected dirs", run, "library-multi")
 
     def test_play_manager_navigation(self):
         self.click_scene("builtin-listen")
@@ -1540,6 +1614,8 @@ try { return await Defaults.apply(true); } finally { window.fetch = realFetch; }
                 self.test_browse_play_meta_spectrum()
                 self.fresh_page()
                 self.test_library_module()
+                self.fresh_page()
+                self.test_library_multiple_dirs()
                 self.fresh_page()
                 self.test_play_manager_navigation()
                 self.fresh_page()

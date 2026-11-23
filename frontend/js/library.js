@@ -28,7 +28,6 @@ function createLibraryPanel() {
   const pickerList = document.getElementById('lib-picker-list');
   const pickerPath = document.getElementById('lib-picker-path');
   const pickerChoose = document.getElementById('lib-picker-choose');
-  const pickerUp = document.getElementById('lib-picker-up');
 
   const FIELD_DEFS = [
     ['title', '标题'],
@@ -52,6 +51,7 @@ function createLibraryPanel() {
   let searchSeq = 0;
   let lastQuery = null;
   let lastResults = [];
+  let setupDirty = false;
   let wasScanning = false;
   let searching = false;
   let fields = Store.get('ac3_library_fields', DEFAULT_FIELDS);
@@ -117,7 +117,18 @@ function createLibraryPanel() {
   function showSetup(show) {
     if (!setupEl) return;
     setupEl.classList.toggle('hidden', !show);
-    if (show) { renderSetup(); setupEl.scrollTop = 0; }
+    if (show) {
+      // 打开目录编辑时以服务端已保存目录为草稿，避免把上一次取消的改动带回来。
+      if (!setupDirty) selectedDirs = ((state && state.dirs) || []).slice();
+      renderSetup();
+      setupEl.scrollTop = 0;
+    }
+  }
+
+  function closeSetup() {
+    setupDirty = false;
+    selectedDirs = ((state && state.dirs) || []).slice();
+    showSetup(false);
   }
 
   function paintState() {
@@ -150,7 +161,11 @@ function createLibraryPanel() {
   async function loadState() {
     try {
       state = await Api.libraryState();
-      selectedDirs = (state.dirs || []).slice();
+      // 目录编辑面板打开且用户已经改过草稿时，不能被 1.8 秒状态轮询把
+      // 刚添加的第二个目录冲掉；保存后再以服务端结果为准。
+      if (!setupDirty || !setupEl || setupEl.classList.contains('hidden')) {
+        selectedDirs = (state.dirs || []).slice();
+      }
       paintState();
       if (!selectedDirs.length || state.configured === false) {
         showSetup(true);
@@ -175,6 +190,7 @@ function createLibraryPanel() {
       if (!out.ok) throw new Error(out.error || '保存失败');
       selectedDirs = (out.dirs || selectedDirs).slice();
       state = out.state || state;
+      setupDirty = false;
       showSetup(false);
       paintState();
       Utils.toast('曲库目录已保存，开始建立索引');
@@ -202,8 +218,12 @@ function createLibraryPanel() {
       const prevScan = !!(state && state.scanning);
       const next = await Api.libraryState();
       state = next;
-      selectedDirs = (next.dirs || []).slice();
+      if (!setupDirty || !setupEl || setupEl.classList.contains('hidden')) {
+        selectedDirs = (next.dirs || []).slice();
+        if (setupEl && !setupEl.classList.contains('hidden')) renderSetup();
+      }
       paintState();
+      if (next.configured === false && setupEl && setupEl.classList.contains('hidden')) showSetup(true);
       if (next.scanning) {
         wasScanning = true;
       } else if (prevScan || wasScanning) {
@@ -278,8 +298,10 @@ function createLibraryPanel() {
 
   async function beginPicker(start) {
     if (!pickerEl) return;
+    const cur = (typeof App !== 'undefined' && App.path) ? App.path : '';
+    const preferred = cur && cur.indexOf('dav:') !== 0 ? cur : (selectedDirs[0] || '');
     pickerEl.classList.remove('hidden');
-    await pickerGo(start || stripLocal(typeof App !== 'undefined' && App.path ? App.path : ''));
+    await pickerGo(start || stripLocal(preferred));
   }
 
   async function pickerGo(path) {
@@ -317,6 +339,7 @@ function createLibraryPanel() {
     const exists = selectedDirs.some(d => stripLocal(d).replace(/\/+$/, '') === p);
     if (exists) { Utils.toast('该目录已经在曲库中'); return; }
     selectedDirs.push(p);
+    setupDirty = true;
     renderSetup();
   }
 
@@ -367,9 +390,9 @@ function createLibraryPanel() {
     refreshState();
   });
 
-  document.getElementById('lib-dirs-btn').addEventListener('click', () => showSetup(true));
-  document.getElementById('lib-setup-close').addEventListener('click', () => showSetup(false));
-  document.getElementById('lib-setup-cancel').addEventListener('click', () => showSetup(false));
+  document.getElementById('lib-dirs-btn').addEventListener('click', () => { setupDirty = false; showSetup(true); });
+  document.getElementById('lib-setup-close').addEventListener('click', closeSetup);
+  document.getElementById('lib-setup-cancel').addEventListener('click', closeSetup);
   document.getElementById('lib-setup-save').addEventListener('click', saveDirs);
   document.getElementById('lib-use-current').addEventListener('click', () => {
     const p = (typeof App !== 'undefined' && App.path) ? App.path : '';
@@ -382,6 +405,7 @@ function createLibraryPanel() {
     const b = e.target.closest('[data-rm-dir]');
     if (!b) return;
     selectedDirs.splice(Number(b.dataset.rmDir), 1);
+    setupDirty = true;
     renderSetup();
   });
   if (pickerEl) pickerEl.addEventListener('click', e => {
@@ -392,11 +416,37 @@ function createLibraryPanel() {
     if (pickPath) addDir(pickPath);
     closePicker();
   });
-  if (pickerUp) pickerUp.addEventListener('click', () => { if (pickParent) pickerGo(pickParent); });
-  if (pickerList) pickerList.addEventListener('click', e => {
-    const row = e.target.closest('[data-dir]');
-    if (row) pickerGo(row.dataset.dir);
-  });
+  if (pickerList) {
+    /* 目录浏览左右滑动返回上级：保留纵向滚动，横向超过阈值才接管。 */
+    let pickSwipe = null, pickSuppressClickUntil = 0;
+    pickerList.addEventListener('pointerdown', e => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      pickSwipe = {id: e.pointerId, x: e.clientX, y: e.clientY};
+    }, {passive: true});
+    pickerList.addEventListener('pointermove', e => {
+      if (!pickSwipe || pickSwipe.id !== e.pointerId) return;
+      const dx = e.clientX - pickSwipe.x, dy = e.clientY - pickSwipe.y;
+      if (Math.abs(dx) > 56 && Math.abs(dx) > Math.abs(dy) * 1.35) {
+        e.preventDefault();
+        try { pickerList.setPointerCapture(e.pointerId); } catch (_) {}
+      }
+    }, {passive: false});
+    pickerList.addEventListener('pointerup', e => {
+      if (!pickSwipe || pickSwipe.id !== e.pointerId) { pickSwipe = null; return; }
+      const dx = e.clientX - pickSwipe.x, dy = e.clientY - pickSwipe.y;
+      pickSwipe = null;
+      if (Math.abs(dx) <= 56 || Math.abs(dx) <= Math.abs(dy) * 1.35) return;
+      pickSuppressClickUntil = Date.now() + 450;
+      if (pickParent) pickerGo(pickParent);
+      else if (typeof Utils !== 'undefined') Utils.toast('已在最上层', 'warn');
+    });
+    pickerList.addEventListener('pointercancel', () => { pickSwipe = null; });
+    pickerList.addEventListener('click', e => {
+      if (Date.now() < pickSuppressClickUntil) { e.preventDefault(); e.stopPropagation(); return; }
+      const row = e.target.closest('[data-dir]');
+      if (row) pickerGo(row.dataset.dir);
+    });
+  }
 
   function maybeAutoScan() {
     if (!state || !selectedDirs.length) return;
