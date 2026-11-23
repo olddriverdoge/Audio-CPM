@@ -37,4 +37,7 @@
 
 ## 构建
 
-- 待 CI 构建后补充 run、包大小、SHA256 与下载地址。
+- CI run `45213655919`，提交 `02014d6`，`main_package=false`，`.dev` 测试包 `com.github.olddriverdoge.audiocpm.dev`，版本 0.5.19/99。
+- 产物 `Audio-CPM-0.5.19-99-dev-library.apk`：22,666,729 字节。
+- SHA256 `50db1a98a9aa76f45e70fbb8febb023099fb28f44a77ffdc079f5d589ea6baed`。
+- 下载 https://aka.doubaocdn.com/s/Ls355Dfw2V 。
