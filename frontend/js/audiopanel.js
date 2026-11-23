@@ -304,6 +304,42 @@ function createAudioPanel() {
 
     if (dynamic) dynamic.innerHTML = html;
     bind();
+    paintAudioFocus(info);
+  }
+
+  function paintAudioFocus(info) {
+    const cb = document.getElementById('af-focus-on');
+    const hint = document.getElementById('af-focus-hint');
+    if (!cb) return;
+    const known = info && info.playback_available !== false && typeof info.audioFocus === 'boolean';
+    const on = known ? !!info.audioFocus : (Store.get('ac3_audio_focus', false) === true);
+    cb.checked = on;
+    if (hint) hint.textContent = on
+      ? '已接管：其他 App 播放/来电时按系统焦点规则暂停或压低'
+      : '默认关闭；打开后被打断会暂停或自动压低音量';
+  }
+
+  function bindAudioFocus() {
+    const cb = document.getElementById('af-focus-on');
+    if (!cb) return;
+    cb.addEventListener('change', async () => {
+      const want = !!cb.checked;
+      cb.disabled = true;
+      try {
+        const r = await Api.setAudioFocus(want);
+        if (!r || !r.ok) throw new Error((r && r.error) || 'not_supported');
+        Store.set('ac3_audio_focus', want);
+        Utils.log('info', '音频焦点: ' + (want ? '接管' : '关闭'));
+        Utils.toast(want ? '已接管音频焦点' : '已关闭音频焦点');
+        paintAudioFocus({playback_available: true, audioFocus: want});
+      } catch (e) {
+        cb.checked = !want;
+        Utils.toast('音频焦点设置失败: ' + ((e && e.message) || e), 'err');
+        paintAudioFocus(info);
+      } finally {
+        cb.disabled = false;
+      }
+    });
   }
 
   function bind() {
@@ -628,6 +664,7 @@ function createAudioPanel() {
 
   bindVolume();
   bindPlayCfg();
+  bindAudioFocus();
   const reloadDevices = bindRoute();
   fw.onToggle(open => {
     if (open) {

@@ -217,10 +217,21 @@ public class AudioCpmBridge {
         }
     }
 
+    /** 音频焦点开关：默认关闭，打开后由 ExoPlayer 处理焦点丢失/短暂 duck。 */
+    public static String setAudioFocus(final boolean enabled) {
+        try {
+            boolean ok = PlaybackService.setAudioFocusEnabled(enabled);
+            return "{\"ok\":" + ok + ",\"audioFocus\":" + enabled + "}";
+        } catch (Throwable t) {
+            return "{\"ok\":false,\"error\":\"" + esc(String.valueOf(t)) + "\"}";
+        }
+    }
+
     /** 输出信息：设备原生采样率/缓冲 + ExoPlayer 实际 PCM 格式 + 音源格式 + 效果状态 */
     public static String audioInfo() {
         try {
             StringBuilder sb = new StringBuilder("{\"ok\":true");
+            sb.append(",\"audioFocus\":").append(PlaybackService.isAudioFocusEnabled());
             try {
                 android.media.AudioManager am = (android.media.AudioManager)
                         AudioCpmApp.get().getSystemService(Context.AUDIO_SERVICE);

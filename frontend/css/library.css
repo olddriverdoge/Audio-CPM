@@ -1,0 +1,138 @@
+/* 曲库独立浮窗：列表/搜索/首次目录引导 */
+.lib-win{
+  left:70px; top:76px;
+  width:min(760px, calc(100vw - 24px));
+  height:min(600px, calc(100vh - 150px));
+}
+.lib-body{
+  display:flex; flex-direction:column; min-height:0; gap:8px;
+  padding:10px 10px 8px; overflow:hidden;
+}
+.lib-searchrow{display:flex; align-items:center; gap:7px; flex:0 0 auto}
+.lib-searchbox{
+  position:relative; flex:1 1 auto; min-width:0; display:flex; align-items:center;
+  background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.13);
+  border-radius:9px; padding:0 8px; height:34px;
+}
+.lib-searchbox:focus-within{border-color:rgba(86,190,255,.62); box-shadow:0 0 0 2px rgba(86,190,255,.12)}
+.lib-search-ico{opacity:.55; font-size:18px; line-height:1; margin-right:4px}
+.lib-searchbox input{
+  flex:1 1 auto; min-width:0; border:0; background:transparent; color:var(--txt);
+  outline:none; height:100%; font-size:13px;
+}
+.lib-search-clear{
+  border:0; background:transparent; color:var(--muted); font-size:13px; cursor:pointer;
+  padding:2px 3px;
+}
+.lib-fields{
+  display:flex; gap:5px; overflow-x:auto; flex:0 0 auto; padding-bottom:1px;
+  scrollbar-width:thin;
+}
+.lib-field{
+  flex:0 0 auto; border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.04);
+  color:var(--muted); border-radius:999px; height:25px; padding:0 10px; font-size:11px;
+}
+.lib-field.on{
+  color:#fff; border-color:rgba(86,190,255,.6); background:rgba(86,190,255,.16);
+}
+.lib-progress{
+  display:flex; align-items:center; gap:8px; flex:0 0 auto;
+  border:1px solid rgba(86,190,255,.22); background:rgba(86,190,255,.09);
+  color:#bde7ff; border-radius:7px; padding:5px 8px; font-size:11px;
+}
+.lib-progress span{flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.lib-list{
+  flex:1 1 auto; min-height:0; overflow:auto; overscroll-behavior:contain;
+  border:1px solid rgba(255,255,255,.08); border-radius:9px; background:rgba(0,0,0,.12);
+  padding:4px;
+}
+.lib-row{
+  display:flex; align-items:center; gap:9px; padding:7px 8px; border-radius:7px;
+  cursor:pointer; min-width:0;
+}
+.lib-row:hover,.lib-row.on{background:rgba(86,190,255,.12)}
+.lib-row-ico{
+  width:26px; height:26px; flex:0 0 auto; border-radius:6px; display:flex;
+  align-items:center; justify-content:center; color:#bde7ff; background:rgba(86,190,255,.12);
+  font-size:14px;
+}
+.lib-row-main{flex:1 1 auto; min-width:0}
+.lib-row-title{
+  color:var(--txt); font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.lib-row-sub{
+  color:var(--muted); font-size:10px; margin-top:2px; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap;
+}
+.lib-row-side{flex:0 0 auto; text-align:right; color:var(--muted); font-size:10px; line-height:1.45}
+.lib-row-side b{display:block; color:#9fdfff; font-weight:600}
+.lib-foot{
+  flex:0 0 auto; color:var(--muted); font-size:10px; min-height:14px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.lib-overlay{
+  position:absolute; inset:0; z-index:12; display:flex; align-items:stretch;
+  justify-content:center; padding:8px; background:rgba(6,11,17,.72);
+  backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px);
+  border-radius:inherit;
+}
+.lib-overlay.hidden{display:none}
+.lib-card{
+  width:100%; max-width:620px; margin:auto; max-height:100%; display:flex;
+  flex-direction:column; min-height:0; background:#172230;
+  border:1px solid rgba(255,255,255,.14); border-radius:12px;
+  box-shadow:0 18px 50px rgba(0,0,0,.45); padding:12px; gap:9px;
+}
+.lib-card-head{display:flex; gap:8px; align-items:flex-start; flex:0 0 auto}
+.lib-card-head > div{flex:1 1 auto; min-width:0}
+.lib-card-head b{font-size:14px; color:#fff}
+.lib-card-head p{margin:3px 0 0; color:var(--muted); font-size:11px; line-height:1.45}
+.lib-setup-list,.lib-picker-list{
+  flex:1 1 auto; min-height:80px; overflow:auto; overscroll-behavior:contain;
+  border:1px solid rgba(255,255,255,.09); border-radius:8px; padding:4px;
+  background:rgba(0,0,0,.18);
+}
+.lib-setup-dir{
+  display:flex; gap:7px; align-items:center; padding:6px 7px; border-radius:6px;
+  background:rgba(255,255,255,.04); margin:3px; font-size:11px;
+}
+.lib-setup-dir-main{flex:1 1 auto; min-width:0}
+.lib-setup-dir-main b{display:block; color:var(--txt); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.lib-setup-dir-main small{display:block; color:var(--muted); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.lib-setup-dir button{flex:0 0 auto}
+.lib-setup-actions{display:flex; gap:7px; flex-wrap:wrap; flex:0 0 auto}
+.lib-setup-hint{color:var(--muted); font-size:10px; line-height:1.4; flex:0 0 auto}
+.lib-card-foot{display:flex; justify-content:flex-end; gap:7px; flex:0 0 auto; padding-top:2px}
+.lib-picker-path{
+  color:#9fdfff !important; word-break:break-all; font-family:ui-monospace,monospace;
+}
+.lib-picker-row{
+  padding:8px 9px; border-radius:6px; font-size:12px; cursor:pointer;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.lib-picker-row:hover{background:rgba(86,190,255,.14)}
+.lib-picker-row.dir{color:var(--txt)}
+.lib-empty{
+  padding:18px 12px; text-align:center; color:var(--muted); font-size:11px; line-height:1.6;
+}
+@media (max-width:560px){
+  .lib-win{left:8px !important; top:64px !important; width:calc(100vw - 16px) !important;
+    height:calc(100vh - 140px) !important;}
+  .lib-card{padding:10px}
+  .lib-row{padding:8px 6px}
+}
+
+/* 播放管理：专辑页 */
+.pf-album-head{
+  display:flex; flex-direction:column; gap:2px; padding:5px 7px 7px;
+  border-bottom:1px solid rgba(255,255,255,.08); margin-bottom:2px;
+}
+.pf-album-head b{font-size:12px; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.pf-album-head span{font-size:10px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.pf-q-time{margin-left:auto; flex:0 0 auto; color:var(--muted); font-size:10px; padding-left:6px}
+
+/* 音频输出：音频焦点开关 */
+.af-focus-row{display:flex; align-items:center; gap:10px; padding:2px 0 3px}
+.af-focus-row > div{flex:1 1 auto; min-width:0}
+.af-focus-row b{display:block; font-size:11.5px; color:var(--txt); font-weight:500}
+.af-focus-row small{display:block; color:var(--muted); font-size:9.5px; line-height:1.4; margin-top:2px}

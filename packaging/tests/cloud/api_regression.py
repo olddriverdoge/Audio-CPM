@@ -401,6 +401,90 @@ class ApiRegression:
             return "custom deleted; local protected"
         self.check("delete source and protect local", delete_source)
 
+    # ---------- library ----------
+    def test_library(self):
+        def configure_and_scan():
+            out = self.jpost("/api/library/config", {"dirs": [self.fx["album_a"]]})
+            self.require(out.get("ok") is True, f"library config: {out}")
+            self.require(out.get("dirs") == [self.local_path(self.fx["album_a"])],
+                         f"library dir normalization: {out.get('dirs')}")
+            started = self.jpost("/api/library/scan", {})
+            self.require(started.get("ok") is True, f"library scan start: {started}")
+            deadline = time.time() + 30
+            state = None
+            while time.time() < deadline:
+                state = self.jget("/api/library/state")
+                if not state.get("scanning"):
+                    break
+                time.sleep(0.1)
+            self.require(state and not state.get("scanning"), f"library scan did not finish: {state}")
+            self.require(state.get("count") == 2, f"library count: {state.get('count')} / {state}")
+            self.require(state.get("lastScan", 0) > 0, f"last scan missing: {state}")
+            return f"{state['count']} tracks, {state.get('dbBytes')} bytes"
+        self.check("library selected-directory scan", configure_and_scan)
+
+        def search_by_fields():
+            rows = self.jget("/api/library/search", params={"q": "Track", "fields": "title"})
+            self.require(rows.get("ok") is True and rows.get("total") == 2, f"title search: {rows}")
+            rows = self.jget("/api/library/search", params={"q": "Test Artist", "fields": "artist"})
+            self.require(rows.get("total") == 1, f"artist search: {rows}")
+            rows = self.jget("/api/library/search", params={"q": "2026", "fields": "year"})
+            self.require(rows.get("total") == 1, f"year search: {rows}")
+            rows = self.jget("/api/library/search", params={"q": "Album A", "fields": "folder"})
+            self.require(rows.get("total") == 2, f"folder search: {rows}")
+            rows = self.jget("/api/library/search", params={"q": "Test Composer", "fields": "composer"})
+            self.require(rows.get("total") == 1, f"composer search: {rows}")
+            return "title/artist/year/folder/composer"
+        self.check("library metadata-field search", search_by_fields)
+
+        def album_page():
+            d = self.jget("/api/library/album", params={"path": self.fx["track1"]})
+            self.require(d.get("ok") is True and d.get("album") == "Test Album", f"album: {d}")
+            tracks = d.get("tracks") or []
+            self.require(len(tracks) == 2, f"album tracks: {tracks}")
+            self.require(tracks[0].get("name") == "Track One.flac" and
+                         tracks[1].get("name") == "Track Two.wav",
+                         f"album order: {[t.get('name') for t in tracks]}")
+            return f"{d.get('album')} / {len(tracks)} tracks"
+        self.check("library album aggregation", album_page)
+
+        def album_unindexed_fallback():
+            d = self.jget("/api/library/album", params={"path": self.fx["covered"]})
+            self.require(d.get("ok") is True, f"unindexed album: {d}")
+            self.require(d.get("indexed") is False, f"unindexed flag: {d}")
+            tracks = d.get("tracks") or []
+            self.require(len(tracks) == 1 and tracks[0].get("name") == "Track With Cover.flac",
+                         f"unindexed album tracks: {tracks}")
+            missing = self.jget("/api/library/album", params={"path": "local:/definitely-missing"})
+            self.require(missing.get("ok") is False and missing.get("error"),
+                         f"missing album should be soft failure: {missing}")
+            return "directory fallback for unindexed track"
+        self.check("library album falls back to directory", album_unindexed_fallback)
+
+        def incremental_scan():
+            before = self.jget("/api/library/state")
+            started = self.jpost("/api/library/scan", {})
+            self.require(started.get("ok") is True, f"incremental start: {started}")
+            deadline = time.time() + 20
+            while time.time() < deadline:
+                state = self.jget("/api/library/state")
+                if not state.get("scanning"):
+                    break
+                time.sleep(0.1)
+            self.require(state.get("count") == 2, f"incremental count: {state}")
+            self.require(state.get("progress", {}).get("added", 1) == 0,
+                         f"unchanged files re-added: {state.get('progress')}")
+            self.require(state.get("lastScan", 0) >= before.get("lastScan", 0),
+                         "last scan timestamp did not advance")
+            return f"no-op incremental, {state.get('progress', {}).get('updated', 0)} updated"
+        self.check("library incremental scan skips unchanged files", incremental_scan)
+
+        def reject_invalid_dir():
+            r = self.post("/api/library/config", {"dirs": ["local:/definitely-not-a-real-dir-xyz"]})
+            self.require(r.status_code == 400, f"invalid dir accepted: {r.status_code}")
+            return "invalid dir rejected"
+        self.check("library rejects invalid directories", reject_invalid_dir)
+
     # ---------- tasks ----------
     def test_tasks(self):
         def preview():
@@ -668,7 +752,10 @@ class ApiRegression:
             self.require(d.get("ok") is False, f"audio fx: {d}")
             dev = self.jpost("/api/audio/device", {"id": 1})
             self.require(dev.get("ok") is False, f"audio device: {dev}")
-            return "fx + device"
+            focus = self.jpost("/api/audio/focus", {"enabled": True})
+            self.require(focus.get("ok") is False and focus.get("error") == "not_supported",
+                         f"audio focus: {focus}")
+            return "fx + device + focus"
         self.check("native audio FX/device fall back cleanly", fx)
 
         def playback_routes():
@@ -697,6 +784,7 @@ class ApiRegression:
     def run(self):
         self.test_static_and_capabilities()
         self.test_browse_and_metadata()
+        self.test_library()
         self.test_media()
         self.test_filesystem()
         self.test_storage_sources()

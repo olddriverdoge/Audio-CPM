@@ -4,7 +4,7 @@ const App = (() => {
   let metaFloat = null, tree = null, playPanel = null, audioPanel = null;
   let currentPath = '';
   let currentParent = '';
-  let fwBrowse = null, fwTask = null, fwTree = null;
+  let fwBrowse = null, fwTask = null, fwTree = null, fwLibrary = null;
   const MODULE_REGISTRY = {};
 
   function viewMode() { return Store.get(K.viewMode, 'list') === 'grid' ? 'grid' : 'list'; }
@@ -922,9 +922,11 @@ const App = (() => {
       minW: 260, minH: 200
     });
 
+    if (typeof createLibraryPanel === 'function') fwLibrary = createLibraryPanel();
     MODULE_REGISTRY.browse = {win: 'fw-browse', fw: fwBrowse};
     MODULE_REGISTRY.task = {win: 'fw-task', fw: fwTask};
     MODULE_REGISTRY.tree = {win: 'fw-tree', fw: fwTree};
+    MODULE_REGISTRY.library = {win: 'fw-library', fw: fwLibrary};
     if (typeof createPlayPanel === 'function') playPanel = createPlayPanel();
     MODULE_REGISTRY.play = {win: 'play-float', fw: playPanel};
     if (typeof createAudioPanel === 'function') audioPanel = createAudioPanel();
@@ -934,7 +936,7 @@ const App = (() => {
 
     /* 右下角模块坞：＋ 展开纵向按钮，10 秒无操作收回 */
     const MODULE_LABEL = {
-      browse: '文件浏览', task: '批处理', tree: '目标目录', play: '播放管理',
+      browse: '文件浏览', task: '批处理', tree: '目标目录', library: '曲库', play: '播放管理',
       audio: '音频输出', meta: '元数据', log: '日志'
     };
     const fab = document.getElementById('module-fab');

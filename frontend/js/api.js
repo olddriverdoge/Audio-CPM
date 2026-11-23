@@ -77,8 +77,16 @@ const Api = (() => {
     playbackSkip: dir => jpost('/api/playback/skip', {dir}),
     audioFx: (op, a, b) => jpost('/api/audio/fx', {op, a, b}),
     audioInfo: () => jfetch('/api/audio/info'),
+    libraryState: () => jfetch('/api/library/state'),
+    libraryConfig: dirs => jpost('/api/library/config', {dirs}),
+    libraryScan: force => jpost('/api/library/scan', {force: !!force}),
+    libraryCancel: () => jpost('/api/library/scan/cancel', {}),
+    librarySearch: (q, fields) => jfetch('/api/library/search?q=' + enc(q || '') +
+      '&fields=' + enc((fields || []).join(',')) + '&limit=200'),
+    libraryAlbum: path => jfetch('/api/library/album?path=' + enc(path)),
     audioDevices: () => jfetch('/api/audio/devices'),
     setAudioDevice: id => jpost('/api/audio/device', {id: Number(id) || 0}),
+    setAudioFocus: enabled => jpost('/api/audio/focus', {enabled: !!enabled}),
     renamePreview: cfg => jpost('/api/tasks/rename-preview', cfg),
     metadataPreview: cfg => jpost('/api/tasks/metadata-preview', cfg),
     appUpdate: force => {

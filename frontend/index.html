@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="/css/organize.css">
 <link rel="stylesheet" href="/css/overlays.css">
 <link rel="stylesheet" href="/css/workbench.css">
+<link rel="stylesheet" href="/css/library.css">
 </head>
 <body>
 <div class="app" id="app">
@@ -321,6 +322,67 @@
 </div>
 
 <!-- 全局悬浮频谱：默认贴边按钮，点开浮窗，右下角可拖动调整大小 -->
+<div class="fw-win lib-win hidden" id="fw-library">
+  <div class="mf-head" id="fw-library-head" title="拖动可移动">
+    <span class="mf-title">曲库</span>
+    <span class="mf-track" id="lib-head-state">未配置目录</span>
+    <button type="button" class="sf-btn" id="lib-dirs-btn" title="选择曲库目录">目录</button>
+    <button type="button" class="sf-btn" id="fw-library-min" title="收起">—</button>
+  </div>
+  <div class="fw-body lib-body" id="fw-library-body">
+    <div class="lib-searchrow">
+      <div class="lib-searchbox">
+        <span class="lib-search-ico" aria-hidden="true">⌕</span>
+        <input type="search" id="lib-search" placeholder="搜索曲库（标题、艺术家、专辑…）" autocomplete="off">
+        <button type="button" class="lib-search-clear hidden" id="lib-search-clear" title="清空">✕</button>
+      </div>
+      <button type="button" class="small primary" id="lib-scan">扫描</button>
+    </div>
+    <div class="lib-fields" id="lib-fields" aria-label="搜索字段"></div>
+    <div class="lib-progress hidden" id="lib-progress">
+      <span id="lib-progress-text">准备扫描…</span>
+      <button type="button" class="small" id="lib-cancel">取消</button>
+    </div>
+    <div class="lib-list" id="lib-list">
+      <div class="detail-empty">先选择目录，再建立曲库索引</div>
+    </div>
+    <div class="lib-foot" id="lib-foot">尚未建立索引</div>
+  </div>
+
+  <div class="lib-overlay hidden" id="lib-setup">
+    <div class="lib-card">
+      <div class="lib-card-head">
+        <div><b>选择曲库目录</b><p>只扫描你勾选的目录，不会全盘搜索。首次建立后按文件增量更新。</p></div>
+        <button type="button" class="small" id="lib-setup-close">✕</button>
+      </div>
+      <div class="lib-setup-list" id="lib-setup-list"></div>
+      <div class="lib-setup-actions">
+        <button type="button" class="small" id="lib-add-dir">＋ 添加目录</button>
+        <button type="button" class="small" id="lib-use-current">使用当前浏览目录</button>
+      </div>
+      <div class="lib-setup-hint" id="lib-setup-hint">建议只选音乐文件夹，不要选整个存储根目录。</div>
+      <div class="lib-card-foot">
+        <button type="button" class="small" id="lib-setup-cancel">取消</button>
+        <button type="button" class="small primary" id="lib-setup-save">保存并扫描</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="lib-overlay hidden" id="lib-picker">
+    <div class="lib-card">
+      <div class="lib-card-head">
+        <div><b>选择目录</b><p class="lib-picker-path" id="lib-picker-path">…</p></div>
+        <button type="button" class="small" id="lib-picker-close">✕</button>
+      </div>
+      <div class="lib-picker-list" id="lib-picker-list"><div class="detail-empty">加载中…</div></div>
+      <div class="lib-card-foot">
+        <button type="button" class="small" id="lib-picker-up">↑ 上级</button>
+        <button type="button" class="small primary" id="lib-picker-choose">选择当前目录</button>
+      </div>
+    </div>
+  </div>
+  <b class="fw-resize" id="fw-library-resize" title="拖动调整大小"></b>
+</div>
 <button type="button" class="sf-fab meta-fab" id="meta-fab" title="元数据（独立浮窗）">🎵<span>元数据</span></button>
 <div class="audio-float hidden" id="audio-float">
   <div class="mf-head" id="af-head" title="拖动可移动 / 双指可缩放">
@@ -342,6 +404,13 @@
       <div class="af-sec-h"><span>输出设备</span><em>USB DAC / 系统默认</em></div>
       <select id="af-device" style="width:100%"><option value="0">系统默认</option></select>
       <p class="hint" id="af-device-hint" style="margin:4px 0 0">选择 USB DAC 或系统默认输出</p>
+    </div>
+    <div class="af-sec">
+      <div class="af-sec-h"><span>音频焦点</span><em>来电 / 导航 / 其他播放器</em></div>
+      <div class="af-focus-row">
+        <div><b>接管音频焦点</b><small id="af-focus-hint">默认关闭；打开后被打断会暂停或自动压低音量</small></div>
+        <label class="af-switch"><input type="checkbox" id="af-focus-on"><i></i></label>
+      </div>
     </div>
     <div class="af-sec-h"><span>外部播放器</span><em>系统播放器模式 / ↗ 使用</em></div>
     <div class="row" style="display:block">
@@ -412,7 +481,7 @@
       </button>
       <span class="pf-qview" id="pf-qview">
         <button type="button" class="pf-qview-btn active" data-qview="browse" aria-pressed="true">目录</button>
-        <button type="button" class="pf-qview-btn" data-qview="queue" aria-pressed="false">队列</button>
+        <button type="button" class="pf-qview-btn" data-qview="album" aria-pressed="false">专辑</button>
       </span>
     </div>
     <div class="pf-queue-tools" id="pf-queue-tools">
@@ -619,6 +688,7 @@ WebDAV 支持浏览 / 播放 / 元数据 / 下载（后续）与远端内部移�
 <script src="/js/filepicker.js"></script>
 <script src="/js/player.js"></script>
 <script src="/js/playpanel.js"></script>
+<script src="/js/library.js"></script>
 <script src="/js/audiopanel.js"></script>
 <script src="/js/playmgr.js"></script>
 <script src="/js/thumbmgr.js"></script>

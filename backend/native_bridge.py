@@ -76,6 +76,7 @@ def register() -> bool:
             'audio_info_raw': lambda: Bridge.audioInfo(),
             'devices': lambda: _call('audioDevices'),
             'set_device': lambda id: _call('setAudioDevice', int(id or 0)),
+            'audio_focus': lambda b: _call('setAudioFocus', bool(b)),
             'meta': lambda p, t, a, c, al: _call('setNowPlayingMeta', str(p), str(t or ''), str(a or ''), str(c or ''), str(al or '')),
         }
     except Exception:
@@ -180,6 +181,15 @@ def set_audio_device(device_id):
         return {'ok': False, 'error': str(e)[:300]}
 
 
+def set_audio_focus(enabled):
+    if not _playback:
+        return {'ok': False, 'error': 'not_supported'}
+    try:
+        return _playback['audio_focus'](bool(enabled))
+    except Exception as e:
+        return {'ok': False, 'error': str(e)[:300]}
+
+
 def playback_meta(path, title='', artist='', composer='', album=''):
     if not _playback:
         return {'ok': False, 'error': 'not_supported'}
@@ -199,7 +209,7 @@ def audio_info():
                     'bridge_available': True, 'mode': 'software',
                     'player': False, 'playing': False, 'playbackState': -1,
                     'deviceSampleRate': 0, 'format': {}, 'sourceFormat': {},
-                    'fx': dict(SOFTWARE_FX_FALLBACK)}
+                    'audioFocus': False, 'fx': dict(SOFTWARE_FX_FALLBACK)}
         logger.warning('audio_info: native playback bridge not registered')
         return {'ok': False, 'error': 'not_supported', 'playback_available': False,
                 'bridge_available': available()}
@@ -218,7 +228,7 @@ def audio_info():
                   'bridge_available': True, 'mode': 'software',
                   'player': True, 'playing': False, 'playbackState': -1,
                   'deviceSampleRate': 0, 'format': {}, 'sourceFormat': {},
-                  'fx': dict(SOFTWARE_FX_FALLBACK),
+                  'audioFocus': False, 'fx': dict(SOFTWARE_FX_FALLBACK),
                   'warning': str(e)[:120],
                   'audioInfoRaw': (raw or '')[:600]}
             return fb

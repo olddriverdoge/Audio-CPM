@@ -39,6 +39,7 @@ public class PlaybackService extends MediaSessionService {
     private static final String CHANNEL_ID = "audio_cpm_playback";
     private static final String PREFS_AUDIO = "ac2_audio_state";
     private static final String KEY_PREFERRED_DEVICE = "preferred_device";
+    private static final String KEY_AUDIO_FOCUS = "audio_focus";
     private static final int NOTIF_ID = 1001;
     private static volatile ExoPlayer player;
     private static volatile MediaSession session;
@@ -46,6 +47,7 @@ public class PlaybackService extends MediaSessionService {
     private static volatile long errorSeq = 0;
     private static volatile int audioSessionId = 0;
     private static volatile int preferredDeviceId = 0;
+    private static volatile boolean audioFocusEnabled = false;
     private PowerManager.WakeLock wakeLock;
     private volatile String metaPath = "";
     private volatile String[] metaCache = null;
@@ -65,6 +67,25 @@ public class PlaybackService extends MediaSessionService {
 
     public static ExoPlayer getPlayer() { return player; }
     public static int getPreferredDeviceId() { return preferredDeviceId; }
+    public static boolean isAudioFocusEnabled() { return audioFocusEnabled; }
+
+    /** 音频焦点开关：持久化并立即应用到当前 ExoPlayer。 */
+    public static boolean setAudioFocusEnabled(boolean enabled) {
+        audioFocusEnabled = enabled;
+        try {
+            Context c = AudioCpmApp.get();
+            if (c != null) c.getSharedPreferences(PREFS_AUDIO, Context.MODE_PRIVATE)
+                    .edit().putBoolean(KEY_AUDIO_FOCUS, enabled).apply();
+        } catch (Throwable ignored) {}
+        ExoPlayer p = player;
+        if (p != null) {
+            p.setAudioAttributes(new AudioAttributes.Builder()
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                    .setUsage(C.USAGE_MEDIA)
+                    .build(), enabled);
+        }
+        return true;
+    }
 
     public static void setNowPlayingMeta(String path, String title, String artist, String composer, String album) {
         hintPath = path == null ? "" : path;
@@ -121,6 +142,8 @@ public class PlaybackService extends MediaSessionService {
         try {
             preferredDeviceId = getSharedPreferences(PREFS_AUDIO, Context.MODE_PRIVATE)
                     .getInt(KEY_PREFERRED_DEVICE, 0);
+            audioFocusEnabled = getSharedPreferences(PREFS_AUDIO, Context.MODE_PRIVATE)
+                    .getBoolean(KEY_AUDIO_FOCUS, false);
         } catch (Throwable ignored) {}
         // 进程可能被系统回收后重建；高低音/EQ 参数从原生偏好恢复，不依赖前端面板是否打开。
         try { SoftwareEqProcessor.restore(this); } catch (Throwable ignored) {}
@@ -148,11 +171,14 @@ public class PlaybackService extends MediaSessionService {
         };
         player = new ExoPlayer.Builder(this, renderers).build();
         applyPreferredDevice();
-        // 不接管音频焦点：旧 p4a 版就是默认行为；接管后一旦焦点被别的应用拿走会直接暂停。
+        /*
+         * 音频焦点默认不接管，保持旧 p4a 行为；用户可在“音频输出”里打开。
+         * 打开后由 ExoPlayer 处理焦点丢失：普通丢失暂停，短暂丢失（来电/导航提示）自动压低。
+         */
         player.setAudioAttributes(new AudioAttributes.Builder()
                 .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
                 .setUsage(C.USAGE_MEDIA)
-                .build(), false);
+                .build(), audioFocusEnabled);
         player.addListener(new Player.Listener() {
             @Override
             public void onPlayerError(PlaybackException error) {

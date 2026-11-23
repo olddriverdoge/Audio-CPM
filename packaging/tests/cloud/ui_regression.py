@@ -447,6 +447,90 @@ class UiRegression:
             return "cover backdrop + persisted queue toggle"
         self.check("play panel cover backdrop and collapsible queue", play_style, "play-style")
 
+    def test_library_module(self):
+        # 曲库测试放在播放管理之前：先把它指向 UI 目录并扫描，后面的专辑页
+        # 就能同时覆盖“已索引”路径。API 测试先前配置的是 api/ 目录，这里重置。
+        self.page.evaluate("""async () => {
+          await fetch('/api/library/config', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({dirs: []})
+          });
+        }""")
+        self.page.evaluate("(p) => App.browse(p)", self.fx["ui_album_a"])
+        self.page.wait_for_function(
+            f"() => App.path === {self.fx['ui_album_a']!r}", timeout=5000)
+        self.page.evaluate("() => App.openModule('library')")
+        self.page.locator("#fw-library").wait_for(state="visible", timeout=5000)
+        self.page.locator("#lib-setup").wait_for(state="visible", timeout=5000)
+
+        def setup_and_scan():
+            self.require(self.page.locator("#lib-setup").is_visible(), "first-run setup missing")
+            self.require(self.page.locator("#lib-setup-list .lib-setup-dir").count() == 0,
+                         "setup should start empty")
+            hint = self.page.locator("#lib-setup-hint").inner_text()
+            self.require("不会全盘" in hint or "不要选整个存储" in hint, f"setup hint: {hint}")
+            self.page.locator("#lib-use-current").click()
+            self.page.wait_for_timeout(250)
+            self.require(self.page.locator("#lib-setup-list .lib-setup-dir").count() == 1,
+                         "current directory was not added")
+            text = self.page.locator("#lib-setup-list").inner_text()
+            self.require("Album A" in text, f"setup dir: {text}")
+            self.page.locator("#lib-setup-save").click()
+            self.page.wait_for_function(
+                "() => document.querySelector('#lib-setup').classList.contains('hidden')",
+                timeout=8000)
+            self.page.wait_for_function(
+                "() => document.querySelectorAll('#lib-list .lib-row').length >= 4",
+                timeout=10000)
+            self.page.wait_for_function(
+                "() => document.querySelector('#lib-foot').textContent.includes('共 ')",
+                timeout=10000)
+            chips = self.page.locator("#lib-fields .lib-field").count()
+            self.require(chips == 7, f"search field chips: {chips}")
+            rows = self.page.locator("#lib-list .lib-row").count()
+            return f"{rows} indexed rows, {chips} search fields"
+        self.check("library first-run directory guide and scan", setup_and_scan, "library-setup")
+
+        def search_and_fields():
+            self.page.locator("#lib-search").fill("Test Artist")
+            self.page.wait_for_function(
+                "() => document.querySelectorAll('#lib-list .lib-row').length === 1",
+                timeout=6000)
+            # 字段多选：流派按钮可打开/关闭。
+            genre = self.page.locator('#lib-fields [data-field="genre"]')
+            genre.click()
+            self.page.wait_for_timeout(150)
+            self.require("on" in (genre.get_attribute("class") or ""), "genre chip did not turn on")
+            genre.click()
+            self.page.wait_for_timeout(150)
+            self.require("on" not in (genre.get_attribute("class") or ""), "genre chip did not turn off")
+            self.page.locator("#lib-search").fill("Track")
+            self.page.wait_for_function(
+                "() => document.querySelectorAll('#lib-list .lib-row').length === 2",
+                timeout=6000)
+            return "2 / 2 results across title and artist"
+        self.check("library fuzzy search honors field chips", search_and_fields, "library-search")
+
+        def album_page():
+            self.page.evaluate("() => PlayMgr.play(%r, 0, {quiet: true})" % self.fx["ui_track1"])
+            self.page.wait_for_timeout(700)
+            self.require(self.page.evaluate("Player.current") == self.fx["ui_track1"],
+                         "album fixture track did not open")
+            self.page.evaluate("() => App.openModule('play')")
+            self.page.locator("#play-float").wait_for(state="visible", timeout=5000)
+            self.require(self.page.locator('#pf-qview [data-qview="queue"]').count() == 0,
+                         "old queue tab still present")
+            self.require(self.page.locator('#pf-qview [data-qview="album"]').count() == 1,
+                         "album tab missing")
+            self.page.locator('#pf-qview [data-qview="album"]').click()
+            self.page.locator("#pf-queue .pf-album-head").wait_for(state="visible", timeout=6000)
+            head = self.page.locator("#pf-queue .pf-album-head").inner_text()
+            self.require("Test Album" in head, f"album header: {head}")
+            rows = self.page.locator("#pf-queue .pf-q[data-path]").count()
+            self.require(rows >= 2, f"album tracks: {rows}")
+            return f"{head.strip()} / {rows} tracks"
+        self.check("play manager album page replaces queue tab", album_page, "album-page")
+
     def test_play_manager_navigation(self):
         self.click_scene("builtin-listen")
         self.page.locator("#fw-browse").wait_for(state="visible", timeout=5000)
@@ -540,7 +624,7 @@ class UiRegression:
             self.require(size1 == size0, f"play window size changed after track click: {size0} -> {size1}")
             self.require(self.page.evaluate("document.querySelector('#spectrum-float').classList.contains('hidden')") == sp_before,
                          "playlist track click opened a second spectrum window")
-            # 播放中也能从目录视图返回上级、进别的目录；再切到队列看纯音频列表。
+            # 播放中也能从目录视图返回上级、进别的目录；再切到专辑看当前播放上下文。
             self.page.evaluate("(p) => App.browse(p)", self.fx["ui_root"])
             self.page.wait_for_timeout(400)
             self.require(self.page.locator("#pf-queue .pf-qdir").count() >= 3,
@@ -549,12 +633,14 @@ class UiRegression:
             self.page.wait_for_timeout(500)
             self.require(self.page.evaluate("App.path") == self.fx["ui_album_b"],
                          "playing state could not open another folder")
-            self.page.locator('#pf-qview [data-qview="queue"]').click()
-            self.page.wait_for_timeout(200)
+            self.page.locator('#pf-qview [data-qview="album"]').click()
+            self.page.wait_for_timeout(700)
             self.require(self.page.locator("#pf-queue .pf-qdir").count() == 0,
-                         "audio queue mixed with folders")
+                         "album view mixed with folders")
             self.require(self.page.locator("#pf-queue .pf-q[data-path]").count() >= 1,
-                         "audio queue empty while playing")
+                         "album view empty while playing")
+            self.require(self.page.locator("#pf-queue .pf-album-head").count() == 1,
+                         "album header missing")
             self.page.locator('#pf-qview [data-qview="browse"]').click()
             self.page.evaluate("(p) => App.browse(p)", self.fx["ui_root"])
             self.page.wait_for_timeout(400)
@@ -574,6 +660,9 @@ class UiRegression:
         self.check("stopped playlist shows folders and direct actions", stopped_folder_view)
 
         def swipe_nav():
+            if not self.page.locator("#pf-queue").is_visible():
+                self.page.locator("#pf-q-toggle").click()
+                self.page.wait_for_timeout(200)
             def swipe_queue(dx):
                 box = self.page.locator("#pf-queue").bounding_box()
                 self.require(box and box["width"] > 120, f"queue box: {box}")
@@ -600,6 +689,9 @@ class UiRegression:
         self.check("playlist swipe navigation returns parent in both directions", swipe_nav)
 
         def favorite_sync():
+            if not self.page.locator("#pf-queue").is_visible():
+                self.page.locator("#pf-q-toggle").click()
+                self.page.wait_for_timeout(200)
             self.page.evaluate("(p) => App.browse(p)", self.fx["ui_album_b"])
             self.page.wait_for_timeout(300)
             self.page.locator("#pf-fav-add").click()
@@ -1010,7 +1102,11 @@ class UiRegression:
             self.page.wait_for_timeout(600)
             body = self.page.locator("#af-body").inner_text()
             self.require("网页" in body or "原生" in body or "不可用" in body, f"audio panel body: {body[:200]}")
-            return "panel shows web/native limitation"
+            self.require(self.page.locator("#af-focus-on").count() == 1, "audio focus switch missing")
+            self.require(self.page.locator("#af-focus-on").is_checked() is False,
+                         "audio focus should default off")
+            self.require("音频焦点" in body, f"audio focus section missing: {body[:300]}")
+            return "panel shows web/native limitation + focus switch"
         self.check("audio panel opens on cloud", open_panel, "audio-panel")
 
     def test_scene_save(self):
@@ -1442,6 +1538,8 @@ try { return await Defaults.apply(true); } finally { window.fetch = realFetch; }
                 self.test_scene_modules_and_task_panels()
                 self.fresh_page()
                 self.test_browse_play_meta_spectrum()
+                self.fresh_page()
+                self.test_library_module()
                 self.fresh_page()
                 self.test_play_manager_navigation()
                 self.fresh_page()

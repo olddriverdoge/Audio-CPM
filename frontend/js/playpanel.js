@@ -42,6 +42,7 @@ function createPlayPanel() {
   let favHold = null, favHoldEl = null, favHoldStart = null, suppressFavClickUntil = 0;
   let idleTimer = 0, idleDimmed = false, lastPlaying = false, wakeSuppressUntil = 0;
   let queueView = 'browse';
+  let albumSeq = 0, albumCachePath = '', albumCacheData = null;
 
   function cssUrl(url) {
     return 'url("' + String(url || '').replace(/"/g, '%22').replace(/\)/g, '%29') + '")';
@@ -222,6 +223,70 @@ function createPlayPanel() {
     qEl.dataset.view = 'queue';
   }
 
+  /* 专辑页：读取当前曲目所属专辑；曲库未索引时后端回退到同目录音频。
+     播放列表不再作为页签，专辑页承担“当前播放上下文”的展示。 */
+  function renderAlbumQueue() {
+    const path = Player.current || '';
+    const seq = ++albumSeq;
+    if (!path) {
+      qEl.dataset.view = 'album';
+      qCount.textContent = '未在播放';
+      qEl.innerHTML = '<div class="detail-empty">' + Utils.escapeHtml(tr('播放一首歌后，这里显示它所属的专辑')) + '</div>';
+      albumCachePath = '';
+      albumCacheData = null;
+      return;
+    }
+    if (albumCachePath === path && albumCacheData) {
+      paintAlbumData(albumCacheData, path);
+      return;
+    }
+    qEl.dataset.view = 'album';
+    qCount.textContent = '读取专辑…';
+    qEl.innerHTML = '<div class="detail-empty">读取专辑…</div>';
+    Api.libraryAlbum(path).then(d => {
+      if (seq !== albumSeq || Player.current !== path) return;
+      if (!d || !d.ok) {
+        qCount.textContent = '未在曲库';
+        qEl.innerHTML = '<div class="detail-empty">' + Utils.escapeHtml(tr('当前曲目不在曲库中')) +
+          '<br><span style="font-size:10px">' + Utils.escapeHtml((d && d.error) || '') + '</span></div>';
+        return;
+      }
+      albumCachePath = path;
+      albumCacheData = d;
+      paintAlbumData(d, path);
+    }).catch(e => {
+      if (seq !== albumSeq) return;
+      qCount.textContent = '读取失败';
+      qEl.innerHTML = '<div class="detail-empty" style="color:var(--err)">' +
+        Utils.escapeHtml('专辑读取失败：' + (e.message || e)) + '</div>';
+    });
+  }
+
+  function paintAlbumData(d, path) {
+    const tracks = d.tracks || [];
+    const cur = String((typeof Player !== 'undefined' && Player.current) || '').replace(/^local:/, '');
+    const album = d.album || tr('未命名专辑');
+    const by = d.artist || '';
+    const side = [by, d.year || '', tracks.length + ' ' + tr('首')].filter(Boolean).join(' · ');
+    qCount.textContent = tracks.length + ' ' + tr('首') + (d.indexed === false ? ' · ' + tr('目录回退') : '');
+    let html = '<div class="pf-album-head"><b>' + Utils.escapeHtml(album) + '</b><span>' +
+      Utils.escapeHtml(side) + '</span></div>';
+    html += tracks.map((t, i) => {
+      const p = t.path || '';
+      const on = String(p).replace(/^local:/, '') === cur;
+      const no = String(t.track || '').split('/')[0].trim();
+      return '<div class="pf-q' + (on ? ' on' : '') + '" data-i="' + i + '" data-path="' +
+        Utils.escapeHtml(p) + '" title="' + Utils.escapeHtml(p) + '">' +
+        '<span class="pf-q-ico">' + (on ? '▶' : (no || '♪')) + '</span>' +
+        '<span class="pf-q-name">' + Utils.escapeHtml(t.title || t.name) + '</span>' +
+        (t.duration ? '<span class="pf-q-time">' + fmt(t.duration) + '</span>' : '') +
+        '</div>';
+    }).join('');
+    if (!tracks.length) html = '<div class="detail-empty">' + Utils.escapeHtml(tr('这张专辑没有音频')) + '</div>';
+    qEl.innerHTML = html;
+    qEl.dataset.view = 'album';
+  }
+
   function paintQueueView() {
     if (!qView) return;
     qView.querySelectorAll('[data-qview]').forEach(b => {
@@ -232,14 +297,15 @@ function createPlayPanel() {
   }
 
   function setQueueView(view) {
-    queueView = view === 'queue' ? 'queue' : 'browse';
+    queueView = view === 'album' ? 'album' : 'browse';
+    if (queueView === 'album') { albumCachePath = ''; albumCacheData = null; }
     paintQueueView();
     renderQueue();
   }
 
   function renderQueue() {
     if (queueView === 'browse') renderBrowseQueue();
-    else renderAudioQueue();
+    else renderAlbumQueue();
   }
 
   /* 同步文件浏览的目录收藏：+ 收藏当前目录，点收藏切目录，长按收藏删除。 */
@@ -257,6 +323,7 @@ function createPlayPanel() {
   }
 
   async function goParent() {
+    if (queueView === 'album') { setQueueView('browse'); return; }
     const p = (typeof App !== 'undefined' && App.currentParent) ? App.currentParent() : '';
     if (!p) { Utils.toast(tr('已在最上层'), 'warn'); return; }
     queueView = 'browse';
@@ -325,8 +392,8 @@ function createPlayPanel() {
     const path = (typeof App !== 'undefined' && App.path) ? App.path : '';
     const list = (typeof App !== 'undefined' && App.playbackQueueList) ? App.playbackQueueList() : [];
     const dirs = (typeof App !== 'undefined' && App.directories) ? App.directories() : [];
-    const sig = queueView === 'queue'
-      ? 'q|' + list.length + ':' + ((list[0] && list[0].path) || '') + ':' + ((list[list.length - 1] && list[list.length - 1].path) || '')
+    const sig = queueView === 'album'
+      ? 'a|' + (Player.current || '')
       : 'b|' + path + '|' + dirs.map(d => d.path || '').join('|') + '|' + list.map(f => f.path || '').join('|');
     if (qEl.dataset.sig !== sig) { qEl.dataset.sig = sig; renderQueue(); }
     renderState();
@@ -624,7 +691,7 @@ function createPlayPanel() {
   function showFloatLayout() {
     queueCollapsed = false;
     sfCollapsed = false;
-    if (Player.queueList && Player.queueList().length) queueView = 'queue';
+    if (Player.queueList && Player.queueList().length) queueView = 'album';
     // 不写 Store：浮窗和主页面共用同一个 localStorage，写这里会把主页面
     // 的“列表收起/声谱展开”偏好改掉，回到 App 就会自动弹出声谱。
     paintQueueState();
@@ -638,7 +705,7 @@ function createPlayPanel() {
 
   document.addEventListener('ac2:queue-changed', () => {
     if (window.__AC2_FLOAT_MODE && Player.queueList && Player.queueList().length) {
-      queueView = 'queue';
+      queueView = 'album';
       paintQueueView();
     }
     renderQueue();

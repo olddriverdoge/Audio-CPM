@@ -36,9 +36,15 @@ async def set_audio_device(request):
     return JSONResponse(await run_in_threadpool(native_bridge.set_audio_device, int(d.get('id') or 0)))
 
 
+async def set_audio_focus(request):
+    d = await _body(request)
+    return JSONResponse(await run_in_threadpool(native_bridge.set_audio_focus, bool(d.get('enabled'))))
+
+
 routes = [
     Route('/api/audio/fx', audio_fx, methods=['POST']),
     Route('/api/audio/info', audio_info, methods=['GET']),
     Route('/api/audio/devices', audio_devices, methods=['GET']),
     Route('/api/audio/device', set_audio_device, methods=['POST']),
+    Route('/api/audio/focus', set_audio_focus, methods=['POST']),
 ]
