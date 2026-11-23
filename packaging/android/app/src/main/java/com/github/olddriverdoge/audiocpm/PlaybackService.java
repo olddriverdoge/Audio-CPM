@@ -9,6 +9,8 @@ import android.media.AudioDeviceInfo;
 import android.media.AudioManager;
 import android.media.MediaMetadataRetriever;
 import android.os.PowerManager;
+import android.os.Handler;
+import android.os.Looper;
 import android.content.Intent;
 import android.os.Build;
 import android.util.Log;
@@ -77,12 +79,20 @@ public class PlaybackService extends MediaSessionService {
             if (c != null) c.getSharedPreferences(PREFS_AUDIO, Context.MODE_PRIVATE)
                     .edit().putBoolean(KEY_AUDIO_FOCUS, enabled).apply();
         } catch (Throwable ignored) {}
-        ExoPlayer p = player;
+        final ExoPlayer p = player;
         if (p != null) {
-            p.setAudioAttributes(new AudioAttributes.Builder()
-                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
-                    .setUsage(C.USAGE_MEDIA)
-                    .build(), enabled);
+            // ExoPlayer 只能在创建它的应用线程（主线程）访问；桥接调用来自
+            // Python 工作线程，直接 setAudioAttributes 会触发线程校验异常。
+            new Handler(Looper.getMainLooper()).post(() -> {
+                try {
+                    p.setAudioAttributes(new AudioAttributes.Builder()
+                            .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                            .setUsage(C.USAGE_MEDIA)
+                            .build(), enabled);
+                } catch (Throwable t) {
+                    Log.w(TAG, "setAudioFocus failed: " + t);
+                }
+            });
         }
         return true;
     }
