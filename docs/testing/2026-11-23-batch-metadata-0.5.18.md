@@ -32,7 +32,7 @@
 
 ## 构建
 
-- CI run `45192258373`，提交 `557684b`，`main_package=false`。
+- CI run `45193157231`，提交 `70579a0`，`main_package=false`。
 - 产物 `Audio-CPM-0.5.18-98-dev-metadata.apk`（测试包 `com.github.olddriverdoge.audiocpm.dev`）。
-- 22,632,325 字节；SHA256 `556529c5ca1e29b13f3963696af48997b4b39e5e6a38f3169cf09cf874559ead`。
-- 下载 https://aka.doubaocdn.com/s/AEsVvxqS1D 。
+- 22,632,177 字节；SHA256 `191440f325780070285d947c9ae41eca2a1442a035911bee89a9825621f99ea6`。
+- 下载 https://aka.doubaocdn.com/s/3w6byeTdI1 。
