@@ -37,7 +37,8 @@
 
 ## 构建
 
-- CI run `45213655919`，提交 `02014d6`，`main_package=false`，`.dev` 测试包 `com.github.olddriverdoge.audiocpm.dev`，版本 0.5.19/99。
-- 产物 `Audio-CPM-0.5.19-99-dev-library.apk`：22,666,729 字节。
-- SHA256 `50db1a98a9aa76f45e70fbb8febb023099fb28f44a77ffdc079f5d589ea6baed`。
-- 下载 https://aka.doubaocdn.com/s/Ls355Dfw2V 。
+- CI run `45214446582`，提交 `0a2675a`，`main_package=false`，`.dev` 测试包 `com.github.olddriverdoge.audiocpm.dev`，版本 0.5.19/99。
+- 产物 `Audio-CPM-0.5.19-99-dev-library.apk`：22,666,973 字节。
+- SHA256 `6a47305367795d5d48e0233d70bd5d7932adadd43fb4361afb1d882f88cb9cf0`。
+- 下载 https://aka.doubaocdn.com/s/bMfPvfXfB4 。
+- 音频焦点切换通过主线程 Handler 应用到 ExoPlayer，避免 Python 工作线程直接访问播放器触发线程校验异常。
