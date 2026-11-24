@@ -26,4 +26,10 @@
 
 ## 构建
 
-待 CI 构建后补充 APK 文件名、大小、SHA256、run id 与包名。
+- CI run `45380508568`，提交 `1c18b6e`，`main_package=false`，`.dev` 测试包 `com.github.olddriverdoge.audiocpm.dev`，版本 0.5.23/103。
+- 产物 `Audio-CPM-0.5.23-103-dev-album-exact.apk`：22,670,789 字节，SHA256 `25bf1f823ecbde8eda9fd0fa5ccc3227c73d785d346dffd90445c84649cc831e`。
+- 仅含 `arm64-v8a`。
+
+## 备注
+
+测试素材中的 Track Two.wav 由 ffmpeg 写入 RIFF INFO，但当前 mutagen 扫描不到这些标签，曲库里 album/artist 为空。按本轮要求的 album+artist 精确查询，它不会进入 Test Album；这避免了旧实现把同目录无标签音频混进专辑的问题。
