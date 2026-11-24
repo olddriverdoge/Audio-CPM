@@ -18,4 +18,7 @@
 
 ## 构建
 
-- 待 CI 构建后补充 run、包大小、SHA256 与下载地址。
+- CI run `45340505080`，提交 `9c545d3`，`main_package=false`，`.dev` 测试包 `com.github.olddriverdoge.audiocpm.dev`，版本 0.5.21/101。
+- 产物 `Audio-CPM-0.5.21-101-dev-library-touch.apk`：22,668,149 字节。
+- SHA256 `2818759a3c791c750f80f0341455f9569dea9cf445a171a0aca51704fd1be5ec`。
+- 下载 https://aka.doubaocdn.com/s/UIejwyOq3U 。
