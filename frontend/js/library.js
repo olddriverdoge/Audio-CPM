@@ -274,7 +274,12 @@ function createLibraryPanel() {
         const p = t.path || '';
         const on = String(p).replace(/^local:/, '') === cur;
         const artist = t.artist || t.albumArtist || '';
-        const sub = [artist, t.album].filter(Boolean).join(' · ') || t.folder || t.dir;
+        const album = t.album || '';
+        const fallback = t.folder || t.dir;
+        const meta = [];
+        if (artist) meta.push('<span class="lib-row-artist">' + Utils.escapeHtml(artist) + '</span>');
+        if (album) meta.push('<span class="lib-row-album">' + Utils.escapeHtml(album) + '</span>');
+        if (!meta.length && fallback) meta.push('<span class="lib-row-folder">' + Utils.escapeHtml(fallback) + '</span>');
         const side = [];
         if (trackNum(t.track)) side.push('#' + trackNum(t.track));
         if (t.year) side.push(t.year);
@@ -283,8 +288,9 @@ function createLibraryPanel() {
           '" title="' + Utils.escapeHtml(p) + '">' +
           '<span class="lib-row-ico">' + (on ? '▶' : '♪') + '</span>' +
           '<span class="lib-row-main"><span class="lib-row-title">' +
-          Utils.escapeHtml(t.title || t.name) + '</span><span class="lib-row-sub">' +
-          Utils.escapeHtml(sub) + '</span></span>' +
+          Utils.escapeHtml(t.title || t.name) + '</span>' +
+          (meta.length ? '<span class="lib-row-meta">' + meta.join('') + '</span>' : '') +
+          '</span>' +
           '<span class="lib-row-side">' + (side.length ? '<b>' + Utils.escapeHtml(side[0]) + '</b>' +
           Utils.escapeHtml(side.slice(1).join(' · ')) : '') + '</span></div>';
       }).join('');

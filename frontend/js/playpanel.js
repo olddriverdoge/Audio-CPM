@@ -25,7 +25,8 @@ function createPlayPanel() {
   const waveHi = document.getElementById('pf-wave-hi');
   const qEl = document.getElementById('pf-queue');
   const qCount = document.getElementById('pf-qcount');
-  const qView = document.getElementById('pf-qview');
+  const qViewLabel = document.getElementById('pf-qview-label');
+  const albumBtn = document.getElementById('pf-album-btn');
   const sfSec = document.getElementById('pf-sf-sec');
   const sfToggle = document.getElementById('pf-sf-toggle');
   const sfBody = document.getElementById('pf-sf-body');
@@ -43,6 +44,10 @@ function createPlayPanel() {
   let idleTimer = 0, idleDimmed = false, lastPlaying = false, wakeSuppressUntil = 0;
   let queueView = 'browse';
   let albumSeq = 0, albumCachePath = '', albumCacheData = null;
+  /* 播放管理的“目录”只来自曲库索引：libPath 是当前曲库目录，和文件浏览的
+     App.path 解耦，避免从播放管理绕进任意文件系统目录。 */
+  let libPath = '', libData = null, libSeq = 0, libLoading = false;
+  let lastActive = false;
 
   function cssUrl(url) {
     return 'url("' + String(url || '').replace(/"/g, '%22').replace(/\)/g, '%29') + '")';
@@ -174,29 +179,98 @@ function createPlayPanel() {
     }
   }
 
-  /* 停止状态：直接显示当前目录的文件夹与音频。
-     文件夹/音频都在这里完成一级操作，不再弹独立的目录选择器。 */
-  function renderBrowseQueue() {
-    const dirs = (typeof App !== 'undefined' && App.directories) ? App.directories() : [];
-    const audios = (typeof App !== 'undefined' && App.playbackQueueList) ? App.playbackQueueList() : [];
-    qCount.textContent = dirs.length + ' ' + tr('个文件夹') + ' · ' + audios.length + ' ' + tr('首音频');
+  /* 曲库目录页：文件夹与音频都来自 /api/library/browse。
+     播放管理不再借用文件浏览的 App.path，避免进入未勾选曲库的目录。 */
+  const stripUri = p => String(p || '').replace(/^local:/, '');
+  const asUri = p => p && !String(p).startsWith('local:') ? 'local:' + p : String(p || '');
+  const isUnder = (p, root) => {
+    const a = stripUri(p).replace(/\/+$/, ''), b = stripUri(root).replace(/\/+$/, '');
+    return !!a && !!b && (a === b || a.indexOf(b + '/') === 0);
+  };
+
+  function libraryStartPath() {
+    const cur = stripUri(Player.current || '');
+    if (!cur || cur.indexOf('dav:') === 0) return '';
+    return Utils.dirname(cur) || '';
+  }
+
+  function loadLibraryDir(path, opts) {
+    const seq = ++libSeq;
+    const start = String(path || '');
+    libLoading = true;
+    Api.libraryBrowse(start).then(d => {
+      if (seq !== libSeq) return;
+      libLoading = false;
+      if (!d || !d.ok) {
+        // 当前曲目不在曲库/目录被移除：退回曲库根目录；根目录也失败时显示提示。
+        if (start && !(opts && opts.noFallback)) { loadLibraryDir('', {noFallback: true}); return; }
+        libPath = '';
+        libData = null;
+        qCount.textContent = tr('曲库不可用');
+        qEl.innerHTML = '<div class="detail-empty">' +
+          Utils.escapeHtml((d && d.error) || tr('曲库尚未配置目录')) +
+          '<br><span style="font-size:10px">' + Utils.escapeHtml(tr('先在曲库模块选择目录')) + '</span></div>';
+        qEl.dataset.view = 'browse';
+        return;
+      }
+      // 只有一个勾选目录时直接进入它；多个目录时先显示曲库根目录列表。
+      if (!start && (d.dirs || []).length === 1) {
+        loadLibraryDir(stripUri(d.dirs[0].path), opts);
+        return;
+      }
+      libPath = stripUri(d.path || start);
+      libData = d;
+      paintLibraryDir();
+    }).catch(e => {
+      if (seq !== libSeq) return;
+      libLoading = false;
+      qCount.textContent = tr('读取失败');
+      qEl.innerHTML = '<div class="detail-empty" style="color:var(--err)">' +
+        Utils.escapeHtml(tr('目录读取失败：') + ((e && e.message) || e)) + '</div>';
+    });
+  }
+
+  function paintLibraryDir() {
+    const d = libData || {};
+    const dirs = d.dirs || [];
+    const tracks = d.tracks || [];
+    const cur = stripUri(Player.current || '');
+    const where = libPath ? Utils.basename(libPath) : tr('曲库');
+    qCount.textContent = where + ' · ' + dirs.length + ' ' + tr('个文件夹') + ' · ' +
+      tracks.length + ' ' + tr('首音频');
     let html = '';
-    html += dirs.map(d => {
-      const p = d.path || '';
+    html += dirs.map(f => {
+      const p = f.path || '';
       return '<div class="pf-q pf-qdir" data-dir="' + Utils.escapeHtml(p) + '" title="' + Utils.escapeHtml(p) + '">' +
         '<span class="pf-q-ico">📁</span>' +
-        '<span class="pf-q-name">' + Utils.escapeHtml(d.name || Utils.basename(p)) + '</span></div>';
+        '<span class="pf-q-name">' + Utils.escapeHtml(f.name || Utils.basename(p)) + '</span>' +
+        (Number(f.count) ? '<span class="pf-q-time">' + Number(f.count) + '</span>' : '') + '</div>';
     }).join('');
-    html += audios.map((f, i) => {
-      const p = f.path || '';
-      return '<div class="pf-q' + (p === Player.current ? ' on' : '') + '" data-i="' + i + '" data-path="' + Utils.escapeHtml(p) + '" title="' + Utils.escapeHtml(p) + '">' +
-        '<span class="pf-q-ico">' + (p === Player.current ? '▶' : '♪') + '</span>' +
-        '<span class="pf-q-name">' + Utils.escapeHtml(Utils.basename(p)) + '</span></div>';
+    html += tracks.map(t => {
+      const p = t.path || '';
+      const on = stripUri(p) === cur;
+      const by = [t.artist || t.albumArtist || '', t.album || ''].filter(Boolean).join(' · ');
+      return '<div class="pf-q' + (on ? ' on' : '') + '" data-path="' + Utils.escapeHtml(p) +
+        '" title="' + Utils.escapeHtml(p) + '">' +
+        '<span class="pf-q-ico">' + (on ? '▶' : '♪') + '</span>' +
+        '<span class="pf-q-name">' + Utils.escapeHtml(t.title || t.name) +
+        (by ? '<small class="pf-q-sub">' + Utils.escapeHtml(by) + '</small>' : '') + '</span>' +
+        (t.duration ? '<span class="pf-q-time">' + fmt(t.duration) + '</span>' : '') +
+        '</div>';
     }).join('');
-    if (!html) html = '<div class="detail-empty">' + Utils.escapeHtml(tr('当前目录没有文件夹或音频')) + '</div>';
+    if (!html) html = '<div class="detail-empty">' + Utils.escapeHtml(tr('这个曲库目录还没有索引音频')) + '</div>';
     qEl.innerHTML = html;
     qEl.dataset.view = 'browse';
-    qEl.dataset.cur = '';
+    qEl.dataset.cur = cur;
+    renderFavorites();
+  }
+
+  function renderBrowseQueue() {
+    if (!libData && !libLoading) {
+      loadLibraryDir(libPath || libraryStartPath());
+      return;
+    }
+    if (libData) paintLibraryDir();
   }
 
   /* 播放/暂停状态：维持当前音频队列，不混入文件夹。 */
@@ -288,17 +362,17 @@ function createPlayPanel() {
   }
 
   function paintQueueView() {
-    if (!qView) return;
-    qView.querySelectorAll('[data-qview]').forEach(b => {
-      const on = b.dataset.qview === queueView;
-      b.classList.toggle('active', on);
-      b.setAttribute('aria-pressed', on ? 'true' : 'false');
-    });
+    if (qViewLabel) qViewLabel.textContent = queueView === 'album' ? tr('专辑详情') : tr('目录');
+    if (albumBtn) {
+      albumBtn.textContent = queueView === 'album' ? tr('返回目录 ‹') : tr('专辑 ›');
+      albumBtn.title = queueView === 'album' ? tr('返回曲库目录') : tr('查看当前曲目的专辑');
+      albumBtn.classList.toggle('on', queueView === 'album');
+    }
   }
 
   function setQueueView(view) {
     queueView = view === 'album' ? 'album' : 'browse';
-    if (queueView === 'album') { albumCachePath = ''; albumCacheData = null; }
+    if (queueView === 'album') { albumCachePath = ''; albumCacheData = null; libSeq++; }
     paintQueueView();
     renderQueue();
   }
@@ -308,40 +382,56 @@ function createPlayPanel() {
     else renderAlbumQueue();
   }
 
-  /* 同步文件浏览的目录收藏：+ 收藏当前目录，点收藏切目录，长按收藏删除。 */
+  /* 收藏只显示落在曲库根目录内的项；+ 收藏当前曲库目录。 */
   function renderFavorites() {
     if (!favBar) return;
+    const roots = (libData && libData.roots) || [];
     const list = (typeof App !== 'undefined' && App.favoriteList) ? App.favoriteList() : [];
-    const cur = (typeof App !== 'undefined' && App.path) ? App.path : '';
+    const shown = roots.length ? list.filter(p => roots.some(r => isUnder(p, r))) : [];
+    const cur = asUri(libPath);
     favBar.innerHTML =
       '<button type="button" class="pf-fav-add" id="pf-fav-add" title="' + Utils.escapeHtml(tr('收藏当前目录')) + '">+</button>' +
       '<div class="pf-fav-scroll">' +
-      list.map((p, i) => '<button type="button" class="pf-fav-chip' + (p === cur ? ' active' : '') +
-        '" data-fav="' + i + '" title="' + Utils.escapeHtml(p) + '">' +
-        '<b>' + Utils.escapeHtml(Utils.basename(p) || p) + '</b></button>').join('') +
+      shown.map((p, i) => '<button type="button" class="pf-fav-chip' + (stripUri(p) === stripUri(cur) ? ' active' : '') +
+        '" data-fav="' + list.indexOf(p) + '" title="' + Utils.escapeHtml(p) + '">' +
+        '<b>' + Utils.escapeHtml(Utils.basename(stripUri(p)) || p) + '</b></button>').join('') +
       '</div>';
   }
 
   async function goParent() {
-    if (queueView === 'album') { setQueueView('browse'); return; }
-    const p = (typeof App !== 'undefined' && App.currentParent) ? App.currentParent() : '';
-    if (!p) { Utils.toast(tr('已在最上层'), 'warn'); return; }
+    if (queueView === 'album') {
+      setQueueView('browse');
+      if (!libData) loadLibraryDir(libPath || libraryStartPath());
+      return;
+    }
+    const parent = stripUri((libData && libData.parent) || '');
+    if (!parent) {
+      // 多个曲库根目录时，从某个根目录返回的是“曲库根目录列表”这个虚拟层。
+      if (libPath && libData && (libData.roots || []).length > 1) {
+        queueView = 'browse';
+        paintQueueView();
+        libPath = ''; libData = null; libSeq++;
+        loadLibraryDir('');
+        return;
+      }
+      Utils.toast(tr('已在曲库最上层'), 'warn');
+      return;
+    }
     queueView = 'browse';
     paintQueueView();
-    try { await App.browse(p); } catch (e) { Utils.toast('打开上级目录失败: ' + (e && e.message || e), 'err'); }
-    renderQueue();
+    loadLibraryDir(parent);
   }
 
+  /* 进入曲库目录；同时把文件浏览同步到同目录，保证下一首/上一首仍有目录上下文。 */
   async function openDir(path) {
     if (!path) return;
     queueView = 'browse';
     paintQueueView();
-    try {
-      await App.browse(path);
-      renderQueue();
-    } catch (e) {
-      Utils.toast('打开目录失败: ' + (e && e.message || e), 'err');
+    const local = stripUri(path);
+    if (typeof App !== 'undefined' && App.browse) {
+      try { await App.browse(local); } catch (_) {}
     }
+    loadLibraryDir(path);
   }
 
   let wavePath = '';
@@ -376,25 +466,25 @@ function createPlayPanel() {
       : '<svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="6,3 20,12 6,21"/></svg>';
     modeBtn.textContent = tr(MODE_LABEL[(App.playMode && App.playMode()) || 'order'] || '顺序');
     // 当前目录变了 / 当前曲目变了 → 队列高亮跟着走
-    const cur = Player.current;
-    if (qEl.dataset.cur !== (cur || '')) {
-      qEl.dataset.cur = cur || '';
+    const cur = stripUri(Player.current || '');
+    if (qEl.dataset.cur !== cur) {
+      qEl.dataset.cur = cur;
       renderQueue();
     }
   }
 
   function tick() {
     if (win.classList.contains('hidden')) return;
-    // 播放/暂停显示音频队列；停止显示当前目录的文件夹 + 音频。
-    // 目录、当前曲目或队列变化都要重画。
     const active = !!Player.current;
     if (!active && queueView !== 'browse') { queueView = 'browse'; paintQueueView(); }
-    const path = (typeof App !== 'undefined' && App.path) ? App.path : '';
-    const list = (typeof App !== 'undefined' && App.playbackQueueList) ? App.playbackQueueList() : [];
-    const dirs = (typeof App !== 'undefined' && App.directories) ? App.directories() : [];
+    // 从播放状态回到停止时回到曲库目录顶层，不在某首歌的目录里停住。
+    if (!active && lastActive) { libPath = ''; libData = null; libSeq++; }
+    lastActive = active;
+    // 目录页只看曲库目录状态；不再被文件浏览的 App.path/队列牵着走。
     const sig = queueView === 'album'
-      ? 'a|' + (Player.current || '')
-      : 'b|' + path + '|' + dirs.map(d => d.path || '').join('|') + '|' + list.map(f => f.path || '').join('|');
+      ? 'a|' + stripUri(Player.current || '')
+      : 'b|' + libPath + '|' + (libData ? ((libData.dirs || []).length + ':' + (libData.tracks || []).length) : 'load') +
+        '|' + stripUri(Player.current || '');
     if (qEl.dataset.sig !== sig) { qEl.dataset.sig = sig; renderQueue(); }
     renderState();
     const playing = Player.isPlaying();
@@ -463,6 +553,7 @@ function createPlayPanel() {
   document.getElementById('pf-stop').addEventListener('click', () => {
     try { Player.close(); } catch (_) {}
     queueView = 'browse';
+    libPath = ''; libData = null; libSeq++;
     paintQueueView();
     renderQueue();
   });
@@ -486,12 +577,16 @@ function createPlayPanel() {
   seek.addEventListener('change', commitSeek);
   seek.addEventListener('pointerup', commitSeek);
 
-  if (qView) {
-    qView.addEventListener('click', e => {
+  if (albumBtn) {
+    albumBtn.addEventListener('click', e => {
       e.stopPropagation();
-      const b = e.target.closest('[data-qview]');
-      if (!b) return;
-      setQueueView(b.dataset.qview);
+      if (queueView === 'album') {
+        setQueueView('browse');
+        if (!libData) loadLibraryDir(libPath || libraryStartPath());
+        return;
+      }
+      if (!Player.current) { Utils.toast(tr('先播放一首歌再查看专辑'), 'warn'); return; }
+      setQueueView('album');
     });
   }
   if (qToggle) {
@@ -590,14 +685,21 @@ function createPlayPanel() {
     if (!row) return;
     if (row.dataset.dir) { openDir(row.dataset.dir); return; }
     if (row.dataset.qi) { Player.playQueueIndex(Number(row.dataset.qi)); return; }
-    if (row.dataset.path) PlayMgr.play(row.dataset.path, 0, {quiet: true});
+    if (row.dataset.path) {
+      const p = row.dataset.path;
+      const dir = Utils.dirname(stripUri(p));
+      // 同步文件浏览上下文，保证下一首/上一首仍按所在目录走。
+      if (dir && typeof App !== 'undefined' && App.browse) App.browse(dir).catch(() => {});
+      PlayMgr.play(p, 0, {quiet: true});
+    }
   }, true);
 
   if (favBar) {
     favBar.addEventListener('click', e => {
       if (Date.now() < suppressFavClickUntil) { e.preventDefault(); e.stopPropagation(); return; }
       if (e.target.closest('#pf-fav-add')) {
-        if (typeof App !== 'undefined' && App.addFavCurrent) App.addFavCurrent();
+        if (!libPath) { Utils.toast(tr('先进入一个曲库目录'), 'warn'); return; }
+        if (typeof App !== 'undefined' && App.addFavorite) App.addFavorite(asUri(libPath));
         return;
       }
       const chip = e.target.closest('.pf-fav-chip');
@@ -691,7 +793,7 @@ function createPlayPanel() {
   function showFloatLayout() {
     queueCollapsed = false;
     sfCollapsed = false;
-    if (Player.queueList && Player.queueList().length) queueView = 'album';
+    queueView = 'browse';
     // 不写 Store：浮窗和主页面共用同一个 localStorage，写这里会把主页面
     // 的“列表收起/声谱展开”偏好改掉，回到 App 就会自动弹出声谱。
     paintQueueState();
@@ -704,10 +806,7 @@ function createPlayPanel() {
   if (window.__AC2_FLOAT_MODE) setTimeout(showFloatLayout, 300);
 
   document.addEventListener('ac2:queue-changed', () => {
-    if (window.__AC2_FLOAT_MODE && Player.queueList && Player.queueList().length) {
-      queueView = 'album';
-      paintQueueView();
-    }
+    // 专辑是当前曲目的详情入口，不随队列变化自动跳到专辑页。
     renderQueue();
   });
   document.addEventListener('ac2:fav-changed', renderFavorites);

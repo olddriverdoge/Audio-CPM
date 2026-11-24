@@ -508,7 +508,16 @@ class UiRegression:
             self.page.wait_for_function(
                 "() => document.querySelectorAll('#lib-list .lib-row').length === 2",
                 timeout=6000)
-            return "2 / 2 results across title and artist"
+            # 标题允许换行；artist / album 各自单独一行，不能挤在标题同一行。
+            row = self.page.locator("#lib-list .lib-row").first
+            title_ws = row.locator(".lib-row-title").evaluate(
+                "el => getComputedStyle(el).whiteSpace + '|' + getComputedStyle(el).webkitLineClamp")
+            self.require("nowrap" not in title_ws, f"library title still single-line: {title_ws}")
+            artist = row.locator(".lib-row-artist").inner_text().strip()
+            album = row.locator(".lib-row-album").inner_text().strip()
+            self.require(artist == "Test Artist", f"library artist line: {artist!r}")
+            self.require(album == "Test Album", f"library album line: {album!r}")
+            return "2 / 2 results across title and artist; title wraps + artist/album lines"
         self.check("library fuzzy search honors field chips", search_and_fields, "library-search")
 
         def album_page():
@@ -522,18 +531,27 @@ class UiRegression:
             if self.page.locator("#pf-q-toggle").get_attribute("aria-expanded") == "false":
                 self.page.locator("#pf-q-toggle").click()
                 self.page.wait_for_timeout(250)
-            self.require(self.page.locator('#pf-qview [data-qview="queue"]').count() == 0,
-                         "old queue tab still present")
-            self.require(self.page.locator('#pf-qview [data-qview="album"]').count() == 1,
-                         "album tab missing")
-            self.page.locator('#pf-qview [data-qview="album"]').click()
+            self.require(self.page.locator('#pf-qview [data-qview]').count() == 0,
+                         "old directory/album tabs still present")
+            self.require(self.page.locator('#pf-album-btn').count() == 1,
+                         "album detail entry missing")
+            self.require(self.page.locator('#pf-qview-label').inner_text().strip() == "目录",
+                         "directory label missing")
+            self.page.locator('#pf-album-btn').click()
             self.page.locator("#pf-queue .pf-album-head").wait_for(state="visible", timeout=6000)
             head = self.page.locator("#pf-queue .pf-album-head").inner_text()
             self.require("Test Album" in head, f"album header: {head}")
             rows = self.page.locator("#pf-queue .pf-q[data-path]").count()
             self.require(rows >= 2, f"album tracks: {rows}")
+            self.require(self.page.locator('#pf-qview-label').inner_text().strip() == "专辑详情",
+                         "album detail label missing")
+            # 专辑是当前曲目的详情入口，不是和目录平级的页签；再点一次回到目录。
+            self.page.locator('#pf-album-btn').click()
+            self.page.wait_for_timeout(300)
+            self.require(self.page.locator('#pf-qview-label').inner_text().strip() == "目录",
+                         "album entry did not return to directory")
             return f"{head.strip()} / {rows} tracks"
-        self.check("play manager album page replaces queue tab", album_page, "album-page")
+        self.check("play manager album entry opens current track album", album_page, "album-page")
 
     def test_library_multiple_dirs(self):
         # 目录草稿不能被 1.8 秒状态轮询刷掉：选完第一个目录后等过一轮，
@@ -654,21 +672,20 @@ class UiRegression:
         self.check("play manager uses playlist label and 30% glass controls", open_panel)
 
         def stopped_folder_view():
-            # 停止状态：播放列表直接列出当前目录的文件夹 + 音频，不再借用目录选择器。
+            # 停止状态：目录只显示曲库根目录；点目录进入曲库数据，不借用文件浏览。
             self.page.evaluate("() => Player.close()")
-            self.page.evaluate("(p) => App.browse(p)", self.fx["ui_root"])
-            self.page.wait_for_timeout(500)
+            self.page.wait_for_timeout(900)
             if not self.page.locator("#pf-queue").is_visible():
                 self.page.locator("#pf-q-toggle").click()
                 self.page.wait_for_timeout(250)
             folder_rows = self.page.locator("#pf-queue .pf-qdir").count()
-            self.require(folder_rows >= 3, f"stopped playlist folders: {folder_rows}")
+            self.require(folder_rows == 2, f"stopped library roots: {folder_rows}")
             count = self.page.locator("#pf-qcount").inner_text()
             self.require("文件夹" in count, f"stopped count missing folders: {count!r}")
             self.require(self.page.locator("#pf-q-up").count() == 0, "old up button still present")
             self.require(self.page.locator("#pf-q-pick").count() == 0, "old folder-pick button still present")
             self.require(self.page.locator("#pf-dir-picker").count() == 0, "old folder picker still present")
-            # 点文件夹直接进入，点音频直接播放，不依赖文件浏览模块的额外点击。
+            # 点曲库目录直接进入，点音频直接播放，不依赖文件浏览模块的额外点击。
             self.page.locator(f'#pf-queue .pf-qdir[data-dir="{self.fx["ui_album_a"]}"]').click()
             self.page.wait_for_function(
                 f"() => App.path === {self.fx['ui_album_a']!r}", timeout=5000)
@@ -676,7 +693,7 @@ class UiRegression:
             self.require(self.page.locator("#pf-queue .pf-qdir").count() == 0,
                          "subfolder rows should be empty in Album A")
             self.require(self.page.locator("#pf-queue .pf-q[data-path]").count() >= 2,
-                         "stopped folder view missing audio rows")
+                         "stopped library view missing audio rows")
             # 固定一个非默认窗口尺寸，后面点击/自动淡化都不能把它读回预设尺寸。
             self.page.evaluate("""() => {
               const c = WinMgr.find(document.querySelector('#play-float'));
@@ -701,16 +718,24 @@ class UiRegression:
             self.require(size1 == size0, f"play window size changed after track click: {size0} -> {size1}")
             self.require(self.page.evaluate("document.querySelector('#spectrum-float').classList.contains('hidden')") == sp_before,
                          "playlist track click opened a second spectrum window")
-            # 播放中也能从目录视图返回上级、进别的目录；再切到专辑看当前播放上下文。
-            self.page.evaluate("(p) => App.browse(p)", self.fx["ui_root"])
-            self.page.wait_for_timeout(400)
-            self.require(self.page.locator("#pf-queue .pf-qdir").count() >= 3,
-                         "playing folder view empty")
+            # 播放中右滑回曲库根目录，再进另一个曲库目录。
+            def swipe_back():
+                box = self.page.locator("#pf-queue").bounding_box()
+                self.require(box and box["width"] > 120, f"queue box: {box}")
+                y = box["y"] + min(18, box["height"] - 1)
+                self.page.mouse.move(box["x"] + 70, y)
+                self.page.mouse.down()
+                self.page.mouse.move(box["x"] + 200, y, steps=6)
+                self.page.mouse.up()
+                self.page.wait_for_timeout(500)
+            swipe_back()
+            self.require(self.page.locator("#pf-queue .pf-qdir").count() == 2,
+                         "playing directory view did not return to library roots")
             self.page.locator(f'#pf-queue .pf-qdir[data-dir="{self.fx["ui_album_b"]}"]').click()
             self.page.wait_for_timeout(500)
             self.require(self.page.evaluate("App.path") == self.fx["ui_album_b"],
-                         "playing state could not open another folder")
-            self.page.locator('#pf-qview [data-qview="album"]').click()
+                         "playing state could not open another library folder")
+            self.page.locator('#pf-album-btn').click()
             self.page.wait_for_timeout(700)
             self.require(self.page.locator("#pf-queue .pf-qdir").count() == 0,
                          "album view mixed with folders")
@@ -718,21 +743,19 @@ class UiRegression:
                          "album view empty while playing")
             self.require(self.page.locator("#pf-queue .pf-album-head").count() == 1,
                          "album header missing")
-            self.page.locator('#pf-qview [data-qview="browse"]').click()
-            self.page.evaluate("(p) => App.browse(p)", self.fx["ui_root"])
-            self.page.wait_for_timeout(400)
+            self.page.locator('#pf-album-btn').click()
+            self.page.wait_for_timeout(300)
             if self.page.evaluate("Player.isPlaying()"):
                 self.page.evaluate("Player.toggle()")
             self.page.wait_for_timeout(200)
             # 暂停不会强制切视图；目录视图里仍可继续浏览。
-            self.require(self.page.locator("#pf-queue .pf-qdir").count() >= 1,
-                         "pause should not lock the directory view")
-            # 停止后回到文件夹浏览视图，而不是停在音频队列。
+            self.require(self.page.locator("#pf-queue .pf-q[data-path]").count() >= 1,
+                         "pause should not lock the library directory view")
+            # 停止后回到曲库根目录，而不是停在某首歌的目录。
             self.page.evaluate("Player.close()")
-            self.page.evaluate("(p) => App.browse(p)", self.fx["ui_root"])
-            self.page.wait_for_timeout(450)
-            self.require(self.page.locator("#pf-queue .pf-qdir").count() >= 3,
-                         "stopped state did not return to folder view")
+            self.page.wait_for_timeout(900)
+            self.require(self.page.locator("#pf-queue .pf-qdir").count() == 2,
+                         "stopped state did not return to library roots")
             return "stopped/playing folder tabs + direct actions + size kept"
         self.check("stopped playlist shows folders and direct actions", stopped_folder_view)
 
@@ -750,27 +773,31 @@ class UiRegression:
                 self.page.mouse.move(x0 + dx, y0, steps=6)
                 self.page.mouse.up()
                 self.page.wait_for_timeout(600)
-            # 从 Album A 右滑回根；从根进 Album B 后左滑也回根。
-            self.page.evaluate("(p) => App.browse(p)", self.fx["ui_album_a"])
-            self.page.wait_for_timeout(300)
+            # 从曲库根进入 Album A 后右滑回根；进 Album B 后左滑也回根。
+            self.page.locator(f'#pf-queue .pf-qdir[data-dir="{self.fx["ui_album_a"]}"]').click()
+            self.page.wait_for_timeout(500)
+            self.require(self.page.locator("#pf-queue .pf-q[data-path]").count() >= 2,
+                         "library Album A rows missing before swipe")
             swipe_queue(130)
-            self.require(self.page.evaluate("App.path") == self.fx["ui_root"],
-                         f"swipe-right did not go parent: {self.page.evaluate('App.path')}")
+            self.require(self.page.locator("#pf-queue .pf-qdir").count() == 2,
+                         "swipe-right did not return to library roots")
             self.page.locator(f'#pf-queue .pf-qdir[data-dir="{self.fx["ui_album_b"]}"]').click()
-            self.page.wait_for_function(
-                f"() => App.path === {self.fx['ui_album_b']!r}", timeout=5000)
+            self.page.wait_for_timeout(500)
+            self.require(self.page.evaluate("App.path") == self.fx["ui_album_b"],
+                         "could not open Album B from library roots")
             swipe_queue(-140)
-            self.require(self.page.evaluate("App.path") == self.fx["ui_root"],
-                         f"swipe-left did not go parent: {self.page.evaluate('App.path')}")
-            return "swipe right/left both return parent"
+            self.require(self.page.locator("#pf-queue .pf-qdir").count() == 2,
+                         "swipe-left did not return to library roots")
+            return "swipe right/left both return library roots"
         self.check("playlist swipe navigation returns parent in both directions", swipe_nav)
 
         def favorite_sync():
             if not self.page.locator("#pf-queue").is_visible():
                 self.page.locator("#pf-q-toggle").click()
                 self.page.wait_for_timeout(200)
-            self.page.evaluate("(p) => App.browse(p)", self.fx["ui_album_b"])
-            self.page.wait_for_timeout(300)
+            if self.page.locator("#pf-queue .pf-qdir").count() == 2:
+                self.page.locator(f'#pf-queue .pf-qdir[data-dir="{self.fx["ui_album_b"]}"]').click()
+                self.page.wait_for_timeout(500)
             self.page.locator("#pf-fav-add").click()
             self.page.wait_for_timeout(250)
             favs = self.page.evaluate("App.favoriteList()")
@@ -787,7 +814,7 @@ class UiRegression:
             )
             self.require(all(v in ("none", "absent") for v in disp),
                          f"metadata still shows the cover while play manager is open: {disp}")
-            return "favorite still synced from direct folder view"
+            return "favorite still synced from library directory"
         self.check("playlist favorite sync", favorite_sync)
 
         def embedded_spectrum():

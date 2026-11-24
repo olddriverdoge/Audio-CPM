@@ -38,6 +38,12 @@ async def library_cancel(request: Request):
     return _json(await run_in_threadpool(library.cancel_scan))
 
 
+async def library_browse(request: Request):
+    out = await run_in_threadpool(library.browse, qs(request, "path", ""))
+    # 未配置/不在曲库范围内是业务状态，统一 200，前端按 ok 字段提示。
+    return _json(out)
+
+
 async def library_search(request: Request):
     fields_raw = qs(request, "fields", "")
     fields = [x.strip() for x in fields_raw.split(",") if x.strip()] if fields_raw else list(DEFAULT_SEARCH_FIELDS)
@@ -61,6 +67,7 @@ routes = [
     Route('/api/library/config', library_config, methods=['POST']),
     Route('/api/library/scan', library_scan, methods=['POST']),
     Route('/api/library/scan/cancel', library_cancel, methods=['POST']),
+    Route('/api/library/browse', library_browse, methods=['GET']),
     Route('/api/library/search', library_search, methods=['GET']),
     Route('/api/library/album', library_album, methods=['GET']),
 ]

@@ -367,8 +367,7 @@ const App = (() => {
     if (!p) return Promise.resolve(false);
     return loadDir(p).catch(err => { Utils.toast('打开收藏失败: ' + (err && err.message || err), 'err'); return false; });
   }
-  function addFavCurrent() {
-    const uri = currentPath;
+  function addFavorite(uri) {
     if (!uri) { Utils.toast('先打开一个目录', 'warn'); return; }
     const list = favs();
     if (list.indexOf(uri) >= 0) { Utils.toast('已在快捷入口里'); return; }
@@ -376,6 +375,9 @@ const App = (() => {
     saveFavs(list);
     renderFavs();
     Utils.toast('已收藏：' + (treeBaseName(uri) || uri));
+  }
+  function addFavCurrent() {
+    addFavorite(currentPath);
   }
   function bindFavs() {
     const bar = document.getElementById('fav-bar');
@@ -1252,7 +1254,7 @@ const App = (() => {
     playPanel: () => playPanel,
     openModule, openModules, closeAllModules, openMod: openModule, openMeta,
     openCoverEditor: path => { if (typeof TaskRunner !== 'undefined') TaskRunner.openCoverEditor(path); },
-    setUiScale, previewUiScale, commitUiScale, currentUiScale, setCanvasPan, applyCanvasPan, canvasPan, addTargetCurrent, addFavCurrent,
+    setUiScale, previewUiScale, commitUiScale, currentUiScale, setCanvasPan, applyCanvasPan, canvasPan, addTargetCurrent, addFavCurrent, addFavorite,
     playbackQueueList: () => {
       // 系统浮窗里没有工作台的目录上下文；有原生队列时以原生队列为准，
       // 这样播放列表可以点选切歌，而不是拿默认目录凑一份假队列。

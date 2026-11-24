@@ -538,6 +538,64 @@ class LibraryStore:
         except Exception as exc:
             return {"ok": False, "error": str(exc)[:240], "tracks": [], "total": 0}
 
+    # ---------- browse ----------
+    def browse(self, path: str = "") -> Dict:
+        """播放管理的目录页：只返回曲库勾选目录内的文件夹与已索引音频。
+
+        path 为空时返回曲库根目录列表；单个根目录可由前端直接进入。
+        """
+        roots = self.dirs()
+        if not roots:
+            return {"ok": False, "error": "曲库尚未配置目录", "path": "", "parent": "",
+                    "roots": [], "dirs": [], "tracks": []}
+        try:
+            with _conn() as c:
+                rows = c.execute("SELECT * FROM tracks").fetchall()
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)[:240], "path": "", "parent": "",
+                    "roots": [], "dirs": [], "tracks": []}
+
+        root_counts = []
+        for root in roots:
+            count = sum(1 for r in rows if _is_under(r["dir"], root))
+            root_counts.append({
+                "path": local_uri(root), "name": os.path.basename(root) or root,
+                "count": count, "root": True,
+            })
+        roots_uri = [x["path"] for x in root_counts]
+        if not str(path or "").strip():
+            return {"ok": True, "path": "", "parent": "", "roots": roots_uri,
+                    "dirs": sorted(root_counts, key=lambda x: _natural_key(x["name"])),
+                    "tracks": []}
+
+        p = _norm_dir(path)
+        if not p or not any(_is_under(p, root) for root in roots):
+            return {"ok": False, "error": "目录不在曲库范围内", "path": "",
+                    "parent": "", "roots": roots_uri, "dirs": [], "tracks": []}
+
+        child_counts = {}
+        for row in rows:
+            d = os.path.abspath(row["dir"])
+            if d == p or not _is_under(d, p):
+                continue
+            rel = os.path.relpath(d, p)
+            child = os.path.join(p, rel.split(os.sep)[0])
+            child_counts[child] = child_counts.get(child, 0) + 1
+        dirs = [{
+            "path": local_uri(child), "name": os.path.basename(child) or child,
+            "count": count, "root": child in roots,
+        } for child, count in child_counts.items()]
+        dirs.sort(key=lambda x: _natural_key(x["name"]))
+
+        tracks = [_track_dict(r) for r in rows if os.path.abspath(r["dir"]) == p]
+        tracks = _sort_album_tracks(tracks)
+        parent = "" if p in roots else os.path.dirname(p)
+        return {
+            "ok": True, "path": local_uri(p),
+            "parent": local_uri(parent) if parent else "",
+            "roots": roots_uri, "dirs": dirs, "tracks": tracks,
+        }
+
     # ---------- album ----------
     def album(self, path: str) -> Dict:
         raw = str(path or "")

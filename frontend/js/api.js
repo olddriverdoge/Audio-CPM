@@ -81,6 +81,7 @@ const Api = (() => {
     libraryConfig: dirs => jpost('/api/library/config', {dirs}),
     libraryScan: force => jpost('/api/library/scan', {force: !!force}),
     libraryCancel: () => jpost('/api/library/scan/cancel', {}),
+    libraryBrowse: path => jfetch('/api/library/browse?path=' + enc(path || '')),
     librarySearch: (q, fields) => jfetch('/api/library/search?q=' + enc(q || '') +
       '&fields=' + enc((fields || []).join(',')) + '&limit=200'),
     libraryAlbum: path => jfetch('/api/library/album?path=' + enc(path)),

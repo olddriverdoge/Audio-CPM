@@ -437,6 +437,29 @@ class ApiRegression:
             return "title/artist/year/folder/composer"
         self.check("library metadata-field search", search_by_fields)
 
+        def browse_dirs():
+            roots = self.jget("/api/library/browse")
+            self.require(roots.get("ok") is True, f"library browse roots: {roots}")
+            self.require(roots.get("path") == "" and len(roots.get("dirs") or []) == 1,
+                         f"library browse root list: {roots}")
+            root = roots["dirs"][0]
+            self.require(root.get("path") == self.fx["album_a"],
+                         f"library browse root path: {root}")
+            self.require(root.get("count") == 2, f"library browse root count: {root}")
+            d = self.jget("/api/library/browse", params={"path": root["path"]})
+            self.require(d.get("ok") is True, f"library browse album: {d}")
+            self.require(d.get("path") == self.fx["album_a"] and d.get("parent") == "",
+                         f"library browse album path/parent: {d}")
+            tracks = d.get("tracks") or []
+            self.require(len(tracks) == 2 and not (d.get("dirs") or []),
+                         f"library browse album content: {d}")
+            self.require(tracks[0].get("name") == "Track One.flac",
+                         f"library browse track order: {[t.get('name') for t in tracks]}")
+            outside = self.jget("/api/library/browse", params={"path": self.fx["ui_root"]})
+            self.require(outside.get("ok") is False, f"library browse outside root: {outside}")
+            return f"{root.get('count')} tracks / roots {len(roots['dirs'])}"
+        self.check("library browse stays inside selected dirs", browse_dirs)
+
         def album_page():
             d = self.jget("/api/library/album", params={"path": self.fx["track1"]})
             self.require(d.get("ok") is True and d.get("album") == "Test Album", f"album: {d}")
