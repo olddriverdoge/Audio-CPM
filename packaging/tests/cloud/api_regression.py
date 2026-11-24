@@ -464,25 +464,25 @@ class ApiRegression:
             d = self.jget("/api/library/album", params={"path": self.fx["track1"]})
             self.require(d.get("ok") is True and d.get("album") == "Test Album", f"album: {d}")
             tracks = d.get("tracks") or []
-            self.require(len(tracks) == 2, f"album tracks: {tracks}")
-            self.require(tracks[0].get("name") == "Track One.flac" and
-                         tracks[1].get("name") == "Track Two.wav",
-                         f"album order: {[t.get('name') for t in tracks]}")
-            return f"{d.get('album')} / {len(tracks)} tracks"
-        self.check("library album aggregation", album_page)
+            # Track Two.wav 的 RIFF INFO 标签当前读不到，曲库里 album/artist 为空；
+            # 按 album+artist 精确查询时不能把同目录的无标签音频混进来。
+            self.require(len(tracks) == 1 and tracks[0].get("name") == "Track One.flac",
+                         f"album tracks: {[t.get('name') for t in tracks]}")
+            self.require(tracks[0].get("album") == "Test Album" and
+                         tracks[0].get("artist") == "Test Artist",
+                         f"album query metadata: {tracks[0]}")
+            return f"{d.get('album')} / {len(tracks)} matching track"
+        self.check("library album aggregation by album+artist", album_page)
 
-        def album_unindexed_fallback():
+        def album_unindexed_rejected():
             d = self.jget("/api/library/album", params={"path": self.fx["covered"]})
-            self.require(d.get("ok") is True, f"unindexed album: {d}")
-            self.require(d.get("indexed") is False, f"unindexed flag: {d}")
-            tracks = d.get("tracks") or []
-            self.require(len(tracks) == 1 and tracks[0].get("name") == "Track With Cover.flac",
-                         f"unindexed album tracks: {tracks}")
+            self.require(d.get("ok") is False and d.get("error"),
+                         f"unindexed album should be rejected: {d}")
             missing = self.jget("/api/library/album", params={"path": "local:/definitely-missing"})
             self.require(missing.get("ok") is False and missing.get("error"),
                          f"missing album should be soft failure: {missing}")
-            return "directory fallback for unindexed track"
-        self.check("library album falls back to directory", album_unindexed_fallback)
+            return "unindexed tracks do not fall back to same-directory audio"
+        self.check("library album requires indexed album+artist", album_unindexed_rejected)
 
         def incremental_scan():
             before = self.jget("/api/library/state")

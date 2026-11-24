@@ -97,6 +97,18 @@ function createPlayPanel() {
     } catch (_) {}
   }
 
+  /* 进入目录/专辑视图时：收起频谱声谱、展开播放列表区。 */
+  function expandQueueForView() {
+    const sfWas = sfCollapsed, queueWas = queueCollapsed;
+    sfCollapsed = true;
+    queueCollapsed = false;
+    if (sfWas !== sfCollapsed) Store.set('ac3_play_sf_collapsed', true);
+    if (queueWas !== queueCollapsed) Store.set('ac3_play_queue_collapsed', false);
+    paintQueueState();
+    paintSfState();
+    setModeButtonState();
+  }
+
   /* 外部入口（起播自动展开）用：收起列表、展开声谱区，并指定模式 */
   function showSpectrum(mode) {
     if (sfCollapsed) { sfCollapsed = false; Store.set('ac3_play_sf_collapsed', false); }
@@ -581,12 +593,23 @@ function createPlayPanel() {
     albumBtn.addEventListener('click', e => {
       e.stopPropagation();
       if (queueView === 'album') {
+        expandQueueForView();
         setQueueView('browse');
         if (!libData) loadLibraryDir(libPath || libraryStartPath());
         return;
       }
       if (!Player.current) { Utils.toast(tr('先播放一首歌再查看专辑'), 'warn'); return; }
+      expandQueueForView();
       setQueueView('album');
+    });
+  }
+  if (qViewLabel) {
+    qViewLabel.addEventListener('click', e => {
+      e.stopPropagation();
+      // “目录”是专辑详情之外的基础视图；点它也从详情/声谱回到曲库目录。
+      expandQueueForView();
+      if (queueView === 'album') setQueueView('browse');
+      else renderQueue();
     });
   }
   if (qToggle) {

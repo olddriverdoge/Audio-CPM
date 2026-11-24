@@ -183,7 +183,9 @@ def _probe(path: str) -> Dict:
 
 def _album_key(row: sqlite3.Row):
     album = (row["album"] or "").strip()
-    artist = (row["album_artist"] or row["artist"] or "").strip()
+    # 专辑页按曲库的 album + artist 组合定位，不再用 album_artist 兜底：
+    # 同一 directory 里的不同专辑/不同艺人不能被合并进来。
+    artist = (row["artist"] or row["album_artist"] or "").strip()
     return album, artist
 
 
@@ -616,28 +618,23 @@ class LibraryStore:
         except Exception:
             row = None
         if row is None:
-            return self._album_from_dir(p if os.path.isdir(p) else os.path.dirname(p))
+            # 专辑页只读曲库索引。未索引曲目无法确定 album+artist，
+            # 退回到“同目录所有音频”会把不同专辑混在一起，直接软失败。
+            return {"ok": False, "error": "当前曲目不在曲库中", "tracks": []}
         album, artist = _album_key(row)
         tracks = []
         try:
             with _conn() as c:
-                if album:
-                    if artist:
-                        rows = c.execute(
-                            "SELECT * FROM tracks WHERE album=? AND (album_artist=? OR album_artist='') "
-                            "ORDER BY id LIMIT 500", (album, artist)).fetchall()
-                    else:
-                        rows = c.execute("SELECT * FROM tracks WHERE album=? ORDER BY id LIMIT 500",
-                                         (album,)).fetchall()
-                    # 同目录、但标签没写专辑的曲目也要归入当前专辑页；
-                    # 否则一张专辑里只要有一首 WAV 标签不完整，列表就会缺歌。
-                    same_dir = c.execute("SELECT * FROM tracks WHERE dir=? ORDER BY id LIMIT 500",
-                                         (row["dir"],)).fetchall()
-                    seen = {r["path"] for r in rows}
-                    rows = list(rows) + [r for r in same_dir if r["path"] not in seen]
+                if album and artist:
+                    rows = c.execute(
+                        "SELECT * FROM tracks WHERE album=? AND artist=? ORDER BY id LIMIT 500",
+                        (album, artist)).fetchall()
+                elif album:
+                    rows = c.execute(
+                        "SELECT * FROM tracks WHERE album=? AND (artist='' OR artist IS NULL) "
+                        "ORDER BY id LIMIT 500", (album,)).fetchall()
                 else:
-                    rows = c.execute("SELECT * FROM tracks WHERE dir=? ORDER BY id LIMIT 500",
-                                     (row["dir"],)).fetchall()
+                    rows = []
             tracks = _sort_album_tracks([_track_dict(r) for r in rows])
             if not tracks:
                 tracks = [_track_dict(row)]
@@ -651,45 +648,6 @@ class LibraryStore:
             "current": _track_dict(row), "tracks": tracks,
         }
 
-    def _album_from_dir(self, p: str) -> Dict:
-        if not os.path.isdir(p):
-            return {"ok": False, "error": "当前曲目不在已索引曲库中"}
-        names = []
-        try:
-            for n in os.listdir(p):
-                if os.path.splitext(n)[1].lower() in MEDIA_EXTS:
-                    names.append(n)
-        except Exception as exc:
-            return {"ok": False, "error": str(exc)[:200]}
-        tracks = []
-        for n in sorted(names, key=_natural_key)[:500]:
-            full = os.path.join(p, n)
-            try:
-                meta = _probe(full)
-                tracks.append({
-                    "path": local_uri(full), "dir": local_uri(p), "name": n,
-                    "title": meta["title"], "artist": meta["artist"], "album": meta["album"],
-                    "albumArtist": meta["album_artist"], "genre": meta["genre"],
-                    "year": meta["year"], "composer": meta["composer"],
-                    "track": meta["track"], "disc": meta["disc"], "duration": meta["duration"],
-                    "format": meta["format"], "bitrate": meta["bitrate"],
-                    "sampleRate": meta["sample_rate"], "channels": meta["channels"],
-                    "folder": os.path.basename(p), "hasCover": bool(meta["has_cover"]),
-                    "indexed": False,
-                })
-            except Exception:
-                continue
-        tracks = _sort_album_tracks(tracks)
-        if not tracks:
-            return {"ok": False, "error": "目录中没有音频"}
-        first = tracks[0]
-        return {
-            "ok": True, "indexed": False, "album": first.get("album") or os.path.basename(p),
-            "artist": first.get("albumArtist") or first.get("artist") or "",
-            "year": first.get("year") or "", "genre": first.get("genre") or "",
-            "dir": local_uri(p), "coverPath": first["path"], "current": None,
-            "tracks": tracks,
-        }
 
 
 library = LibraryStore()

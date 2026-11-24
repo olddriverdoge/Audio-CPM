@@ -151,7 +151,8 @@
   .play-float.queue-collapsed .pf-q-caret{transform:rotate(180deg)}
   /* 播放列表分「目录 / 队列」两视图：停止与播放中都能自由切，不再靠播放状态锁死 */
   .pf-qview{display:flex;gap:1px;flex:0 0 auto;align-items:center;padding:0 2px}
-  .pf-qview-label{color:var(--muted);font-size:10px;line-height:1;letter-spacing:.03em}
+  .pf-qview-label{color:var(--muted);font-size:10px;line-height:1;letter-spacing:.03em;cursor:pointer;padding:2px 3px;border-radius:4px}
+  .pf-qview-label:hover{color:var(--accent);background:rgba(56,189,248,.10)}
   .pf-album-entry{border:1px solid rgba(86,190,255,.28);background:rgba(86,190,255,.10);
     color:#9fdfff;font:inherit;font-size:10px;line-height:1;padding:4px 7px;border-radius:999px;
     cursor:pointer;flex:0 0 auto}

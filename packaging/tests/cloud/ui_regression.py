@@ -496,6 +496,15 @@ class UiRegression:
             self.page.wait_for_function(
                 "() => document.querySelectorAll('#lib-list .lib-row').length === 1",
                 timeout=6000)
+            # 标题允许换行；artist / album 各自单独一行，不能挤在标题同一行。
+            row = self.page.locator("#lib-list .lib-row").first
+            title_ws = row.locator(".lib-row-title").evaluate(
+                "el => getComputedStyle(el).whiteSpace + '|' + getComputedStyle(el).webkitLineClamp")
+            self.require("nowrap" not in title_ws, f"library title still single-line: {title_ws}")
+            artist = row.locator(".lib-row-artist").inner_text().strip()
+            album = row.locator(".lib-row-album").inner_text().strip()
+            self.require(artist == "Test Artist", f"library artist line: {artist!r}")
+            self.require(album == "Test Album", f"library album line: {album!r}")
             # 字段多选：流派按钮可打开/关闭。
             genre = self.page.locator('#lib-fields [data-field="genre"]')
             genre.click()
@@ -508,15 +517,6 @@ class UiRegression:
             self.page.wait_for_function(
                 "() => document.querySelectorAll('#lib-list .lib-row').length === 2",
                 timeout=6000)
-            # 标题允许换行；artist / album 各自单独一行，不能挤在标题同一行。
-            row = self.page.locator("#lib-list .lib-row").first
-            title_ws = row.locator(".lib-row-title").evaluate(
-                "el => getComputedStyle(el).whiteSpace + '|' + getComputedStyle(el).webkitLineClamp")
-            self.require("nowrap" not in title_ws, f"library title still single-line: {title_ws}")
-            artist = row.locator(".lib-row-artist").inner_text().strip()
-            album = row.locator(".lib-row-album").inner_text().strip()
-            self.require(artist == "Test Artist", f"library artist line: {artist!r}")
-            self.require(album == "Test Album", f"library album line: {album!r}")
             return "2 / 2 results across title and artist; title wraps + artist/album lines"
         self.check("library fuzzy search honors field chips", search_and_fields, "library-search")
 
@@ -537,20 +537,39 @@ class UiRegression:
                          "album detail entry missing")
             self.require(self.page.locator('#pf-qview-label').inner_text().strip() == "目录",
                          "directory label missing")
+            # 先把频谱展开、再点专辑，验证会自动收起声谱并展开播放列表。
+            sf_cls = self.page.locator("#pf-sf-sec").get_attribute("class") or ""
+            if "collapsed" in sf_cls:
+                self.page.locator("#pf-sf-toggle").click()
+                self.page.wait_for_timeout(220)
+            if self.page.evaluate("document.querySelector('#play-float').classList.contains('queue-collapsed')"):
+                self.page.locator("#pf-q-toggle").click()
+                self.page.wait_for_timeout(250)
             self.page.locator('#pf-album-btn').click()
             self.page.locator("#pf-queue .pf-album-head").wait_for(state="visible", timeout=6000)
+            self.page.wait_for_timeout(250)
+            self.require(not self.page.evaluate(
+                "document.querySelector('#play-float').classList.contains('queue-collapsed')"),
+                "album entry did not expand the queue")
+            self.require("collapsed" in (self.page.locator("#pf-sf-sec").get_attribute("class") or ""),
+                         "album entry did not collapse the spectrum")
             head = self.page.locator("#pf-queue .pf-album-head").inner_text()
-            self.require("Test Album" in head, f"album header: {head}")
+            self.require("Test Album" in head and "1 首" in head, f"album header: {head}")
             rows = self.page.locator("#pf-queue .pf-q[data-path]").count()
-            self.require(rows >= 2, f"album tracks: {rows}")
+            self.require(rows == 1, f"album tracks mixed from other albums: {rows}")
+            names = self.page.locator("#pf-queue .pf-q[data-path] .pf-q-name").all_inner_texts()
+            self.require(all("A Long Tone" not in n and "Track Two" not in n for n in names),
+                         f"album contains untagged same-directory tracks: {names}")
             self.require(self.page.locator('#pf-qview-label').inner_text().strip() == "专辑详情",
                          "album detail label missing")
-            # 专辑是当前曲目的详情入口，不是和目录平级的页签；再点一次回到目录。
-            self.page.locator('#pf-album-btn').click()
+            # 目录标签可点，回到曲库目录；频谱保持收起、列表保持展开。
+            self.page.locator('#pf-qview-label').click()
             self.page.wait_for_timeout(300)
             self.require(self.page.locator('#pf-qview-label').inner_text().strip() == "目录",
-                         "album entry did not return to directory")
-            return f"{head.strip()} / {rows} tracks"
+                         "directory label did not return to directory")
+            self.require("collapsed" in (self.page.locator("#pf-sf-sec").get_attribute("class") or ""),
+                         "directory view expanded the spectrum again")
+            return f"{head.strip()} / {rows} same album tracks"
         self.check("play manager album entry opens current track album", album_page, "album-page")
 
     def test_library_multiple_dirs(self):
