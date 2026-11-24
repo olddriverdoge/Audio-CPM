@@ -39,4 +39,6 @@
 
 ## 构建
 
-待 CI 构建后补充 APK 文件名、大小、SHA256、run id 与包名。
+- CI run `45370828048`，提交 `f7b2521`，`main_package=false`，`.dev` 测试包 `com.github.olddriverdoge.audiocpm.dev`，版本 0.5.22/102。
+- 产物 `Audio-CPM-0.5.22-102-dev-library-play.apk`：22,672,501 字节，SHA256 `9807fa447d0b523b5fe8feaac59eee7b999173a4788910a3299ef7155ccb90b4`。
+- 仅含 `arm64-v8a`。
