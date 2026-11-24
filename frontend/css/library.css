@@ -94,6 +94,8 @@
   border:1px solid rgba(255,255,255,.09); border-radius:8px; padding:4px;
   background:rgba(0,0,0,.18);
 }
+/* 横向手势交给曲库脚本处理（左右滑返回上级），纵向仍由浏览器滚动。 */
+.lib-picker-list{touch-action:pan-y}
 .lib-setup-dir{
   display:flex; gap:7px; align-items:center; padding:6px 7px; border-radius:6px;
   background:rgba(255,255,255,.04); margin:3px; font-size:11px;

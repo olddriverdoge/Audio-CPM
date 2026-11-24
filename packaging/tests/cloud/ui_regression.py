@@ -569,6 +569,9 @@ class UiRegression:
             self.page.locator("#lib-picker").wait_for(state="visible", timeout=4000)
             self.require(self.page.locator("#lib-picker-up").count() == 0,
                          "old parent button still present")
+            self.require(self.page.evaluate(
+                "() => getComputedStyle(document.querySelector('#lib-picker-list')).touchAction") == "pan-y",
+                "picker list does not reserve horizontal touch gestures")
             box = self.page.locator("#lib-picker-list").bounding_box()
             self.require(bool(box), "picker list has no box")
             y = box["y"] + min(70, box["height"] / 2)
