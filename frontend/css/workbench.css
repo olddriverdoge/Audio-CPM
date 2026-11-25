@@ -182,6 +182,13 @@
   .pf-q:hover{background:rgba(56,189,248,.14)}
   .pf-q.on{color:var(--accent);background:rgba(56,189,248,.20)}
   .pf-q-ico{width:14px;flex:0 0 auto;text-align:center}
+  /* 目录视图左侧封面预览；专辑视图仍用序号/音符，不加载封面 */
+  .pf-q-cover{width:30px;height:30px;flex:0 0 30px;border-radius:5px;overflow:hidden;position:relative;
+    display:flex;align-items:center;justify-content:center;background:rgba(8,13,19,.35);
+    border:1px solid rgba(255,255,255,.08)}
+  .pf-q-cover .pf-q-ph{font-size:13px;line-height:1;color:var(--muted)}
+  .pf-q-cover img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+  .pf-q-cover.dir .pf-q-ph{font-size:15px;color:var(--accent)}
   .pf-q-name{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .pf-q-sub{display:block;color:var(--muted);font-size:9px;line-height:1.25;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   /* 停止状态直接浏览当前目录：文件夹行与音频行共用列表，不再另开选择器 */

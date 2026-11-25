@@ -562,6 +562,8 @@ class UiRegression:
                          f"album contains untagged same-directory tracks: {names}")
             self.require(self.page.locator('#pf-qview-label').inner_text().strip() == "专辑详情",
                          "album detail label missing")
+            self.require(self.page.locator("#pf-queue .pf-q-cover").count() == 0,
+                         "album view should not show cover previews")
             # 目录标签可点，回到曲库目录；频谱保持收起、列表保持展开。
             self.page.locator('#pf-qview-label').click()
             self.page.wait_for_timeout(300)
@@ -699,6 +701,14 @@ class UiRegression:
                 self.page.wait_for_timeout(250)
             folder_rows = self.page.locator("#pf-queue .pf-qdir").count()
             self.require(folder_rows == 2, f"stopped library roots: {folder_rows}")
+            # 目录视图的文件夹也带左侧封面预览，和文件浏览一致。
+            folder_covers = self.page.locator("#pf-queue .pf-qdir .pf-q-cover.dir").count()
+            self.require(folder_covers == folder_rows,
+                         f"folder cover previews missing: {folder_covers}/{folder_rows}")
+            # 预览图不只是占位标签，至少要有一张确实加载出来。
+            self.page.wait_for_function(
+                "() => [...document.querySelectorAll('#pf-queue .pf-qdir .pf-q-cover img')].some(i => i.complete && i.naturalWidth > 0)",
+                timeout=6000)
             count = self.page.locator("#pf-qcount").inner_text()
             self.require("文件夹" in count, f"stopped count missing folders: {count!r}")
             self.require(self.page.locator("#pf-q-up").count() == 0, "old up button still present")
@@ -711,8 +721,17 @@ class UiRegression:
             self.page.wait_for_timeout(250)
             self.require(self.page.locator("#pf-queue .pf-qdir").count() == 0,
                          "subfolder rows should be empty in Album A")
-            self.require(self.page.locator("#pf-queue .pf-q[data-path]").count() >= 2,
-                         "stopped library view missing audio rows")
+            track_rows = self.page.locator("#pf-queue .pf-q[data-path]").count()
+            self.require(track_rows >= 2, "stopped library view missing audio rows")
+            track_covers = self.page.locator("#pf-queue .pf-q[data-path] .pf-q-cover").count()
+            self.require(track_covers == track_rows,
+                         f"track cover previews missing: {track_covers}/{track_rows}")
+            first_is_cover = self.page.evaluate(
+                "() => document.querySelector('#pf-queue .pf-q[data-path]').firstElementChild.className.includes('pf-q-cover')")
+            self.require(first_is_cover, "track cover is not the first element in the row")
+            self.page.wait_for_function(
+                "() => [...document.querySelectorAll('#pf-queue .pf-q[data-path] .pf-q-cover img')].some(i => i.complete && i.naturalWidth > 0)",
+                timeout=6000)
             # 固定一个非默认窗口尺寸，后面点击/自动淡化都不能把它读回预设尺寸。
             self.page.evaluate("""() => {
               const c = WinMgr.find(document.querySelector('#play-float'));
@@ -762,6 +781,10 @@ class UiRegression:
                          "album view empty while playing")
             self.require(self.page.locator("#pf-queue .pf-album-head").count() == 1,
                          "album header missing")
+            self.require(self.page.locator("#pf-queue .pf-q-cover").count() == 0,
+                         "album view should not show cover previews")
+            self.require(self.page.locator("#pf-queue .pf-q-cover img").count() == 0,
+                         "album view should not load cover thumbnails")
             self.page.locator('#pf-album-btn').click()
             self.page.wait_for_timeout(300)
             if self.page.evaluate("Player.isPlaying()"):

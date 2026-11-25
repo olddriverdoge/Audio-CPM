@@ -253,8 +253,11 @@ function createPlayPanel() {
     let html = '';
     html += dirs.map(f => {
       const p = f.path || '';
+      const thumb = p ? Api.folderCoverUrl(p) : '';
       return '<div class="pf-q pf-qdir" data-dir="' + Utils.escapeHtml(p) + '" title="' + Utils.escapeHtml(p) + '">' +
-        '<span class="pf-q-ico">📁</span>' +
+        '<span class="pf-q-cover dir"><span class="pf-q-ph">📁</span>' +
+        (thumb ? '<img data-thumb="' + Utils.escapeHtml(thumb) + '" alt="" onerror="ThumbMgr.onError(this)">' : '') +
+        '</span>' +
         '<span class="pf-q-name">' + Utils.escapeHtml(f.name || Utils.basename(p)) + '</span>' +
         (Number(f.count) ? '<span class="pf-q-time">' + Number(f.count) + '</span>' : '') + '</div>';
     }).join('');
@@ -262,9 +265,12 @@ function createPlayPanel() {
       const p = t.path || '';
       const on = stripUri(p) === cur;
       const by = [t.artist || t.albumArtist || '', t.album || ''].filter(Boolean).join(' · ');
+      const thumb = p ? Api.thumbUrl(p, 48) : '';
       return '<div class="pf-q' + (on ? ' on' : '') + '" data-path="' + Utils.escapeHtml(p) +
         '" title="' + Utils.escapeHtml(p) + '">' +
-        '<span class="pf-q-ico">' + (on ? '▶' : '♪') + '</span>' +
+        '<span class="pf-q-cover"><span class="pf-q-ph">' + (on ? '▶' : '♪') + '</span>' +
+        (thumb ? '<img data-thumb="' + Utils.escapeHtml(thumb) + '" alt="" onerror="ThumbMgr.onError(this)">' : '') +
+        '</span>' +
         '<span class="pf-q-name">' + Utils.escapeHtml(t.title || t.name) +
         (by ? '<small class="pf-q-sub">' + Utils.escapeHtml(by) + '</small>' : '') + '</span>' +
         (t.duration ? '<span class="pf-q-time">' + fmt(t.duration) + '</span>' : '') +
@@ -274,6 +280,7 @@ function createPlayPanel() {
     qEl.innerHTML = html;
     qEl.dataset.view = 'browse';
     qEl.dataset.cur = cur;
+    try { if (typeof ThumbMgr !== 'undefined') ThumbMgr.attach(qEl, 40); } catch (_) {}
     renderFavorites();
   }
 
@@ -371,6 +378,7 @@ function createPlayPanel() {
     if (!tracks.length) html = '<div class="detail-empty">' + Utils.escapeHtml(tr('这张专辑没有音频')) + '</div>';
     qEl.innerHTML = html;
     qEl.dataset.view = 'album';
+    try { if (typeof ThumbMgr !== 'undefined') ThumbMgr.detach(qEl); } catch (_) {}
   }
 
   function paintQueueView() {
