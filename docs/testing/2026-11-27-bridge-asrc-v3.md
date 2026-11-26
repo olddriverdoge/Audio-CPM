@@ -42,6 +42,8 @@
 | 块标记完整性 | 标记丢失率、标记偏移样本数、尾块保留 | 模型帧/缓冲元数据队列（预留，见 V2 第 3 节） |
 | 双向环回计数 | 播放/录音两侧 ASRC 速率误差叠加 | 录音桥接入后补齐 |
 | 回调线程耗时 | 单块处理耗时 P50/P95/P99，确认不阻塞 AAudio 回调 | `aaudio_sink.cpp` 写入路径计时 |
+| 真实发送计数 | 累计写入字节/帧数、`nativeWrite` 负返回次数与最近错误、发送后 `framesWritten` 增量 | `AaudioAudioSink` 增加静态计数，纳入 `describe()` |
+| XRun 上报 | cpp 已有 `nativeXRunCount`（`AAudioStream_getXRunCount`），Java `describe()` 尚未带出 | `AaudioAudioSink.describe()` 补 `xrunCount` 字段 |
 
 > 缺口字段在真机埋点补齐前，第 3.2 节对应指标只能人工从 logcat 记录，不能作为自动化门禁。
 
@@ -68,6 +70,12 @@
 - **B 录音桥**：48k→24k；44.1k→24k；短时静音、突发大音量、水位过载。
 - **C 双向环回**：24k 模型，播放桥与录音桥同时跑，48k 与 44.1k 两组；抓两侧 ASRC 速率误差叠加导致的长时间单调漂移与音调缓偏。
 - **D 块边界专项**：正常连续块、短尾块、零样本静音块、跨插值窗口边界、语音→静音→语音快速切换；核对尾音不被吞、不粘连杂音。
+- **E 接管模式与真实发送**（`AaudioAudioSink` nativeActive 路径）：
+  - *接管前置条件*（`configure()` 判定，全部满足才 `nativeActive=true`）：SDK ≥ 26；采样率/声道有效、声道 ≤ 2；线性 PCM 16BIT/FLOAT；`speed==1.0` 且 `pitch==1.0`；声道映射直通；pipeline 激活；`nativeOpen` 成功且实际 rate/ch/编码与请求一致。
+  - *真接管断言*：`audioInfo().aaudio` 为 `active=true`、`fallback=false`、`sampleRate>0`、`error=""`，`device` 为 `AAudio exclusive`/`AAudio shared`；不能出现"面板显示在播但实际走 fallback"。
+  - *真实发送校验*：接管后 PCM 经 `pipeline.queueInput → drainPipeline → nativeWrite` 写入原生流（非 direct buffer 先拷 `directScratch`）。当前可观测：播放位置持续推进、`hasPendingData`/`nativePendingFrames` 有硬件队列帧数、无 `WriteException`、logcat 无 fallback 切换记录；埋点补齐后再核对累计写入字节/帧数随播放单调增长、负返回计数为 0。
+  - *必须降级反例*（以下任一命中应 `fallback=true`，且 `error` 能对应原因，不得伪接管）：变速/变调（speed 或 pitch ≠ 1.0）；非直通声道映射；声道 > 2；非 S16/FLOAT 编码；`nativeOpen` 失败或实际参数不匹配；SDK < 26。
+  - *发送健壮性*：`nativeWrite` 返回负值须上抛 `WriteException` 交上层处理；返回 0 不死循环（`drainPipeline`/`handleBuffer` guard 上限生效）；暂停期间补的 preroll 帧直接丢弃，不在写路径内 `requestStart`。
 - **长稳**：连续 30min，统计水位波动、underrun/overrun 次数与时刻、P50/P90/P99 延迟、ppm 漂移收敛情况。
 
 ### 3.3 主观听测（真机，控制台/听感记录，不截图）
@@ -86,6 +94,7 @@
 | 闭环长稳 | 30min 无持续 underrun/overrun；允许极短时触边但自动恢复、不爆音；ppm 稳定收敛、无单调累积偏移 | 自动化（埋点补齐后）+ 人工复核 |
 | 延迟 | P99 < 120ms；单块处理耗时 P95 < 回调周期 30% | 自动化（埋点补齐后） |
 | 块边界 | 静音块、短尾块正常渲染，无吞尾、无粘连杂音，标记零错位 | 人工 + 标记计数自动化 |
+| 接管与真实发送 | 满足前置条件时 `fallback=false` 且 PCM 真实写入原生流（发送计数单调增长、无负返回）；命中反例必须降级且 `error` 可归因 | 自动化（埋点补齐后）+ 人工复核 |
 | 热切换 | 采样率/声道切换仅允许一次极短淡入淡出，不卡死、不爆音、不丢标记流 | 人工 |
 
 ## 5. 报告 JSON 结构
@@ -109,6 +118,8 @@
   "thd_db": -84.3,
   "snr_db": 92.1,
   "latency_p99_ms": 96,
+  "takeover": {"active": true, "fallback": false, "exclusive": false},
+  "send": {"bytes_written": 0, "frames_written": 0, "write_errors": 0, "xrun_count": 0},
   "converge_ok": true,
   "verdict": "pass"
 }
@@ -122,6 +133,7 @@
 4. **静音帧被优化逻辑丢弃**：显式静音块承载停顿语义，桥接层必须原样透传标记，不能当无效数据丢弃。
 5. **双向闭环调速共振**：播放桥与录音桥各一套水位闭环，参数未错开带宽会周期性水位起伏、声音发颤；播放侧优先稳水位，录音侧调速更保守。
 6. **ROM 不上报原生采样率**：`audioInfo()` 已有三级兜底（AudioManager 属性 → AudioTrack 原生率 → AAudio 实际流率），真机回归需确认兜底链路在目标机型生效。
+7. **伪接管 / 静默误降级**：`nativeActive` 打开失败后回退 `fallback`，若面板只看"在播"状态容易误以为走了 AAudio。真机必须核对 `aaudio.fallback` 与 `error`；降级原因（变速/非直通/打开失败/参数不匹配）要能从 `error` 字段直接归因。
 
 ## 7. 落地步骤（本地 CLI）
 
