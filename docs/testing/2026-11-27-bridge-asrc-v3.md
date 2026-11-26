@@ -30,6 +30,7 @@
 | 源格式 | `sourceFormat.{sampleRate,channels,encoding}` | ExoPlayer `getCurrentTracks` |
 | 播放倍速 | `speed` | `getPlaybackParameters().speed` |
 | AAudio 流状态 | `aaudio.{active,fallback,sampleRate,channels,encoding,device,inputSampleRate,inputChannels,inputEncoding,exclusive,error}` | `AaudioAudioSink.describe()` |
+| 工作模式 | `mode` ∈ `aaudio_exclusive` / `aaudio_shared` / `shared`（fallback），由 `aaActive`+`aaExclusive` 推导 | `AudioCpmBridge` 播放状态上报 |
 | 频谱/音效 | `format`、`fx` | `SpectrumProcessor.describe()` / `AudioFx.info()` |
 
 ### 2.2 缺口（ASRC 验收必需，当前未上报）
@@ -44,6 +45,7 @@
 | 回调线程耗时 | 单块处理耗时 P50/P95/P99，确认不阻塞 AAudio 回调 | `aaudio_sink.cpp` 写入路径计时 |
 | 真实发送计数 | 累计写入字节/帧数、`nativeWrite` 负返回次数与最近错误、发送后 `framesWritten` 增量 | `AaudioAudioSink` 增加静态计数，纳入 `describe()` |
 | XRun 上报 | cpp 已有 `nativeXRunCount`（`AAudioStream_getXRunCount`），Java `describe()` 尚未带出 | `AaudioAudioSink.describe()` 补 `xrunCount` 字段 |
+| 模式切换事件 | 当前只有当前态快照，缺进入/退出各档模式的时刻与触发原因（独占被拒/打开失败/变速降级/路由变化） | `AaudioAudioSink` 记录模式迁移序列，纳入 `audioInfo()` 或日志 |
 
 > 缺口字段在真机埋点补齐前，第 3.2 节对应指标只能人工从 logcat 记录，不能作为自动化门禁。
 
@@ -76,6 +78,15 @@
   - *真实发送校验*：接管后 PCM 经 `pipeline.queueInput → drainPipeline → nativeWrite` 写入原生流（非 direct buffer 先拷 `directScratch`）。当前可观测：播放位置持续推进、`hasPendingData`/`nativePendingFrames` 有硬件队列帧数、无 `WriteException`、logcat 无 fallback 切换记录；埋点补齐后再核对累计写入字节/帧数随播放单调增长、负返回计数为 0。
   - *必须降级反例*（以下任一命中应 `fallback=true`，且 `error` 能对应原因，不得伪接管）：变速/变调（speed 或 pitch ≠ 1.0）；非直通声道映射；声道 > 2；非 S16/FLOAT 编码；`nativeOpen` 失败或实际参数不匹配；SDK < 26。
   - *发送健壮性*：`nativeWrite` 返回负值须上抛 `WriteException` 交上层处理；返回 0 不死循环（`drainPipeline`/`handleBuffer` guard 上限生效）；暂停期间补的 preroll 帧直接丢弃，不在写路径内 `requestStart`。
+- **F 工作模式采样**（三档输出路径，同一信号分档采集对比）：
+  - *档位定义与回退链*：
+    - `aaudio_exclusive`：AAudio 独占，`LOW_LATENCY` 性能模式，缓冲目标 `sampleRate/12`（约 80ms）、容量 ×2；
+    - `aaudio_shared`：独占打开失败后 cpp 自动重试 AAudio 共享混响，仍走 `nativeWrite`；
+    - `shared`（fallback）：AAudio 两级都失败，或前置条件不满足（变速变调/非直通映射/>2 声道/非 S16·FLOAT/SDK<26），走 `DefaultAudioSink`。
+  - *分档采集*：同一 1kHz 正弦 + 语音 + 音乐样本，在三档下分别记录 `mode`、采样率/声道/编码、缓冲帧数、估算延迟、xrun 计数、回采 SNR/THD/LSD 与主观听感；重点对比独占与共享的延迟、xrun 与高频表现。
+  - *模式自洽断言*：`mode` 必须与 `aaudio.active / exclusive / fallback / error` 一致；独占被拒应先自动落到 `aaudio_shared`，不能直接掉到 fallback；只有 AAudio 两级都失败才进入 `shared`(fallback)。
+  - *分档关注点*：独占缓冲小、易 underrun，核对 buffer size/capacity、xrun 与 P99 延迟；共享走系统混响，核对 `deviceSampleRate` 与 `aaudio.sampleRate` 是否被系统再次转码；fallback 确认不经 `nativeWrite`，变速/Sonic 在 `DefaultAudioSink` 内完成。
+  - *模式升降级*：外设热插拔/路由变化、变速开关、声道映射切换时，模式按链路正确升降级，切换瞬间无爆音、不卡死，`error` 可归因到具体原因。
 - **长稳**：连续 30min，统计水位波动、underrun/overrun 次数与时刻、P50/P90/P99 延迟、ppm 漂移收敛情况。
 
 ### 3.3 主观听测（真机，控制台/听感记录，不截图）
@@ -95,6 +106,7 @@
 | 延迟 | P99 < 120ms；单块处理耗时 P95 < 回调周期 30% | 自动化（埋点补齐后） |
 | 块边界 | 静音块、短尾块正常渲染，无吞尾、无粘连杂音，标记零错位 | 人工 + 标记计数自动化 |
 | 接管与真实发送 | 满足前置条件时 `fallback=false` 且 PCM 真实写入原生流（发送计数单调增长、无负返回）；命中反例必须降级且 `error` 可归因 | 自动化（埋点补齐后）+ 人工复核 |
+| 工作模式 | 三档 `mode` 与 `active/exclusive/fallback` 自洽；独占被拒先落共享、再退 fallback；分档延迟/xrun/音质达标，升降级无爆音卡死 | 自动化（埋点补齐后）+ 人工复核 |
 | 热切换 | 采样率/声道切换仅允许一次极短淡入淡出，不卡死、不爆音、不丢标记流 | 人工 |
 
 ## 5. 报告 JSON 结构
@@ -119,6 +131,7 @@
   "snr_db": 92.1,
   "latency_p99_ms": 96,
   "takeover": {"active": true, "fallback": false, "exclusive": false},
+  "work_mode": "aaudio_exclusive",
   "send": {"bytes_written": 0, "frames_written": 0, "write_errors": 0, "xrun_count": 0},
   "converge_ok": true,
   "verdict": "pass"
